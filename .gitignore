@@ -1,0 +1,10 @@
+node_modules
+.env
+dist
+build
+.expo
+archivos.txt
+estructura.txt
+local.txt
+.env.local
+.DS_Store
