@@ -1,0 +1,53 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function operatorRole() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : null;
+    }
+
+    function isAdmin() {
+      return operatorRole() == "admin";
+    }
+
+    function isOperator() {
+      return operatorRole() in ["store", "driver", "admin"];
+    }
+
+    function canReadOrder(order) {
+      return signedIn()
+        && isOperator()
+        && (isAdmin()
+          || order.storeId == request.auth.uid
+          || order.driverId == request.auth.uid);
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /orders/{orderId} {
+      allow read: if canReadOrder(resource.data);
+      allow create, update, delete: if false;
+
+      match /events/{eventId} {
+        allow read: if exists(/databases/$(database)/documents/orders/$(orderId))
+          && canReadOrder(get(/databases/$(database)/documents/orders/$(orderId)).data);
+        allow write: if false;
+      }
+
+      match /incidents/{incidentId} {
+        allow read: if exists(/databases/$(database)/documents/orders/$(orderId))
+          && canReadOrder(get(/databases/$(database)/documents/orders/$(orderId)).data);
+        allow write: if false;
+      }
+    }
+  }
+}
