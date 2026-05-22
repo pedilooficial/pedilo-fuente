@@ -13,7 +13,6 @@ architecture_paths=(
   app/src/main
   app/build.gradle.kts
   functions/src
-  functions/lib
   firestore.rules
   firestore.indexes.json
   README.md
