@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -16,43 +20,84 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+private enum class PublicRoute {
+    Home,
+    Plus,
+    Shop,
+}
+
 @Composable
 fun PublicApp() {
     PublicTheme {
-        PublicRecoveryPlaceholder()
+        var route by remember { mutableStateOf(PublicRoute.Home) }
+
+        when (route) {
+            PublicRoute.Home -> PublicHomeScreen(
+                onHome = { route = PublicRoute.Home },
+                onPlus = { route = PublicRoute.Plus },
+                onShop = { route = PublicRoute.Shop },
+            )
+            PublicRoute.Plus -> PublicPhasePlaceholder(
+                title = "Boton +",
+                body = "Este acceso rapido se construira en una fase posterior.",
+                onHome = { route = PublicRoute.Home },
+                onPlus = { route = PublicRoute.Plus },
+                onShop = { route = PublicRoute.Shop },
+            )
+            PublicRoute.Shop -> PublicPhasePlaceholder(
+                title = "Tienda",
+                body = "La exploracion de categorias se construira en una fase posterior.",
+                onHome = { route = PublicRoute.Home },
+                onPlus = { route = PublicRoute.Plus },
+                onShop = { route = PublicRoute.Shop },
+            )
+        }
     }
 }
 
 @Composable
-private fun PublicRecoveryPlaceholder() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PediloBg)
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+private fun PublicPhasePlaceholder(
+    title: String,
+    body: String,
+    onHome: () -> Unit,
+    onPlus: () -> Unit,
+    onShop: () -> Unit,
+) {
+    PublicShell(
+        current = if (title == "Tienda") PublicBottomDestination.Shop else PublicBottomDestination.Plus,
+        onHome = onHome,
+        onPlus = onPlus,
+        onShop = onShop,
     ) {
-        Text(
-            text = "Pedilo",
-            color = PediloOrange,
-            fontSize = 44.sp,
-            fontWeight = FontWeight.ExtraBold,
-        )
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = "Recuperacion tecnica en curso",
-            color = PediloText,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "La UI publica se reconstruira con componentes reales.",
-            color = PediloMuted,
-            fontSize = 14.sp,
-            textAlign = TextAlign.Center,
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(PediloBg)
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = "Pedilo",
+                color = PediloOrange,
+                fontSize = 44.sp,
+                fontWeight = FontWeight.ExtraBold,
+            )
+            Spacer(Modifier.height(14.dp))
+            Text(
+                text = title,
+                color = PediloText,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = body,
+                color = PediloMuted,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
