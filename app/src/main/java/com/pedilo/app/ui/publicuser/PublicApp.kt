@@ -20,16 +20,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private enum class PublicRoute {
-    Home,
-    Plus,
-    Shop,
+private sealed interface PublicRoute {
+    data object Home : PublicRoute
+    data object Plus : PublicRoute
+    data object Shop : PublicRoute
+    data class ShopSubcategory(val name: String) : PublicRoute
 }
 
 @Composable
 fun PublicApp() {
     PublicTheme {
-        var route by remember { mutableStateOf(PublicRoute.Home) }
+        var route by remember { mutableStateOf<PublicRoute>(PublicRoute.Home) }
 
         when (route) {
             PublicRoute.Home -> PublicHomeScreen(
@@ -45,6 +46,14 @@ fun PublicApp() {
                 onShop = { route = PublicRoute.Shop },
             )
             PublicRoute.Shop -> PublicShopScreen(
+                onHome = { route = PublicRoute.Home },
+                onPlus = { route = PublicRoute.Plus },
+                onShop = { route = PublicRoute.Shop },
+                onSubcategory = { route = PublicRoute.ShopSubcategory(it) },
+            )
+            is PublicRoute.ShopSubcategory -> PublicShopSubcategoryScreen(
+                title = (route as PublicRoute.ShopSubcategory).name,
+                onBack = { route = PublicRoute.Shop },
                 onHome = { route = PublicRoute.Home },
                 onPlus = { route = PublicRoute.Plus },
                 onShop = { route = PublicRoute.Shop },

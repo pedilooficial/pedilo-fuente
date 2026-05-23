@@ -137,6 +137,7 @@ fun PublicShopScreen(
     onHome: () -> Unit,
     onPlus: () -> Unit,
     onShop: () -> Unit,
+    onSubcategory: (String) -> Unit,
 ) {
     var statusMessage by remember { mutableStateOf("Selecciona una categoria para explorar en una fase posterior.") }
 
@@ -158,7 +159,7 @@ fun PublicShopScreen(
             item { ShopSearchCard(onPending = { statusMessage = "El buscador de Tienda se construira en una fase posterior." }) }
             item { TrackingLookupCard(onPending = { statusMessage = "El seguimiento completo se construira en una fase posterior." }) }
             items(shopGroups) { group ->
-                CategoryGroupCard(group = group, onPending = { statusMessage = "La subcategoria ${it.title} se construira en una fase posterior." })
+                CategoryGroupCard(group = group, onPending = { onSubcategory(it.title) })
             }
             item { ShopStatusNote(statusMessage) }
         }
