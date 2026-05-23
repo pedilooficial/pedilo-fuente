@@ -25,6 +25,7 @@ private sealed interface PublicRoute {
     data object Plus : PublicRoute
     data object Shop : PublicRoute
     data class ShopSubcategory(val name: String) : PublicRoute
+    data class ShopSearch(val query: String) : PublicRoute
 }
 
 @Composable
@@ -49,7 +50,15 @@ fun PublicApp() {
                 onHome = { route = PublicRoute.Home },
                 onPlus = { route = PublicRoute.Plus },
                 onShop = { route = PublicRoute.Shop },
+                onSearch = { route = PublicRoute.ShopSearch(it) },
                 onSubcategory = { route = PublicRoute.ShopSubcategory(it) },
+            )
+            is PublicRoute.ShopSearch -> PublicShopSearchScreen(
+                query = (route as PublicRoute.ShopSearch).query,
+                onBack = { route = PublicRoute.Shop },
+                onHome = { route = PublicRoute.Home },
+                onPlus = { route = PublicRoute.Plus },
+                onShop = { route = PublicRoute.Shop },
             )
             is PublicRoute.ShopSubcategory -> PublicShopSubcategoryScreen(
                 title = (route as PublicRoute.ShopSubcategory).name,

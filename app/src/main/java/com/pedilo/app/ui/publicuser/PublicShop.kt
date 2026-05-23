@@ -137,6 +137,7 @@ fun PublicShopScreen(
     onHome: () -> Unit,
     onPlus: () -> Unit,
     onShop: () -> Unit,
+    onSearch: (String) -> Unit,
     onSubcategory: (String) -> Unit,
 ) {
     var statusMessage by remember { mutableStateOf("Selecciona una categoria para explorar en una fase posterior.") }
@@ -156,7 +157,7 @@ fun PublicShopScreen(
             verticalArrangement = Arrangement.spacedBy(11.dp),
         ) {
             item { ShopHeader() }
-            item { ShopSearchCard(onPending = { statusMessage = "El buscador de Tienda se construira en una fase posterior." }) }
+            item { ShopSearchCard(onPending = { onSearch("Pizzas") }) }
             item { TrackingLookupCard(onPending = { statusMessage = "El seguimiento completo se construira en una fase posterior." }) }
             items(shopGroups) { group ->
                 CategoryGroupCard(group = group, onPending = { onSubcategory(it.title) })
@@ -234,6 +235,7 @@ private fun ShopSearchCard(onPending: () -> Unit) {
                 onValueChange = { query = it },
                 textStyle = TextStyle(color = PediloText, fontSize = 13.sp),
                 singleLine = true,
+                enabled = false,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
