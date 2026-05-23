@@ -86,8 +86,8 @@ fun PublicApp() {
                 onSearch = { navigateTo(PublicRoute.ShopSearch("", PublicBottomDestination.Home)) },
             )
             PublicRoute.Plus -> PublicPhasePlaceholder(
-                title = "Boton +",
-                body = "Este acceso rapido se construira en una fase posterior.",
+                title = "Botón +",
+                body = "Este acceso rápido se construirá en una fase posterior.",
                 onHome = { goHome() },
                 onPlus = { navigateTo(PublicRoute.Plus) },
                 onShop = { goShop() },

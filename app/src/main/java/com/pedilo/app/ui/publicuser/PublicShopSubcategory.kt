@@ -46,9 +46,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 private enum class SubcategoryFilter(val label: String) {
-    Nearby("Mas cercanos"),
+    Nearby("Más cercanos"),
     Rated("Mejor puntuados"),
-    Fast("Entrega rapida"),
+    Fast("Entrega rápida"),
 }
 
 private data class RelatedStore(
@@ -63,11 +63,11 @@ private data class RelatedStore(
 )
 
 private val pizzaStores = listOf(
-    RelatedStore("Pizzeria Roma", "Pizza a la piedra", "4.8", "1.245", "0,8 km", "20-30 min", "$1.200", verified = true),
-    RelatedStore("La Esquina Pizzeria", "Pizza al molde y a la piedra", "4.6", "829", "1,2 km", "25-35 min", "$1.300"),
+    RelatedStore("Pizzería Roma", "Pizza a la piedra", "4.8", "1.245", "0,8 km", "20-30 min", "$1.200", verified = true),
+    RelatedStore("La Esquina Pizzería", "Pizza al molde y a la piedra", "4.6", "829", "1,2 km", "25-35 min", "$1.300"),
     RelatedStore("Pizza & Co.", "Pizzas artesanales", "4.7", "1.003", "1,5 km", "30-40 min", "$1.200"),
-    RelatedStore("Don Pietro Pizzeria", "Tradicion italiana desde 1990", "4.6", "743", "1,0 km", "20-30 min", "$1.100"),
-    RelatedStore("Napoli Pizza", "Estilo napolitano autentico", "4.7", "954", "1,3 km", "25-35 min", "$1.200"),
+    RelatedStore("Don Pietro Pizzería", "Tradición italiana desde 1990", "4.6", "743", "1,0 km", "20-30 min", "$1.100"),
+    RelatedStore("Napoli Pizza", "Estilo napolitano auténtico", "4.7", "954", "1,3 km", "25-35 min", "$1.200"),
     RelatedStore("Masa Madre", "Pizzas de horno y focaccias", "4.5", "612", "1,7 km", "30-45 min", "$1.450"),
 )
 
@@ -119,7 +119,7 @@ fun PublicShopSubcategoryScreen(
             items(pizzaStores) { store ->
                 RelatedStoreCard(
                     store = store,
-                    onView = { statusMessage = "Ver local se construira en la fase de Local publico." },
+                    onView = { statusMessage = "Ver local se construirá en la fase de Local público." },
                 )
             }
             item {
@@ -158,7 +158,7 @@ private fun SubcategoryHeader(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "Locales relacionados con esta categoria",
+                text = "Locales relacionados con esta categoría",
                 color = PediloMuted,
                 fontSize = 13.sp,
                 lineHeight = 16.sp,

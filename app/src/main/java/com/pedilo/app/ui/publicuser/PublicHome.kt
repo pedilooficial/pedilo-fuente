@@ -106,8 +106,8 @@ private val quickAccessItems = listOf(
 )
 
 private val offerItems = listOf(
-    OfferItem("Hamburguesas Clasicas", "Burger House", "$4.990", "$6.290", "-20%", PediloIconKind.Cart),
-    OfferItem("Pizzas Seleccionadas", "Pizzeria Roma", "$5.990", "$7.990", "-15%", PediloIconKind.Tag),
+    OfferItem("Hamburguesas Clásicas", "Burger House", "$4.990", "$6.290", "-20%", PediloIconKind.Cart),
+    OfferItem("Pizzas Seleccionadas", "Pizzería Roma", "$5.990", "$7.990", "-15%", PediloIconKind.Tag),
     OfferItem("Empanadas x 6", "La Criolla", "$3.590", "$3.990", "-10%", PediloIconKind.Tag),
     OfferItem("Jugos Naturales", "Fruta Viva", "$2.240", "$2.990", "-25%", PediloIconKind.Bottle),
 )
