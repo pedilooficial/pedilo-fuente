@@ -76,7 +76,6 @@ private val pizzaSearchStores = listOf(
 @Composable
 fun PublicShopSearchScreen(
     query: String,
-    onBack: () -> Unit,
     onHome: () -> Unit,
     onPlus: () -> Unit,
     onShop: () -> Unit,
@@ -102,7 +101,6 @@ fun PublicShopSearchScreen(
             item {
                 SearchHeader(
                     query = activeQuery,
-                    onBack = onBack,
                 )
             }
             item {
@@ -153,22 +151,11 @@ fun PublicShopSearchScreen(
 @Composable
 private fun SearchHeader(
     query: String,
-    onBack: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clickable(role = Role.Button, onClick = onBack)
-                .semantics { contentDescription = "Volver a Tienda" },
-            contentAlignment = Alignment.Center,
-        ) {
-            SearchIcon(SearchIconKind.Back, tint = PediloText, modifier = Modifier.size(30.dp))
-        }
-        Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "Resultado: ${query.ifBlank { "Pizzas" }}",
@@ -360,7 +347,6 @@ private fun SearchStoreThumbnail(store: SearchStore) {
 }
 
 private enum class SearchIconKind {
-    Back,
     Search,
     Close,
     Star,
@@ -377,11 +363,6 @@ private fun SearchIcon(
     Canvas(modifier = modifier) {
         val stroke = Stroke(width = size.minDimension * 0.1f, cap = StrokeCap.Round)
         when (kind) {
-            SearchIconKind.Back -> {
-                drawLine(tint, Offset(size.width * 0.75f, size.height * 0.5f), Offset(size.width * 0.25f, size.height * 0.5f), strokeWidth = stroke.width, cap = StrokeCap.Round)
-                drawLine(tint, Offset(size.width * 0.25f, size.height * 0.5f), Offset(size.width * 0.45f, size.height * 0.28f), strokeWidth = stroke.width, cap = StrokeCap.Round)
-                drawLine(tint, Offset(size.width * 0.25f, size.height * 0.5f), Offset(size.width * 0.45f, size.height * 0.72f), strokeWidth = stroke.width, cap = StrokeCap.Round)
-            }
             SearchIconKind.Search -> {
                 drawCircle(tint, size.minDimension * 0.28f, Offset(size.width * 0.42f, size.height * 0.42f), style = stroke)
                 drawLine(tint, Offset(size.width * 0.62f, size.height * 0.62f), Offset(size.width * 0.82f, size.height * 0.82f), strokeWidth = stroke.width, cap = StrokeCap.Round)

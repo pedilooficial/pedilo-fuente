@@ -1,5 +1,7 @@
 package com.pedilo.app.ui.publicuser
 
+import android.app.Activity
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -7,12 +9,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -31,41 +37,99 @@ private sealed interface PublicRoute {
 @Composable
 fun PublicApp() {
     PublicTheme {
+        val activity = LocalContext.current as? Activity
         var route by remember { mutableStateOf<PublicRoute>(PublicRoute.Home) }
+        val history = remember { mutableStateListOf<PublicRoute>() }
+        var showExitConfirmation by remember { mutableStateOf(false) }
+
+        fun navigateTo(next: PublicRoute) {
+            if (route != next) {
+                history.add(route)
+                route = next
+            }
+        }
+
+        fun goHome() {
+            history.clear()
+            route = PublicRoute.Home
+            showExitConfirmation = false
+        }
+
+        fun goShop() {
+            history.clear()
+            route = PublicRoute.Shop
+            showExitConfirmation = false
+        }
+
+        fun handleNativeBack() {
+            if (history.isNotEmpty()) {
+                route = history.removeAt(history.lastIndex)
+                showExitConfirmation = false
+            } else if (route != PublicRoute.Home) {
+                route = PublicRoute.Home
+                showExitConfirmation = false
+            } else {
+                showExitConfirmation = true
+            }
+        }
+
+        BackHandler {
+            handleNativeBack()
+        }
 
         when (route) {
             PublicRoute.Home -> PublicHomeScreen(
-                onHome = { route = PublicRoute.Home },
-                onPlus = { route = PublicRoute.Plus },
-                onShop = { route = PublicRoute.Shop },
+                onHome = { goHome() },
+                onPlus = { navigateTo(PublicRoute.Plus) },
+                onShop = { goShop() },
             )
             PublicRoute.Plus -> PublicPhasePlaceholder(
                 title = "Boton +",
                 body = "Este acceso rapido se construira en una fase posterior.",
-                onHome = { route = PublicRoute.Home },
-                onPlus = { route = PublicRoute.Plus },
-                onShop = { route = PublicRoute.Shop },
+                onHome = { goHome() },
+                onPlus = { navigateTo(PublicRoute.Plus) },
+                onShop = { goShop() },
             )
             PublicRoute.Shop -> PublicShopScreen(
-                onHome = { route = PublicRoute.Home },
-                onPlus = { route = PublicRoute.Plus },
-                onShop = { route = PublicRoute.Shop },
-                onSearch = { route = PublicRoute.ShopSearch(it) },
-                onSubcategory = { route = PublicRoute.ShopSubcategory(it) },
+                onHome = { goHome() },
+                onPlus = { navigateTo(PublicRoute.Plus) },
+                onShop = { goShop() },
+                onSearch = { navigateTo(PublicRoute.ShopSearch(it)) },
+                onSubcategory = { navigateTo(PublicRoute.ShopSubcategory(it)) },
             )
             is PublicRoute.ShopSearch -> PublicShopSearchScreen(
                 query = (route as PublicRoute.ShopSearch).query,
-                onBack = { route = PublicRoute.Shop },
-                onHome = { route = PublicRoute.Home },
-                onPlus = { route = PublicRoute.Plus },
-                onShop = { route = PublicRoute.Shop },
+                onHome = { goHome() },
+                onPlus = { navigateTo(PublicRoute.Plus) },
+                onShop = { goShop() },
             )
             is PublicRoute.ShopSubcategory -> PublicShopSubcategoryScreen(
                 title = (route as PublicRoute.ShopSubcategory).name,
-                onBack = { route = PublicRoute.Shop },
-                onHome = { route = PublicRoute.Home },
-                onPlus = { route = PublicRoute.Plus },
-                onShop = { route = PublicRoute.Shop },
+                onHome = { goHome() },
+                onPlus = { navigateTo(PublicRoute.Plus) },
+                onShop = { goShop() },
+            )
+        }
+
+        if (showExitConfirmation) {
+            AlertDialog(
+                onDismissRequest = { showExitConfirmation = false },
+                title = {
+                    Text("Salir de Pedilo")
+                },
+                text = {
+                    Text("Queres cerrar la app?")
+                },
+                confirmButton = {
+                    TextButton(onClick = { activity?.finish() }) {
+                        Text("Salir")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showExitConfirmation = false }) {
+                        Text("Seguir")
+                    }
+                },
             )
         }
     }

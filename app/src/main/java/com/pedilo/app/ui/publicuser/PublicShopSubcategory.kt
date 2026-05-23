@@ -74,7 +74,6 @@ private val pizzaStores = listOf(
 @Composable
 fun PublicShopSubcategoryScreen(
     title: String,
-    onBack: () -> Unit,
     onHome: () -> Unit,
     onPlus: () -> Unit,
     onShop: () -> Unit,
@@ -99,7 +98,6 @@ fun PublicShopSubcategoryScreen(
             item {
                 SubcategoryHeader(
                     title = title,
-                    onBack = onBack,
                 )
             }
             item {
@@ -144,22 +142,11 @@ fun PublicShopSubcategoryScreen(
 @Composable
 private fun SubcategoryHeader(
     title: String,
-    onBack: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clickable(role = Role.Button, onClick = onBack)
-                .semantics { contentDescription = "Volver a Tienda" },
-            contentAlignment = Alignment.Center,
-        ) {
-            SubcategoryIcon(SubcategoryIconKind.Back, tint = PediloText, modifier = Modifier.size(30.dp))
-        }
-        Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
@@ -325,7 +312,6 @@ private fun VerifiedBadge() {
 }
 
 private enum class SubcategoryIconKind {
-    Back,
     Star,
     Pin,
     Clock,
@@ -344,11 +330,6 @@ private fun SubcategoryIcon(
     Canvas(modifier = modifier) {
         val stroke = Stroke(width = size.minDimension * 0.1f, cap = StrokeCap.Round)
         when (kind) {
-            SubcategoryIconKind.Back -> {
-                drawLine(tint, Offset(size.width * 0.75f, size.height * 0.5f), Offset(size.width * 0.25f, size.height * 0.5f), strokeWidth = stroke.width, cap = StrokeCap.Round)
-                drawLine(tint, Offset(size.width * 0.25f, size.height * 0.5f), Offset(size.width * 0.45f, size.height * 0.28f), strokeWidth = stroke.width, cap = StrokeCap.Round)
-                drawLine(tint, Offset(size.width * 0.25f, size.height * 0.5f), Offset(size.width * 0.45f, size.height * 0.72f), strokeWidth = stroke.width, cap = StrokeCap.Round)
-            }
             SubcategoryIconKind.Star -> {
                 val star = Path().apply {
                     moveTo(size.width * 0.5f, size.height * 0.16f)
