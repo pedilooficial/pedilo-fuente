@@ -124,6 +124,7 @@ fun PublicHomeScreen(
     onHome: () -> Unit,
     onPlus: () -> Unit,
     onShop: () -> Unit,
+    onSearch: () -> Unit,
 ) {
     PublicShell(
         current = PublicBottomDestination.Home,
@@ -140,7 +141,7 @@ fun PublicHomeScreen(
             verticalArrangement = Arrangement.spacedBy(11.dp),
         ) {
             item { PublicHeader() }
-            item { SearchBlock() }
+            item { SearchBlock(onSearch = onSearch) }
             item { QuickAccessSection() }
             item { OffersSection() }
             item { LocalsSection() }
@@ -213,7 +214,7 @@ private fun PublicHeader() {
 }
 
 @Composable
-private fun SearchBlock() {
+private fun SearchBlock(onSearch: () -> Unit) {
     SurfacePanel {
         Text(
             text = "Que necesitas?",
@@ -225,40 +226,32 @@ private fun SearchBlock() {
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(10.dp))
-        SearchInput()
+        SearchInput(onSearch = onSearch)
     }
 }
 
 @Composable
-private fun SearchInput() {
-    var query by remember { mutableStateOf("") }
+private fun SearchInput(onSearch: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(48.dp)
             .background(PediloPanelSoft, RoundedCornerShape(12.dp))
             .border(1.dp, PediloLine, RoundedCornerShape(12.dp))
+            .clickable(role = Role.Button, onClick = onSearch)
+            .semantics { contentDescription = "Buscar desde Home" }
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         PediloLineIcon(PediloIconKind.Search, tint = PediloMuted, modifier = Modifier.size(24.dp))
         Spacer(Modifier.width(10.dp))
         Box(modifier = Modifier.weight(1f)) {
-            if (query.isEmpty()) {
-                Text(
-                    text = "Buscar productos, locales o categorias...",
-                    color = PediloMuted,
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            BasicTextField(
-                value = query,
-                onValueChange = { query = it },
-                textStyle = TextStyle(color = PediloText, fontSize = 13.sp),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+            Text(
+                text = "Buscar productos, locales o categorías...",
+                color = PediloMuted,
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

@@ -31,7 +31,8 @@ private sealed interface PublicRoute {
     data object Plus : PublicRoute
     data object Shop : PublicRoute
     data class ShopSubcategory(val name: String) : PublicRoute
-    data class ShopSearch(val query: String) : PublicRoute
+    data class ShopSearch(val query: String, val origin: PublicBottomDestination) : PublicRoute
+    data class ShopTracking(val orderNumber: String) : PublicRoute
 }
 
 @Composable
@@ -82,6 +83,7 @@ fun PublicApp() {
                 onHome = { goHome() },
                 onPlus = { navigateTo(PublicRoute.Plus) },
                 onShop = { goShop() },
+                onSearch = { navigateTo(PublicRoute.ShopSearch("", PublicBottomDestination.Home)) },
             )
             PublicRoute.Plus -> PublicPhasePlaceholder(
                 title = "Boton +",
@@ -94,17 +96,25 @@ fun PublicApp() {
                 onHome = { goHome() },
                 onPlus = { navigateTo(PublicRoute.Plus) },
                 onShop = { goShop() },
-                onSearch = { navigateTo(PublicRoute.ShopSearch(it)) },
+                onSearch = { navigateTo(PublicRoute.ShopSearch(it, PublicBottomDestination.Shop)) },
+                onTracking = { navigateTo(PublicRoute.ShopTracking(it)) },
                 onSubcategory = { navigateTo(PublicRoute.ShopSubcategory(it)) },
             )
             is PublicRoute.ShopSearch -> PublicShopSearchScreen(
                 query = (route as PublicRoute.ShopSearch).query,
+                current = (route as PublicRoute.ShopSearch).origin,
                 onHome = { goHome() },
                 onPlus = { navigateTo(PublicRoute.Plus) },
                 onShop = { goShop() },
             )
             is PublicRoute.ShopSubcategory -> PublicShopSubcategoryScreen(
                 title = (route as PublicRoute.ShopSubcategory).name,
+                onHome = { goHome() },
+                onPlus = { navigateTo(PublicRoute.Plus) },
+                onShop = { goShop() },
+            )
+            is PublicRoute.ShopTracking -> PublicShopTrackingScreen(
+                orderNumber = (route as PublicRoute.ShopTracking).orderNumber,
                 onHome = { goHome() },
                 onPlus = { navigateTo(PublicRoute.Plus) },
                 onShop = { goShop() },

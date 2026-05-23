@@ -48,9 +48,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 private enum class SearchFilter(val label: String) {
-    Nearby("Mas cercanos"),
+    Nearby("Más cercanos"),
     Rated("Mejor puntuados"),
-    Fast("Entrega rapida"),
+    Fast("Entrega rápida"),
 }
 
 private data class SearchStore(
@@ -65,27 +65,29 @@ private data class SearchStore(
 )
 
 private val pizzaSearchStores = listOf(
-    SearchStore("Pizzeria Roma", "Pizza a la piedra", "4.6", "2.451", "0.8 km", "20-30 min", "$1200", "10% OFF"),
-    SearchStore("La Esquina Pizzeria", "Pizza al molde y a la piedra", "4.6", "820", "1.2 km", "25-35 min", "$1300"),
+    SearchStore("Pizzería Roma", "Pizza a la piedra", "4.6", "2.451", "0.8 km", "20-30 min", "$1200", "10% OFF"),
+    SearchStore("La Esquina Pizzería", "Pizza al molde y a la piedra", "4.6", "820", "1.2 km", "25-35 min", "$1300"),
     SearchStore("Pizza & Co.", "Pizzas artesanales", "4.7", "1.050", "1.5 km", "30-40 min", "$1200"),
-    SearchStore("Don Pietro Pizzeria", "Tradicion italiana desde 1990", "4.5", "743", "1.0 km", "20-30 min", "$1.100"),
-    SearchStore("Napoli Pizza", "Estilo napolitano autentico", "4.7", "591", "1.3 km", "25-35 min", "$1200", "TOP"),
+    SearchStore("Don Pietro Pizzería", "Tradición italiana desde 1990", "4.5", "743", "1.0 km", "20-30 min", "$1.100"),
+    SearchStore("Napoli Pizza", "Estilo napolitano auténtico", "4.7", "591", "1.3 km", "25-35 min", "$1200", "TOP"),
     SearchStore("La Nonna Pizzas", "Recetas caseras desde 1985", "4.4", "612", "1.8 km", "30-45 min", "$1.350"),
 )
 
 @Composable
 fun PublicShopSearchScreen(
     query: String,
+    current: PublicBottomDestination = PublicBottomDestination.Shop,
     onHome: () -> Unit,
     onPlus: () -> Unit,
     onShop: () -> Unit,
 ) {
     var selectedFilter by remember { mutableStateOf(SearchFilter.Nearby) }
     var activeQuery by remember(query) { mutableStateOf(query) }
-    var statusMessage by remember { mutableStateOf("Los resultados usan datos locales de muestra.") }
+    var statusMessage by remember { mutableStateOf("Escribí para ver resultados relacionados.") }
+    val hasQuery = activeQuery.isNotBlank()
 
     PublicShell(
-        current = PublicBottomDestination.Shop,
+        current = current,
         onHome = onHome,
         onPlus = onPlus,
         onShop = onShop,
@@ -108,28 +110,39 @@ fun PublicShopSearchScreen(
                     query = activeQuery,
                     onQueryChange = {
                         activeQuery = it
-                        statusMessage = "Busqueda local actualizada."
+                        statusMessage = if (it.isBlank()) "Escribí para ver resultados relacionados." else "Resultados locales para ${it.trim()}."
                     },
                     onClear = {
                         activeQuery = ""
-                        statusMessage = "Busqueda local limpiada."
+                        statusMessage = "Escribí para ver resultados relacionados."
                     },
                 )
             }
-            item {
-                SearchFilterRow(
-                    selected = selectedFilter,
-                    onSelected = {
-                        selectedFilter = it
-                        statusMessage = "Filtro ${it.label} aplicado localmente."
-                    },
-                )
-            }
-            items(pizzaSearchStores) { store ->
-                SearchResultCard(
-                    store = store,
-                    onView = { statusMessage = "Ver local se construira en la fase de Local publico." },
-                )
+            if (hasQuery) {
+                item {
+                    SearchFilterRow(
+                        selected = selectedFilter,
+                        onSelected = {
+                            selectedFilter = it
+                            statusMessage = "Filtro ${it.label} aplicado localmente."
+                        },
+                    )
+                }
+                items(pizzaSearchStores) { store ->
+                    SearchResultCard(
+                        store = store,
+                        onView = { statusMessage = "Ver local se construirá en la fase de Local público." },
+                    )
+                }
+            } else {
+                item {
+                    SearchEmptyState(
+                        onSuggestion = {
+                            activeQuery = it
+                            statusMessage = "Resultados locales para $it."
+                        },
+                    )
+                }
             }
             item {
                 Text(
@@ -152,13 +165,14 @@ fun PublicShopSearchScreen(
 private fun SearchHeader(
     query: String,
 ) {
+    val hasQuery = query.isNotBlank()
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Resultado: ${query.ifBlank { "Pizzas" }}",
+                text = if (hasQuery) "Resultado: ${query.trim()}" else "Buscar en Pedilo",
                 color = PediloText,
                 fontSize = 24.sp,
                 lineHeight = 27.sp,
@@ -167,7 +181,7 @@ private fun SearchHeader(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "Locales relacionados con tu busqueda",
+                text = if (hasQuery) "Locales relacionados con tu búsqueda" else "Buscá productos, locales o categorías",
                 color = PediloMuted,
                 fontSize = 13.sp,
                 maxLines = 1,
@@ -201,6 +215,18 @@ private fun ActiveSearchBox(
             textStyle = TextStyle(color = PediloText, fontSize = 18.sp, fontWeight = FontWeight.SemiBold),
             singleLine = true,
             modifier = Modifier.weight(1f),
+            decorationBox = { innerTextField ->
+                if (query.isEmpty()) {
+                    Text(
+                        text = "Qué estás buscando?",
+                        color = PediloMuted,
+                        fontSize = 18.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                innerTextField()
+            },
         )
         Spacer(Modifier.width(10.dp))
         Box(
@@ -211,6 +237,59 @@ private fun ActiveSearchBox(
             contentAlignment = Alignment.Center,
         ) {
             SearchIcon(SearchIconKind.Close, tint = PediloText, modifier = Modifier.size(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun SearchEmptyState(
+    onSuggestion: (String) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(PediloOverlay, RoundedCornerShape(14.dp))
+            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .padding(16.dp),
+    ) {
+        Text(
+            text = "Buscá productos, locales o categorías",
+            color = PediloText,
+            fontSize = 19.sp,
+            lineHeight = 22.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "Escribí una palabra para ver locales relacionados. La búsqueda de esta fase usa datos locales de muestra.",
+            color = PediloMuted,
+            fontSize = 13.sp,
+            lineHeight = 17.sp,
+        )
+        Spacer(Modifier.height(14.dp))
+        Text("Sugerencias populares", color = PediloMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(8.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(
+                listOf("Pizzas", "Hamburguesas"),
+                listOf("Heladería", "Farmacia"),
+            ).forEach { rowSuggestions ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    rowSuggestions.forEach { suggestion ->
+                        Box(
+                            modifier = Modifier
+                                .height(36.dp)
+                                .background(PediloPanel, RoundedCornerShape(18.dp))
+                                .border(1.dp, PediloLine, RoundedCornerShape(18.dp))
+                                .clickable(role = Role.Button) { onSuggestion(suggestion) }
+                                .padding(horizontal = 12.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(suggestion, color = PediloText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
         }
     }
 }

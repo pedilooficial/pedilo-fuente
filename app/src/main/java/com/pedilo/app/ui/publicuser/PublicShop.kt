@@ -112,7 +112,7 @@ private val shopGroups = listOf(
         icon = ShopIconKind.Cake,
         accent = PediloPink,
         items = listOf(
-            ShopCategoryItem("Heladeria", ShopIconKind.Cake, isNew = true),
+            ShopCategoryItem("Heladería", ShopIconKind.Cake, isNew = true),
             ShopCategoryItem("Panaderia", ShopIconKind.Sandwich),
             ShopCategoryItem("Cafeteria", ShopIconKind.Coffee),
             ShopCategoryItem("Especialidades", ShopIconKind.Cake),
@@ -138,6 +138,7 @@ fun PublicShopScreen(
     onPlus: () -> Unit,
     onShop: () -> Unit,
     onSearch: (String) -> Unit,
+    onTracking: (String) -> Unit,
     onSubcategory: (String) -> Unit,
 ) {
     var statusMessage by remember { mutableStateOf("Selecciona una categoria para explorar en una fase posterior.") }
@@ -157,8 +158,8 @@ fun PublicShopScreen(
             verticalArrangement = Arrangement.spacedBy(11.dp),
         ) {
             item { ShopHeader() }
-            item { ShopSearchCard(onPending = { onSearch("Pizzas") }) }
-            item { TrackingLookupCard(onPending = { statusMessage = "El seguimiento completo se construira en una fase posterior." }) }
+            item { ShopSearchCard(onPending = { onSearch("") }) }
+            item { TrackingLookupCard(onPending = { onTracking(it) }) }
             items(shopGroups) { group ->
                 CategoryGroupCard(group = group, onPending = { onSubcategory(it.title) })
             }
@@ -185,7 +186,7 @@ private fun ShopHeader() {
                 fontWeight = FontWeight.ExtraBold,
             )
             Text(
-                text = "Explora categorias, locales y productos",
+                text = "Explora categorías, locales y productos",
                 color = PediloText,
                 fontSize = 12.sp,
                 maxLines = 1,
@@ -223,7 +224,7 @@ private fun ShopSearchCard(onPending: () -> Unit) {
         Box(modifier = Modifier.weight(1f)) {
             if (query.isEmpty()) {
                 Text(
-                    text = "Buscar productos, locales o categorias...",
+                    text = "Buscar productos, locales o categorías...",
                     color = PediloMuted,
                     fontSize = 13.sp,
                     maxLines = 1,
@@ -243,8 +244,8 @@ private fun ShopSearchCard(onPending: () -> Unit) {
 }
 
 @Composable
-private fun TrackingLookupCard(onPending: () -> Unit) {
-    var code by remember { mutableStateOf("") }
+private fun TrackingLookupCard(onPending: (String) -> Unit) {
+    var code by remember { mutableStateOf("PDL-123456") }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -288,7 +289,7 @@ private fun TrackingLookupCard(onPending: () -> Unit) {
                     .height(40.dp)
                     .width(90.dp)
                     .background(Brush.verticalGradient(listOf(PediloOrangeSoft, PediloOrange)), RoundedCornerShape(10.dp))
-                    .clickable(role = Role.Button, onClick = onPending),
+                    .clickable(role = Role.Button, onClick = { onPending(code.ifBlank { "PDL-123456" }) }),
                 contentAlignment = Alignment.Center,
             ) {
                 Text("Consultar", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
