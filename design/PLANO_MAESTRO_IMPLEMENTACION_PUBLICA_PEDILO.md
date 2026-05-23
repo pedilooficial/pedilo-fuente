@@ -22,10 +22,10 @@ La app pública debe construirse siguiendo:
 
 Las imágenes aprobadas son el plano visual y estructural de la app pública.
 
-No son inspiración.  
-No son referencia flexible.  
-No son moodboard.  
-No son sugerencia estética.  
+No son inspiración.
+No son referencia flexible.
+No son moodboard.
+No son sugerencia estética.
 No son “algo parecido”.
 
 Son contrato visual obligatorio.
@@ -44,8 +44,8 @@ Codex debe construir una app real en Kotlin + Jetpack Compose que respete las im
 - cortes de navegación
 - pantallas finales de cada flujo
 
-El resultado no debe ser una app genérica.  
-El resultado no debe parecer un esqueleto Compose.  
+El resultado no debe ser una app genérica.
+El resultado no debe parecer un esqueleto Compose.
 El resultado no debe parecer una tabla, formulario básico o maqueta sin diseño.
 
 El resultado debe sentirse como una app pública real de Pédilo.
@@ -100,18 +100,27 @@ Lo correcto es construir pantallas reales en Compose usando las imágenes como p
 
 # 3. Estado del proyecto
 
-El proyecto fue vaciado para construir desde cero.
+El trabajo actual está organizado sobre la carpeta `design/`, con referencias visuales limpias, documentos maestros, specs por pantalla y flujos separados.
 
-No se debe restaurar UI vieja.  
-No se debe recrear arquitectura vieja.  
-No se debe traer roles anteriores.  
+No se debe restaurar UI vieja.
+No se debe recrear arquitectura vieja.
+No se debe traer roles anteriores.
 No se debe reconstruir Admin, Store ni Driver en esta etapa.
 
-En esta etapa se construye solamente:
+En esta etapa se trabaja solamente:
 
 **USUARIO PÚBLICO PÉDILO**
 
 El núcleo/core real, backend, Firebase, WhatsApp, métricas reales, pagos reales, roles internos y tracking persistente quedan para una etapa posterior.
+
+Estado técnico seguro registrado:
+
+```text
+d452d79 Recover clean architecture and remove mockup-runtime UI
+a719d1e Build real public Home in Compose
+```
+
+Tienda principal fue construida por Codex, pero antes de avanzar debe revisarse visualmente y decidir si se acepta, ajusta o rechaza.
 
 ---
 
@@ -178,31 +187,94 @@ La app debe compilar y generar APK debug.
 
 # 6. Mapa de carpetas de diseño
 
-Las referencias visuales están organizadas en:
+Las referencias visuales y documentos de control están organizados así:
 
 ```text
 design/
-  Splash/
+  00-master/
+  01-screens/
+  02-flows/
   public-user-approved-mockups/
-6.1 Splash
-design/Splash/logopedilo.png
-design/Splash/splash.png
+  Splash/
+  README.md
+  PLANO_MAESTRO_IMPLEMENTACION_PUBLICA_PEDILO.md
+```
 
-logopedilo.png representa el logo principal de Pédilo.
-Debe usarse como identidad visual y como base del ícono instalado.
+## 6.1 Documentos maestros
 
-splash.png representa la secuencia visual deseada de apertura.
+```text
+design/00-master/
+  00-estado-actual.md
+  01-reglas-globales.md
+  02-mapa-de-fases.md
+  03-criterios-validacion.md
+  04-plantilla-fase-codex.md
+  05-revision-visual-pendiente.md
+  06-indice-visual-aprobado.md
+  07-prompt-retoma-codex.md
+```
 
-6.2 Mockups públicos
+## 6.2 Specs por pantalla
+
+```text
+design/01-screens/
+  home/
+  tienda-principal/
+  tienda-buscador/
+  tienda-seguimiento/
+  tienda-subcategoria/
+  convenciones/
+  boton-mas/
+  local-publico/
+  splash/
+```
+
+## 6.3 Flujos separados
+
+```text
+design/02-flows/
+```
+
+## 6.4 Splash
+
+```text
+design/Splash/
+  1-splash.png
+  logo-instal.png
+  splash.png
+```
+
+Interpretación:
+
+```text
+1-splash.png      → pantalla vertical final del splash / inicio visual
+logo-instal.png   → logo/icono instalado o marca puntual
+splash.png        → lámina explicativa del flujo visual del splash
+```
+
+Reglas:
+
+- no usar versiones viejas del logo;
+- no cortar el logo;
+- no deformar el logo;
+- no usar el splash como screenshot runtime pegado;
+- construir splash real en Compose/Android usando la referencia como plano.
+
+## 6.5 Mockups públicos aprobados
 
 Carpetas internas esperadas:
 
+```text
 design/public-user-approved-mockups/home/
-design/public-user-approved-mockups/boton_mas/
-design/public-user-approved-mockups/locla/
 design/public-user-approved-mockups/tienda/
+design/public-user-approved-mockups/convenciones/
+design/public-user-approved-mockups/boton_mas/
+design/public-user-approved-mockups/local/
+```
 
-Nota: si la carpeta aparece como locla, respetar ese nombre real del proyecto. No corregirlo silenciosamente si ya existe así.
+No usar la carpeta vieja `locla/` como referencia nueva.
+Si existiera por historial, debe considerarse legado y no fuente principal.
+
 
 7. Contrato visual global
 
@@ -263,21 +335,20 @@ Cada flujo debe construirse respetando su rootline.
 9.1 Home principal
 Splash → Home público
 9.2 Buscador de intención desde Home
-Home → tocar buscador → escribir intención → resultado relacionado → locales/producto según lámina
+Home → tocar buscador → escribir intención → resultado relacionado → locales relacionados
 
-Este flujo sigue la imagen 02-buscador_de_intención.png.
+Este flujo sigue `design/public-user-approved-mockups/home/02-home-buscador.png`.
 
 9.3 Acceso rápido
-Home → tocar acceso rápido → recorrido aprobado → producto
+Home → tocar acceso rápido → locales relacionados
 
-Termina donde indica la referencia.
-No extender a carrito si la lámina no lo hace.
+Corte obligatorio: termina en resultados/locales relacionados.
+No abrir local si la fase actual no lo autoriza.
 
 9.4 Ofertas
-Home → tocar oferta → recorrido aprobado → producto
+Home → tocar oferta o sección Ofertas → ofertas/locales relacionados
 
-Termina en producto.
-No extender a carrito, checkout o ticket si la referencia no lo indica.
+Corte obligatorio: no abrir producto, local, carrito, checkout ni ticket en la pantalla de Ofertas.
 
 9.5 Local
 Entrada hacia local → pantalla de local → productos destacados / menú
@@ -285,7 +356,7 @@ Entrada hacia local → pantalla de local → productos destacados / menú
 Local es una pantalla homogénea y única.
 
 9.6 Pedido desde local
-Local → producto → carrito/pedido del local → datos → confirmación/ticket según referencia
+Local → producto → carrito/pedido del local → datos → confirmación → ticket/seguimiento común
 
 Regla central: el carrito pertenece a un solo local.
 
@@ -295,8 +366,8 @@ Home → Convenciones / más → pantalla Convenciones
 Desde Convenciones salen tres caminos:
 
 Convenciones → Información del día → leer → volver
-Convenciones → Reclamo → completar reclamo → enviar → confirmación simple
-Convenciones → Seguimiento → ingresar número → seguimiento público
+Convenciones → Reclamo → completar reclamo → enviar aviso/registro
+Convenciones → Seguimiento → ingresar número → seguimiento público común
 9.8 Botón +
 Home / barra inferior → + → elegir Comprar o Retiro/Envío
 9.9 Comprar desde +
@@ -304,7 +375,7 @@ Home / barra inferior → + → elegir Comprar o Retiro/Envío
 9.10 Retiro / Envío desde +
 + → Retiro/Envío → datos de retiro → pago/monto si corresponde → descripción → datos comunes → confirmar
 9.11 Confirmación común
-Comprar o Retiro/Envío → Confirmación → Pedido recibido → Ticket → Seguimiento
+Comprar o Retiro/Envío → Confirmación → Pedido recibido / Ticket → Seguimiento común
 
 Comprar y Retiro/Envío convergen en confirmación.
 
@@ -389,7 +460,7 @@ Pedido desde local no es compra directa.
 
 Referencia:
 
-design/Splash/logopedilo.png
+design/Splash/logo-instal.png
 design/Splash/splash.png
 
 Construir:
@@ -445,7 +516,7 @@ Si parece una lista básica, está mal.
 
 Referencia:
 
-design/public-user-approved-mockups/home/02-buscador_de_intención.png
+design/public-user-approved-mockups/home/02-home-buscador.png
 
 Construir:
 
@@ -469,7 +540,7 @@ Debe mantener el mismo sistema visual de la lámina y cortar donde corresponde.
 
 Referencia:
 
-design/public-user-approved-mockups/home/03-acceso_rapido.png
+design/public-user-approved-mockups/home/03-home-acceso-rapido.png
 
 Construir:
 
@@ -491,7 +562,7 @@ Debe verse como parte del mismo sistema del Home y del buscador.
 
 Referencia:
 
-design/public-user-approved-mockups/home/04-ofertas.png
+design/public-user-approved-mockups/home/04-home-ofertas.png
 
 Construir:
 
@@ -512,7 +583,7 @@ Oferta debe actuar como entrada directa al recorrido aprobado.
 
 Referencia:
 
-design/public-user-approved-mockups/locla/05.0-local.png
+design/public-user-approved-mockups/local/05.0-local.png
 
 Construir:
 
@@ -546,7 +617,7 @@ Debe ser un local homogéneo, único y alineado a la referencia.
 
 Referencia:
 
-design/public-user-approved-mockups/locla/05.1-Pedido_de_local.png
+design/public-user-approved-mockups/local/05.1-local-producto.png
 
 Construir:
 
@@ -573,7 +644,7 @@ multi-local
 
 Referencia:
 
-design/public-user-approved-mockups/home/06.0-convenciones_reclamos.png
+design/public-user-approved-mockups/convenciones/06.1-convenciones-reclamo.png
 
 Construir:
 
@@ -597,7 +668,7 @@ backend real
 
 Referencia:
 
-design/public-user-approved-mockups/home/06.1-convenciones_seguimiento.png
+design/public-user-approved-mockups/convenciones/06.2-convenciones-seguimiento.png
 
 Construir:
 
@@ -621,7 +692,7 @@ datos internos
 
 Referencia:
 
-design/public-user-approved-mockups/home/06.2-convenciones_informacion.png
+design/public-user-approved-mockups/convenciones/06.3-convenciones-informacion.png
 
 Construir:
 
@@ -643,7 +714,7 @@ El usuario entra, lee información pública de Pédilo y vuelve.
 
 Referencia:
 
-design/public-user-approved-mockups/boton_mas/07.0-botonmas_comprar.png
+design/public-user-approved-mockups/boton_mas/07.1-botonmas-comprar.png
 
 Construir:
 
@@ -664,7 +735,7 @@ pedido antes de confirmar
 
 Referencia:
 
-design/public-user-approved-mockups/boton_mas/07.1-botonmas_retirar.png
+design/public-user-approved-mockups/boton_mas/07.2-botonmas-retiro-envio.png
 
 Construir:
 
@@ -685,7 +756,7 @@ compra directa
 
 Referencia:
 
-design/public-user-approved-mockups/boton_mas/07.2-botonmas_confirmar.png
+design/public-user-approved-mockups/boton_mas/07.3-botonmas-confirmacion.png
 
 Construir:
 
@@ -1023,3 +1094,92 @@ El resultado esperado es:
 App pública Pédilo construida desde cero, visualmente fiel al plano aprobado, navegable, con datos mock, sin backend, sin roles internos, sin lógica productiva real y preparada para integrar core en una etapa posterior.
 
 No se acepta menos que el plano.
+---
+
+# 23. Índice visual aprobado vigente
+
+Este bloque es la fuente rápida de rutas visuales aprobadas.
+Debe coincidir con `design/00-master/06-indice-visual-aprobado.md`.
+
+## 23.1 Splash
+
+```text
+design/Splash/
+  1-splash.png
+  logo-instal.png
+  splash.png
+```
+
+## 23.2 Home
+
+```text
+design/public-user-approved-mockups/home/
+  01-home.png
+  02-home-buscador.png
+  03-home-acceso-rapido.png
+  04-home-ofertas.png
+  09-home-nuevos-locales.png
+```
+
+## 23.3 Tienda
+
+```text
+design/public-user-approved-mockups/tienda/
+  08.0-tienda.png
+  08.1-tienda-buscador.png
+  08.2-tienda-seguimiento.png
+  08.3-tienda-subcategoria.png
+```
+
+## 23.4 Convenciones
+
+```text
+design/public-user-approved-mockups/convenciones/
+  06.0-convenciones.png
+  06.1-convenciones-reclamo.png
+  06.2-convenciones-seguimiento.png
+  06.3-convenciones-informacion.png
+```
+
+Nota: `06.2-convenciones-seguimiento.png` es pantalla de carga del número.
+Luego converge al seguimiento público común.
+
+## 23.5 Botón +
+
+```text
+design/public-user-approved-mockups/boton_mas/
+  07.0-botonmas-eleccion.png
+  07.1-botonmas-comprar.png
+  07.2-botonmas-retiro-envio.png
+  07.3-botonmas-confirmacion.png
+  07.4-botonmas-ticket.png
+```
+
+## 23.6 Local público
+
+```text
+design/public-user-approved-mockups/local/
+  05.0-local.png
+  05.1-local-producto.png
+  05.2-local-carrito.png
+  05.3-local-datos.png
+  05.4-local-confirmacion.png
+  05.5-local-navegacion-interna.png
+```
+
+Nota: `05.5-local-navegacion-interna.png` es lámina explicativa, no pantalla final.
+Aclara que las pestañas internas solo filtran productos dentro del mismo local.
+
+---
+
+# 24. Correcciones críticas aplicadas a este plano
+
+Este documento corrige las referencias viejas del plano anterior:
+
+- `locla/` fue reemplazado por `local/`.
+- Las referencias antiguas de Convenciones dentro de `home/` fueron reemplazadas por `convenciones/`.
+- Las referencias antiguas del botón más fueron reemplazadas por la serie nueva `07.0` a `07.4`.
+- Splash usa `1-splash.png`, `logo-instal.png` y `splash.png`.
+- Home usa la serie limpia `01`, `02`, `03`, `04`, `09`.
+- Tienda, Convenciones, Botón + y Local quedan alineados con el índice visual aprobado.
+- Las imágenes siguen siendo plano visual, no runtime pegado.
