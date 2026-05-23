@@ -64,6 +64,7 @@ private data class PublicTrackingData(
 @Composable
 fun PublicShopTrackingScreen(
     orderNumber: String,
+    current: PublicBottomDestination = PublicBottomDestination.Shop,
     onHome: () -> Unit,
     onPlus: () -> Unit,
     onShop: () -> Unit,
@@ -82,7 +83,7 @@ fun PublicShopTrackingScreen(
     }
 
     PublicShell(
-        current = PublicBottomDestination.Shop,
+        current = current,
         onHome = onHome,
         onPlus = onPlus,
         onShop = onShop,

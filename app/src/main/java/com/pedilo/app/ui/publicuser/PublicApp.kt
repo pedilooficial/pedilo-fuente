@@ -30,6 +30,11 @@ private sealed interface PublicRoute {
     data object Home : PublicRoute
     data object Plus : PublicRoute
     data object Shop : PublicRoute
+    data object Conventions : PublicRoute
+    data object ConventionsInfo : PublicRoute
+    data object ConventionsClaim : PublicRoute
+    data object ConventionsTrackingEntry : PublicRoute
+    data class PublicTracking(val orderNumber: String, val current: PublicBottomDestination) : PublicRoute
     data class ShopSubcategory(val name: String) : PublicRoute
     data class ShopSearch(val query: String, val origin: PublicBottomDestination) : PublicRoute
     data class ShopTracking(val orderNumber: String) : PublicRoute
@@ -84,6 +89,7 @@ fun PublicApp() {
                 onPlus = { navigateTo(PublicRoute.Plus) },
                 onShop = { goShop() },
                 onSearch = { navigateTo(PublicRoute.ShopSearch("", PublicBottomDestination.Home)) },
+                onConventions = { navigateTo(PublicRoute.Conventions) },
             )
             PublicRoute.Plus -> PublicPhasePlaceholder(
                 title = "Botón +",
@@ -115,6 +121,38 @@ fun PublicApp() {
             )
             is PublicRoute.ShopTracking -> PublicShopTrackingScreen(
                 orderNumber = (route as PublicRoute.ShopTracking).orderNumber,
+                current = PublicBottomDestination.Shop,
+                onHome = { goHome() },
+                onPlus = { navigateTo(PublicRoute.Plus) },
+                onShop = { goShop() },
+            )
+            PublicRoute.Conventions -> PublicConventionsScreen(
+                onHome = { goHome() },
+                onPlus = { navigateTo(PublicRoute.Plus) },
+                onShop = { goShop() },
+                onInfo = { navigateTo(PublicRoute.ConventionsInfo) },
+                onClaim = { navigateTo(PublicRoute.ConventionsClaim) },
+                onTracking = { navigateTo(PublicRoute.ConventionsTrackingEntry) },
+            )
+            PublicRoute.ConventionsInfo -> PublicConventionsInfoScreen(
+                onHome = { goHome() },
+                onPlus = { navigateTo(PublicRoute.Plus) },
+                onShop = { goShop() },
+            )
+            PublicRoute.ConventionsClaim -> PublicConventionsClaimScreen(
+                onHome = { goHome() },
+                onPlus = { navigateTo(PublicRoute.Plus) },
+                onShop = { goShop() },
+            )
+            PublicRoute.ConventionsTrackingEntry -> PublicConventionsTrackingEntryScreen(
+                onHome = { goHome() },
+                onPlus = { navigateTo(PublicRoute.Plus) },
+                onShop = { goShop() },
+                onSubmit = { navigateTo(PublicRoute.PublicTracking(it, PublicBottomDestination.Home)) },
+            )
+            is PublicRoute.PublicTracking -> PublicShopTrackingScreen(
+                orderNumber = (route as PublicRoute.PublicTracking).orderNumber,
+                current = (route as PublicRoute.PublicTracking).current,
                 onHome = { goHome() },
                 onPlus = { navigateTo(PublicRoute.Plus) },
                 onShop = { goShop() },

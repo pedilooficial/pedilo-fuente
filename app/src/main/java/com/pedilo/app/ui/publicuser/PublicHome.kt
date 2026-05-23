@@ -125,6 +125,7 @@ fun PublicHomeScreen(
     onPlus: () -> Unit,
     onShop: () -> Unit,
     onSearch: () -> Unit,
+    onConventions: () -> Unit,
 ) {
     PublicShell(
         current = PublicBottomDestination.Home,
@@ -146,7 +147,7 @@ fun PublicHomeScreen(
             item { OffersSection() }
             item { LocalsSection() }
             item { HomeBanner() }
-            item { ConventionsSection() }
+            item { ConventionsSection(onConventions = onConventions) }
         }
     }
 }
@@ -433,13 +434,21 @@ private fun HomeBanner() {
 }
 
 @Composable
-private fun ConventionsSection() {
-    SurfacePanel {
+private fun ConventionsSection(onConventions: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(PediloOverlay, RoundedCornerShape(14.dp))
+            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .clickable(role = Role.Button, onClick = onConventions)
+            .semantics { contentDescription = "Abrir Convenciones" }
+            .padding(14.dp),
+    ) {
         Text("Convenciones", color = PediloText, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(10.dp))
         ConventionRow(label = "Indicador de novedad", badge = "Nuevo")
-        ConventionRow(label = "Descuento / Promocion", badge = "-20%")
-        ConventionIconRow(label = "Calificacion del local", icon = PediloIconKind.Star)
+        ConventionRow(label = "Descuento / Promoción", badge = "-20%")
+        ConventionIconRow(label = "Calificación del local", icon = PediloIconKind.Star)
         ConventionIconRow(label = "Tiempo estimado", icon = PediloIconKind.Clock)
     }
 }
