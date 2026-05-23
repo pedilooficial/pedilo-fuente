@@ -44,9 +44,7 @@ fun PublicApp() {
                 onPlus = { route = PublicRoute.Plus },
                 onShop = { route = PublicRoute.Shop },
             )
-            PublicRoute.Shop -> PublicPhasePlaceholder(
-                title = "Tienda",
-                body = "La exploracion de categorias se construira en una fase posterior.",
+            PublicRoute.Shop -> PublicShopScreen(
                 onHome = { route = PublicRoute.Home },
                 onPlus = { route = PublicRoute.Plus },
                 onShop = { route = PublicRoute.Shop },

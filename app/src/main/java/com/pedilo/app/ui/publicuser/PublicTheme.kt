@@ -18,6 +18,9 @@ val PediloGreen = Color(0xFF69D125)
 val PediloOrangeSoft = Color(0xFFFF8A2A)
 val PediloWarning = Color(0xFFFFB54A)
 val PediloOverlay = Color(0x66111F26)
+val PediloCyan = Color(0xFF3B7E8E)
+val PediloPink = Color(0xFF9A4A78)
+val PediloOlive = Color(0xFF5E7D2B)
 
 private val PublicScheme = darkColorScheme(
     primary = PediloOrange,
