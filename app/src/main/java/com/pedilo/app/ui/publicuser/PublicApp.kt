@@ -29,6 +29,10 @@ import androidx.compose.ui.unit.sp
 private sealed interface PublicRoute {
     data object Home : PublicRoute
     data object Plus : PublicRoute
+    data object PlusBuy : PublicRoute
+    data object PlusPickupShipping : PublicRoute
+    data class PlusConfirmation(val request: PublicPlusRequest) : PublicRoute
+    data class PlusTicket(val request: PublicPlusRequest) : PublicRoute
     data object Shop : PublicRoute
     data object Conventions : PublicRoute
     data object ConventionsInfo : PublicRoute
@@ -91,12 +95,38 @@ fun PublicApp() {
                 onSearch = { navigateTo(PublicRoute.ShopSearch("", PublicBottomDestination.Home)) },
                 onConventions = { navigateTo(PublicRoute.Conventions) },
             )
-            PublicRoute.Plus -> PublicPhasePlaceholder(
-                title = "Botón +",
-                body = "Este acceso rápido se construirá en una fase posterior.",
+            PublicRoute.Plus -> PublicPlusChoiceScreen(
                 onHome = { goHome() },
                 onPlus = { navigateTo(PublicRoute.Plus) },
                 onShop = { goShop() },
+                onBuy = { navigateTo(PublicRoute.PlusBuy) },
+                onPickupShipping = { navigateTo(PublicRoute.PlusPickupShipping) },
+            )
+            PublicRoute.PlusBuy -> PublicPlusBuyScreen(
+                onHome = { goHome() },
+                onPlus = { navigateTo(PublicRoute.Plus) },
+                onShop = { goShop() },
+                onContinue = { navigateTo(PublicRoute.PlusConfirmation(it)) },
+            )
+            PublicRoute.PlusPickupShipping -> PublicPlusPickupShippingScreen(
+                onHome = { goHome() },
+                onPlus = { navigateTo(PublicRoute.Plus) },
+                onShop = { goShop() },
+                onContinue = { navigateTo(PublicRoute.PlusConfirmation(it)) },
+            )
+            is PublicRoute.PlusConfirmation -> PublicPlusConfirmationScreen(
+                request = (route as PublicRoute.PlusConfirmation).request,
+                onHome = { goHome() },
+                onPlus = { navigateTo(PublicRoute.Plus) },
+                onShop = { goShop() },
+                onConfirm = { navigateTo(PublicRoute.PlusTicket(it)) },
+            )
+            is PublicRoute.PlusTicket -> PublicPlusTicketScreen(
+                request = (route as PublicRoute.PlusTicket).request,
+                onHome = { goHome() },
+                onPlus = { navigateTo(PublicRoute.Plus) },
+                onShop = { goShop() },
+                onTracking = { navigateTo(PublicRoute.PublicTracking(it, PublicBottomDestination.Plus)) },
             )
             PublicRoute.Shop -> PublicShopScreen(
                 onHome = { goHome() },
