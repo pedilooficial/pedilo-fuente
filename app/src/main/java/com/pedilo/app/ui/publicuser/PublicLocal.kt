@@ -390,7 +390,7 @@ private fun LocalHero() {
 @Composable
 private fun LocalStatsRow() {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        StatPill("4.8", "opiniones", LocalIconKind.Star, Modifier.weight(1f))
+        StatPill("Horario", "hasta 00:30", LocalIconKind.Clock, Modifier.weight(1f))
         StatPill("20-30", "min", LocalIconKind.Clock, Modifier.weight(1f))
         StatPill("$1.200", "envío", LocalIconKind.Delivery, Modifier.weight(1f))
     }

@@ -1,5 +1,7 @@
 package com.pedilo.app.ui.publicuser
 
+import android.graphics.Paint
+import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -44,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -194,27 +197,31 @@ private fun PublicHeader() {
             Text(
                 text = "Pédilo!",
                 color = PediloOrange,
-                fontSize = 44.sp,
-                lineHeight = 44.sp,
+                fontSize = 48.sp,
+                lineHeight = 48.sp,
                 fontWeight = FontWeight.ExtraBold,
             )
             Text(
                 text = "todos tus pedidos en un solo lugar",
                 color = PediloText,
-                fontSize = 12.sp,
-                lineHeight = 14.sp,
+                fontSize = 13.sp,
+                lineHeight = 16.sp,
+                fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Row(
-            modifier = Modifier.padding(top = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Box(
+            modifier = Modifier
+                .padding(top = 10.dp)
+                .background(PediloOrange, RoundedCornerShape(18.dp))
+                .clickable(role = Role.Button, onClick = {})
+                .semantics { contentDescription = "Equipo" }
+                .padding(horizontal = 13.dp, vertical = 7.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            PediloLineIcon(PediloIconKind.Info, tint = PediloOrange, modifier = Modifier.size(17.dp))
-            Spacer(Modifier.width(4.dp))
-            Text("Ayuda", color = PediloOrange, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text("Equipo", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
         }
     }
 }
@@ -428,16 +435,30 @@ private fun HomeBanner(onConventions: () -> Unit) {
             Text("¡Envíos más rápidos!", color = Color.White, fontSize = 18.sp, lineHeight = 20.sp, fontWeight = FontWeight.ExtraBold)
             Text("Tus locales favoritos, ahora más cerca que nunca.", color = Color.White, fontSize = 11.sp, lineHeight = 14.sp)
             Spacer(Modifier.height(10.dp))
-            Text(
-                text = "Ver más",
-                color = PediloOrangeDark,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
+            Canvas(
                 modifier = Modifier
-                    .background(Color.White, RoundedCornerShape(18.dp))
+                    .width(112.dp)
+                    .height(38.dp)
                     .clickable(role = Role.Button, onClick = onConventions)
-                    .padding(horizontal = 18.dp, vertical = 7.dp),
-            )
+                    .semantics { contentDescription = "Ver más" },
+            ) {
+                drawRoundRect(
+                    color = Color.White,
+                    cornerRadius = CornerRadius(size.height / 2f, size.height / 2f),
+                )
+                    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = android.graphics.Color.BLACK
+                        textAlign = Paint.Align.CENTER
+                    textSize = size.height * 0.62f
+                        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    }
+                    drawContext.canvas.nativeCanvas.drawText(
+                        "Ver más",
+                        size.width / 2f,
+                    size.height * 0.7f,
+                        paint,
+                    )
+            }
         }
         PediloLineIcon(PediloIconKind.Megaphone, tint = PediloWarning, modifier = Modifier.align(Alignment.CenterEnd).size(54.dp))
     }
