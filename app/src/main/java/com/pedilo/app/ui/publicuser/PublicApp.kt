@@ -42,6 +42,12 @@ private sealed interface PublicRoute {
     data class ShopSubcategory(val name: String) : PublicRoute
     data class ShopSearch(val query: String, val origin: PublicBottomDestination) : PublicRoute
     data class ShopTracking(val orderNumber: String) : PublicRoute
+    data object Local : PublicRoute
+    data class LocalProductDetail(val product: LocalProduct) : PublicRoute
+    data object LocalCart : PublicRoute
+    data object LocalData : PublicRoute
+    data class LocalConfirmation(val orderData: LocalOrderData) : PublicRoute
+    data class LocalTicket(val orderData: LocalOrderData) : PublicRoute
 }
 
 @Composable
@@ -50,7 +56,23 @@ fun PublicApp() {
         val activity = LocalContext.current as? Activity
         var route by remember { mutableStateOf<PublicRoute>(PublicRoute.Home) }
         val history = remember { mutableStateListOf<PublicRoute>() }
+        val localCart = remember { mutableStateListOf<LocalCartItem>() }
+        var localCategory by remember { mutableStateOf(LocalCategory.Featured) }
+        var localOrderPlaced by remember { mutableStateOf(false) }
         var showExitConfirmation by remember { mutableStateOf(false) }
+        var pendingLocalExit by remember { mutableStateOf<PublicRoute?>(null) }
+
+        fun isLocalRoute(target: PublicRoute): Boolean = when (target) {
+            PublicRoute.Local,
+            is PublicRoute.LocalProductDetail,
+            PublicRoute.LocalCart,
+            PublicRoute.LocalData,
+            is PublicRoute.LocalConfirmation,
+            is PublicRoute.LocalTicket -> true
+            else -> false
+        }
+
+        fun hasActiveLocalCart(): Boolean = localCart.isNotEmpty() && !localOrderPlaced
 
         fun navigateTo(next: PublicRoute) {
             if (route != next) {
@@ -60,19 +82,48 @@ fun PublicApp() {
         }
 
         fun goHome() {
+            if (isLocalRoute(route) && hasActiveLocalCart()) {
+                pendingLocalExit = PublicRoute.Home
+                return
+            }
             history.clear()
             route = PublicRoute.Home
             showExitConfirmation = false
         }
 
         fun goShop() {
+            if (isLocalRoute(route) && hasActiveLocalCart()) {
+                pendingLocalExit = PublicRoute.Shop
+                return
+            }
             history.clear()
             route = PublicRoute.Shop
             showExitConfirmation = false
         }
 
+        fun goPlus() {
+            if (isLocalRoute(route) && hasActiveLocalCart()) {
+                pendingLocalExit = PublicRoute.Plus
+                return
+            }
+            navigateTo(PublicRoute.Plus)
+        }
+
+        fun confirmLocalExit() {
+            val target = pendingLocalExit ?: PublicRoute.Home
+            localCart.clear()
+            localOrderPlaced = false
+            pendingLocalExit = null
+            history.clear()
+            route = target
+            showExitConfirmation = false
+        }
+
         fun handleNativeBack() {
-            if (history.isNotEmpty()) {
+            val previous = history.lastOrNull()
+            if (isLocalRoute(route) && hasActiveLocalCart() && (previous == null || !isLocalRoute(previous))) {
+                pendingLocalExit = previous ?: PublicRoute.Home
+            } else if (history.isNotEmpty()) {
                 route = history.removeAt(history.lastIndex)
                 showExitConfirmation = false
             } else if (route != PublicRoute.Home) {
@@ -90,47 +141,47 @@ fun PublicApp() {
         when (route) {
             PublicRoute.Home -> PublicHomeScreen(
                 onHome = { goHome() },
-                onPlus = { navigateTo(PublicRoute.Plus) },
+                onPlus = { goPlus() },
                 onShop = { goShop() },
                 onSearch = { navigateTo(PublicRoute.ShopSearch("", PublicBottomDestination.Home)) },
                 onConventions = { navigateTo(PublicRoute.Conventions) },
             )
             PublicRoute.Plus -> PublicPlusChoiceScreen(
                 onHome = { goHome() },
-                onPlus = { navigateTo(PublicRoute.Plus) },
+                onPlus = { goPlus() },
                 onShop = { goShop() },
                 onBuy = { navigateTo(PublicRoute.PlusBuy) },
                 onPickupShipping = { navigateTo(PublicRoute.PlusPickupShipping) },
             )
             PublicRoute.PlusBuy -> PublicPlusBuyScreen(
                 onHome = { goHome() },
-                onPlus = { navigateTo(PublicRoute.Plus) },
+                onPlus = { goPlus() },
                 onShop = { goShop() },
                 onContinue = { navigateTo(PublicRoute.PlusConfirmation(it)) },
             )
             PublicRoute.PlusPickupShipping -> PublicPlusPickupShippingScreen(
                 onHome = { goHome() },
-                onPlus = { navigateTo(PublicRoute.Plus) },
+                onPlus = { goPlus() },
                 onShop = { goShop() },
                 onContinue = { navigateTo(PublicRoute.PlusConfirmation(it)) },
             )
             is PublicRoute.PlusConfirmation -> PublicPlusConfirmationScreen(
                 request = (route as PublicRoute.PlusConfirmation).request,
                 onHome = { goHome() },
-                onPlus = { navigateTo(PublicRoute.Plus) },
+                onPlus = { goPlus() },
                 onShop = { goShop() },
                 onConfirm = { navigateTo(PublicRoute.PlusTicket(it)) },
             )
             is PublicRoute.PlusTicket -> PublicPlusTicketScreen(
                 request = (route as PublicRoute.PlusTicket).request,
                 onHome = { goHome() },
-                onPlus = { navigateTo(PublicRoute.Plus) },
+                onPlus = { goPlus() },
                 onShop = { goShop() },
                 onTracking = { navigateTo(PublicRoute.PublicTracking(it, PublicBottomDestination.Plus)) },
             )
             PublicRoute.Shop -> PublicShopScreen(
                 onHome = { goHome() },
-                onPlus = { navigateTo(PublicRoute.Plus) },
+                onPlus = { goPlus() },
                 onShop = { goShop() },
                 onSearch = { navigateTo(PublicRoute.ShopSearch(it, PublicBottomDestination.Shop)) },
                 onTracking = { navigateTo(PublicRoute.ShopTracking(it)) },
@@ -140,25 +191,33 @@ fun PublicApp() {
                 query = (route as PublicRoute.ShopSearch).query,
                 current = (route as PublicRoute.ShopSearch).origin,
                 onHome = { goHome() },
-                onPlus = { navigateTo(PublicRoute.Plus) },
+                onPlus = { goPlus() },
                 onShop = { goShop() },
+                onViewLocal = {
+                    localOrderPlaced = false
+                    navigateTo(PublicRoute.Local)
+                },
             )
             is PublicRoute.ShopSubcategory -> PublicShopSubcategoryScreen(
                 title = (route as PublicRoute.ShopSubcategory).name,
                 onHome = { goHome() },
-                onPlus = { navigateTo(PublicRoute.Plus) },
+                onPlus = { goPlus() },
                 onShop = { goShop() },
+                onViewLocal = {
+                    localOrderPlaced = false
+                    navigateTo(PublicRoute.Local)
+                },
             )
             is PublicRoute.ShopTracking -> PublicShopTrackingScreen(
                 orderNumber = (route as PublicRoute.ShopTracking).orderNumber,
                 current = PublicBottomDestination.Shop,
                 onHome = { goHome() },
-                onPlus = { navigateTo(PublicRoute.Plus) },
+                onPlus = { goPlus() },
                 onShop = { goShop() },
             )
             PublicRoute.Conventions -> PublicConventionsScreen(
                 onHome = { goHome() },
-                onPlus = { navigateTo(PublicRoute.Plus) },
+                onPlus = { goPlus() },
                 onShop = { goShop() },
                 onInfo = { navigateTo(PublicRoute.ConventionsInfo) },
                 onClaim = { navigateTo(PublicRoute.ConventionsClaim) },
@@ -166,17 +225,17 @@ fun PublicApp() {
             )
             PublicRoute.ConventionsInfo -> PublicConventionsInfoScreen(
                 onHome = { goHome() },
-                onPlus = { navigateTo(PublicRoute.Plus) },
+                onPlus = { goPlus() },
                 onShop = { goShop() },
             )
             PublicRoute.ConventionsClaim -> PublicConventionsClaimScreen(
                 onHome = { goHome() },
-                onPlus = { navigateTo(PublicRoute.Plus) },
+                onPlus = { goPlus() },
                 onShop = { goShop() },
             )
             PublicRoute.ConventionsTrackingEntry -> PublicConventionsTrackingEntryScreen(
                 onHome = { goHome() },
-                onPlus = { navigateTo(PublicRoute.Plus) },
+                onPlus = { goPlus() },
                 onShop = { goShop() },
                 onSubmit = { navigateTo(PublicRoute.PublicTracking(it, PublicBottomDestination.Home)) },
             )
@@ -184,7 +243,67 @@ fun PublicApp() {
                 orderNumber = (route as PublicRoute.PublicTracking).orderNumber,
                 current = (route as PublicRoute.PublicTracking).current,
                 onHome = { goHome() },
-                onPlus = { navigateTo(PublicRoute.Plus) },
+                onPlus = { goPlus() },
+                onShop = { goShop() },
+            )
+            PublicRoute.Local -> PublicLocalScreen(
+                selectedCategory = localCategory,
+                cartItems = localCart,
+                onCategory = { localCategory = it },
+                onProduct = { navigateTo(PublicRoute.LocalProductDetail(it)) },
+                onCart = { navigateTo(PublicRoute.LocalCart) },
+                onHome = { goHome() },
+                onPlus = { goPlus() },
+                onShop = { goShop() },
+            )
+            is PublicRoute.LocalProductDetail -> PublicLocalProductScreen(
+                product = (route as PublicRoute.LocalProductDetail).product,
+                onAddToCart = {
+                    localOrderPlaced = false
+                    localCart.add(it)
+                    navigateTo(PublicRoute.LocalCart)
+                },
+                onHome = { goHome() },
+                onPlus = { goPlus() },
+                onShop = { goShop() },
+            )
+            PublicRoute.LocalCart -> PublicLocalCartScreen(
+                cartItems = localCart,
+                onMoreProducts = { navigateTo(PublicRoute.Local) },
+                onContinue = { navigateTo(PublicRoute.LocalData) },
+                onHome = { goHome() },
+                onPlus = { goPlus() },
+                onShop = { goShop() },
+            )
+            PublicRoute.LocalData -> PublicLocalDataScreen(
+                cartItems = localCart,
+                onContinue = { navigateTo(PublicRoute.LocalConfirmation(it)) },
+                onHome = { goHome() },
+                onPlus = { goPlus() },
+                onShop = { goShop() },
+            )
+            is PublicRoute.LocalConfirmation -> PublicLocalConfirmationScreen(
+                cartItems = localCart,
+                orderData = (route as PublicRoute.LocalConfirmation).orderData,
+                onEditData = { navigateTo(PublicRoute.LocalData) },
+                onConfirm = {
+                    localOrderPlaced = true
+                    navigateTo(PublicRoute.LocalTicket((route as PublicRoute.LocalConfirmation).orderData))
+                },
+                onHome = { goHome() },
+                onPlus = { goPlus() },
+                onShop = { goShop() },
+            )
+            is PublicRoute.LocalTicket -> PublicLocalTicketScreen(
+                cartItems = localCart,
+                orderData = (route as PublicRoute.LocalTicket).orderData,
+                onTracking = { navigateTo(PublicRoute.PublicTracking(it, PublicBottomDestination.Shop)) },
+                onHome = {
+                    localCart.clear()
+                    localOrderPlaced = false
+                    goHome()
+                },
+                onPlus = { goPlus() },
                 onShop = { goShop() },
             )
         }
@@ -206,6 +325,28 @@ fun PublicApp() {
                 dismissButton = {
                     TextButton(onClick = { showExitConfirmation = false }) {
                         Text("Seguir")
+                    }
+                },
+            )
+        }
+
+        pendingLocalExit?.let {
+            AlertDialog(
+                onDismissRequest = { pendingLocalExit = null },
+                title = {
+                    Text("Salir del local")
+                },
+                text = {
+                    Text("Tenés productos de Pizzería Roma en el carrito. Si salís, se vacía este pedido del local.")
+                },
+                confirmButton = {
+                    TextButton(onClick = { confirmLocalExit() }) {
+                        Text("Salir y vaciar")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingLocalExit = null }) {
+                        Text("Seguir en el local")
                     }
                 },
             )

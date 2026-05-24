@@ -80,6 +80,7 @@ fun PublicShopSearchScreen(
     onHome: () -> Unit,
     onPlus: () -> Unit,
     onShop: () -> Unit,
+    onViewLocal: () -> Unit,
 ) {
     var selectedFilter by remember { mutableStateOf(SearchFilter.Nearby) }
     var activeQuery by remember(query) { mutableStateOf(query) }
@@ -131,7 +132,7 @@ fun PublicShopSearchScreen(
                 items(pizzaSearchStores) { store ->
                     SearchResultCard(
                         store = store,
-                        onView = { statusMessage = "Ver local se construirá en la fase de Local público." },
+                        onView = onViewLocal,
                     )
                 }
             } else {

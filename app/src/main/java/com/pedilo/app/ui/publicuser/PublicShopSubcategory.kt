@@ -77,6 +77,7 @@ fun PublicShopSubcategoryScreen(
     onHome: () -> Unit,
     onPlus: () -> Unit,
     onShop: () -> Unit,
+    onViewLocal: () -> Unit,
 ) {
     var selectedFilter by remember { mutableStateOf(SubcategoryFilter.Nearby) }
     var statusMessage by remember { mutableStateOf("Elegir un local se habilitara en una fase posterior.") }
@@ -119,7 +120,7 @@ fun PublicShopSubcategoryScreen(
             items(pizzaStores) { store ->
                 RelatedStoreCard(
                     store = store,
-                    onView = { statusMessage = "Ver local se construirá en la fase de Local público." },
+                    onView = onViewLocal,
                 )
             }
             item {
