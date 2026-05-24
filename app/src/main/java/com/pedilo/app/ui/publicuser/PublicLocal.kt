@@ -53,7 +53,7 @@ import androidx.compose.ui.unit.sp
 
 enum class LocalCategory(val label: String) {
     Featured("Destacados"),
-    Pizzas("Pizzas"),
+    Pizzas("Productos"),
     Starters("Entradas"),
     Drinks("Bebidas"),
 }
@@ -145,7 +145,7 @@ fun PublicLocalScreen(
             contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 132.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { LocalHero(cartCount = cartItems.sumOf { it.quantity }, onCart = onCart) }
+            item { LocalHero() }
             item { LocalStatsRow() }
             item { CategoryTabs(selected = selectedCategory, onSelected = onCategory) }
             item { LocalPromo() }
@@ -258,7 +258,7 @@ fun PublicLocalDataScreen(
             contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 132.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { LocalSectionTitle("Datos del pedido", "Completá la entrega para Pizzería Roma") }
+            item { LocalSectionTitle("Completá tus datos.", "") }
             item { LocalInput("Nombre completo", name, "Tu nombre", onValueChange = { name = it }) }
             item { LocalInput("WhatsApp", phone, "11 5555 5555", onValueChange = { phone = it }) }
             item { LocalInput("Dirección de entrega", address, "Calle, altura y piso", onValueChange = { address = it }) }
@@ -301,13 +301,12 @@ fun PublicLocalConfirmationScreen(
             contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 132.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { LocalSectionTitle("Confirmación", "Revisá el pedido de Pizzería Roma") }
+            item { LocalSectionTitle("Confirmación", "") }
             item { CompactOrderCard(cartItems) }
             item { LocalInfoCard("Entrega", listOf(orderData.fullName, orderData.phone, orderData.address, orderData.notes), LocalIconKind.Location) }
             item { LocalInfoCard("Pago", listOf(orderData.payment, "Total ${formatLocalMoney(localGrandTotal(cartItems))}"), LocalIconKind.Cart) }
             item { LocalSecondaryButton("Editar datos", LocalIconKind.Person, onEditData) }
             item { LocalPrimaryButton("Confirmar pedido", LocalIconKind.Check, onConfirm) }
-            item { LocalNotice("Revisá los datos antes de confirmar.") }
         }
     }
 }
@@ -346,6 +345,8 @@ fun PublicLocalTicketScreen(
                     Spacer(Modifier.height(12.dp))
                     Text("Pedido recibido", color = PediloText, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
                     Text(orderNumber, color = PediloOrange, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(6.dp))
+                    Text("Guardá este número para consultar el estado del pedido.", color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp, textAlign = TextAlign.Center)
                     Text("Estado inicial: Recibido", color = PediloMuted, fontSize = 14.sp)
                 }
             }
@@ -353,13 +354,12 @@ fun PublicLocalTicketScreen(
             item { LocalInfoCard("Entrega", listOf(orderData.address, orderData.payment), LocalIconKind.Location) }
             item { LocalPrimaryButton("Ver seguimiento", LocalIconKind.Tracking) { onTracking(orderNumber) } }
             item { LocalSecondaryButton("Volver al inicio", LocalIconKind.Check, onHome) }
-            item { LocalNotice("Guardá este número para consultar el estado del pedido.") }
         }
     }
 }
 
 @Composable
-private fun LocalHero(cartCount: Int, onCart: () -> Unit) {
+private fun LocalHero() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -375,24 +375,6 @@ private fun LocalHero(cartCount: Int, onCart: () -> Unit) {
             contentAlignment = Alignment.Center,
         ) {
             LocalIcon(LocalIconKind.Pizza, Color.White, Modifier.size(90.dp))
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(12.dp)
-                    .height(38.dp)
-                    .background(PediloBg.copy(alpha = 0.78f), RoundedCornerShape(19.dp))
-                    .border(1.dp, PediloOrange, RoundedCornerShape(19.dp))
-                    .clickable(role = Role.Button, onClick = onCart)
-                    .semantics { contentDescription = "Abrir carrito del local" }
-                    .padding(horizontal = 12.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    LocalIcon(LocalIconKind.Cart, PediloOrange, Modifier.size(20.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("$cartCount", color = PediloText, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                }
-            }
         }
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -452,17 +434,17 @@ private fun CategoryTabs(selected: LocalCategory, onSelected: (LocalCategory) ->
 
 @Composable
 private fun LocalPromo() {
-    Text(
-        "Promo del día: pizza grande con bebida con precio especial.",
-        color = PediloText,
-        fontSize = 13.sp,
-        lineHeight = 17.sp,
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(PediloOverlay, RoundedCornerShape(12.dp))
             .border(1.dp, PediloLine, RoundedCornerShape(12.dp))
             .padding(12.dp),
-    )
+    ) {
+        Text("Promo del día", color = PediloText, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(4.dp))
+        Text("Pizza grande con bebida con precio especial.", color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp)
+    }
 }
 
 @Composable
@@ -525,8 +507,10 @@ private fun ProductThumb(product: LocalProduct) {
 @Composable
 private fun LocalSectionTitle(title: String, subtitle: String) {
     Column(Modifier.fillMaxWidth()) {
-        Text(title, color = PediloText, fontSize = 28.sp, lineHeight = 31.sp, fontWeight = FontWeight.ExtraBold)
-        Text(subtitle, color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp)
+        Text(title, color = PediloOrange, fontSize = 30.sp, lineHeight = 33.sp, fontWeight = FontWeight.ExtraBold)
+        if (subtitle.isNotBlank()) {
+            Text(subtitle, color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp)
+        }
     }
 }
 

@@ -110,7 +110,7 @@ fun PublicPlusChoiceScreen(
             contentPadding = PaddingValues(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 132.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { PlusHeader(title = "¿Qué necesitás?", subtitle = "Elegí una solicitud directa de Pédilo") }
+            item { PlusHeader(title = "¿Qué necesitás?", subtitle = "") }
             item {
                 ChoiceHeroCard()
             }
@@ -132,7 +132,6 @@ fun PublicPlusChoiceScreen(
                     onClick = onPickupShipping,
                 )
             }
-            item { PlusNotice("Usá este acceso para pedir una compra directa o un retiro puntual.") }
         }
     }
 }
@@ -318,7 +317,7 @@ fun PublicPlusConfirmationScreen(
             contentPadding = PaddingValues(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 132.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { PlusHeader(title = "Confirmación", subtitle = "Revisá la solicitud antes de enviarla") }
+            item { PlusHeader(title = "Confirmación", subtitle = "") }
             item { RequestSummaryCard(request = request, expanded = true) }
             item {
                 DetailLineCard(
@@ -341,7 +340,6 @@ fun PublicPlusConfirmationScreen(
                     onClick = { onConfirm(request) },
                 )
             }
-            item { PlusNotice("Revisá los datos antes de confirmar.") }
         }
     }
 }
@@ -386,7 +384,6 @@ fun PublicPlusTicketScreen(
                     onClick = onHome,
                 )
             }
-            item { PlusNotice("Guardá este número para consultar el estado del pedido.") }
         }
     }
 }
@@ -403,14 +400,16 @@ private fun PlusHeader(title: String, subtitle: String) {
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        Text(
-            text = subtitle,
-            color = PediloMuted,
-            fontSize = 14.sp,
-            lineHeight = 18.sp,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
+        if (subtitle.isNotBlank()) {
+            Text(
+                text = subtitle,
+                color = PediloMuted,
+                fontSize = 14.sp,
+                lineHeight = 18.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -424,16 +423,6 @@ private fun ChoiceHeroCard() {
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(58.dp)
-                .clip(CircleShape)
-                .background(PediloOrange),
-            contentAlignment = Alignment.Center,
-        ) {
-            PlusIcon(PlusIconKind.Plus, tint = Color.White, modifier = Modifier.size(32.dp))
-        }
-        Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text("¿Qué necesitás hacer?", color = PediloText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Text("Elegí una opción para continuar.", color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp)
@@ -635,6 +624,8 @@ private fun TicketHero(request: PublicPlusRequest) {
         Spacer(Modifier.height(12.dp))
         Text("Pedido recibido", color = PediloText, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
         Text(request.orderNumber, color = PediloOrange, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(6.dp))
+        Text("Guardá este número para consultar el estado del pedido.", color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp, textAlign = TextAlign.Center)
         Text("Estado inicial: Recibido", color = PediloMuted, fontSize = 14.sp)
     }
 }

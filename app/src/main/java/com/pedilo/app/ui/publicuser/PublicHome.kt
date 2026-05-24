@@ -152,8 +152,7 @@ fun PublicHomeScreen(
             item { QuickAccessSection(onCategory = onCategory) }
             item { OffersSection(onOffer = onOffer, onAllOffers = onAllOffers) }
             item { LocalsSection(onLocal = onLocal, onAllLocals = onAllLocals) }
-            item { HomeBanner() }
-            item { ConventionsSection(onConventions = onConventions) }
+            item { HomeBanner(onConventions = onConventions) }
         }
     }
 }
@@ -415,13 +414,15 @@ private fun LocalCard(local: LocalItem, onClick: () -> Unit) {
 }
 
 @Composable
-private fun HomeBanner() {
+private fun HomeBanner(onConventions: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(112.dp)
             .background(Brush.horizontalGradient(listOf(PediloOrangeDark, PediloPanel)), RoundedCornerShape(12.dp))
             .border(1.dp, PediloOrange, RoundedCornerShape(12.dp))
+            .clickable(role = Role.Button, onClick = onConventions)
+            .semantics { contentDescription = "Abrir Convenciones" }
             .padding(16.dp),
     ) {
         Column(modifier = Modifier.align(Alignment.CenterStart).fillMaxWidth().padding(end = 82.dp)) {
@@ -435,70 +436,11 @@ private fun HomeBanner() {
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
                     .background(Color.White, RoundedCornerShape(18.dp))
+                    .clickable(role = Role.Button, onClick = onConventions)
                     .padding(horizontal = 18.dp, vertical = 7.dp),
             )
         }
         PediloLineIcon(PediloIconKind.Megaphone, tint = PediloWarning, modifier = Modifier.align(Alignment.CenterEnd).size(54.dp))
-    }
-}
-
-@Composable
-private fun ConventionsSection(onConventions: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(PediloOverlay, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
-            .clickable(role = Role.Button, onClick = onConventions)
-            .semantics { contentDescription = "Abrir Convenciones" }
-            .padding(14.dp),
-    ) {
-        Text("Convenciones", color = PediloText, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(10.dp))
-        ConventionRow(label = "Indicador de novedad", badge = "Nuevo")
-        ConventionRow(label = "Descuento / Promoción", badge = "-20%")
-        ConventionIconRow(label = "Calificación del local", icon = PediloIconKind.Star)
-        ConventionIconRow(label = "Tiempo estimado", icon = PediloIconKind.Clock)
-    }
-}
-
-@Composable
-private fun ConventionRow(label: String, badge: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = badge,
-            color = Color.White,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier
-                .width(58.dp)
-                .background(PediloOrange, RoundedCornerShape(5.dp))
-                .padding(vertical = 4.dp),
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.width(12.dp))
-        Text(label, color = PediloMuted, fontSize = 13.sp)
-    }
-}
-
-@Composable
-private fun ConventionIconRow(label: String, icon: PediloIconKind) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.width(58.dp), contentAlignment = Alignment.Center) {
-            PediloLineIcon(icon, tint = PediloOrange, modifier = Modifier.size(24.dp))
-        }
-        Spacer(Modifier.width(12.dp))
-        Text(label, color = PediloMuted, fontSize = 13.sp)
     }
 }
 

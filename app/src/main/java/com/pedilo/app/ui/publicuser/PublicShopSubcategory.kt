@@ -71,6 +71,54 @@ private val pizzaStores = listOf(
     RelatedStore("Masa Madre", "Pizzas de horno y focaccias", "4.5", "612", "1,7 km", "30-45 min", "$1.450"),
 )
 
+private val relatedStoresByCategory = mapOf(
+    "pizzas" to pizzaStores,
+    "mascotas" to listOf(
+        RelatedStore("Pet Shop Norte", "Alimentos y accesorios", "4.8", "721", "1,0 km", "20-30 min", "$1.000", verified = true),
+        RelatedStore("Veterinaria Patitas", "Cuidado y alimentos", "4.7", "466", "1,8 km", "25-40 min", "$1.200"),
+    ),
+    "farmacia" to listOf(
+        RelatedStore("Farmacia Central", "Farmacia y perfumería", "4.8", "932", "0,7 km", "15-25 min", "$900", verified = true),
+        RelatedStore("Salud Norte", "Medicamentos y cuidado personal", "4.6", "518", "1,6 km", "20-35 min", "$1.100"),
+    ),
+    "bebidas" to listOf(
+        RelatedStore("Bebidas Express", "Gaseosas, aguas y jugos", "4.6", "690", "0,8 km", "15-25 min", "$900", verified = true),
+        RelatedStore("Kiosco La Esquina", "Bebidas frías y snacks", "4.4", "385", "1,1 km", "20-30 min", "$850"),
+    ),
+    "hamburguesas" to listOf(
+        RelatedStore("Burger House", "Hamburguesas clásicas", "4.7", "1.208", "0,9 km", "20-30 min", "$1.100", verified = true),
+        RelatedStore("Big Burger", "Combos y papas", "4.5", "684", "1,4 km", "25-35 min", "$1.250"),
+    ),
+    "sushi" to listOf(
+        RelatedStore("Sushi Zen", "Rolls y piezas combinadas", "4.7", "812", "1,5 km", "30-40 min", "$1.500", verified = true),
+        RelatedStore("Nikkei Club", "Sushi y cocina japonesa", "4.6", "430", "2,1 km", "35-45 min", "$1.700"),
+    ),
+    "panadería" to listOf(
+        RelatedStore("Dulce Hogar", "Panadería y facturas", "4.9", "755", "0,9 km", "20-30 min", "$850", verified = true),
+        RelatedStore("La Espiga", "Panificados artesanales", "4.6", "389", "1,4 km", "25-35 min", "$950"),
+    ),
+    "cafetería" to listOf(
+        RelatedStore("Café Central", "Café y pastelería", "4.8", "903", "0,7 km", "20-30 min", "$900", verified = true),
+        RelatedStore("Barista Club", "Café de especialidad", "4.7", "612", "1,3 km", "25-35 min", "$1.000"),
+    ),
+    "heladería" to listOf(
+        RelatedStore("Helados Norte", "Helados artesanales", "4.8", "611", "1,0 km", "20-30 min", "$900", verified = true),
+        RelatedStore("Dulce Frío", "Postres y helados", "4.6", "402", "1,6 km", "25-35 min", "$1.000"),
+    ),
+    "supermercado" to listOf(
+        RelatedStore("Supermercado Sol", "Almacén y frescos", "4.5", "1.020", "1,2 km", "25-40 min", "$1.300"),
+        RelatedStore("Almacén Don Luis", "Despensa de barrio", "4.6", "544", "0,6 km", "20-30 min", "$950"),
+    ),
+)
+
+private fun storesForSubcategory(title: String): List<RelatedStore> {
+    val normalized = title.trim().lowercase()
+    relatedStoresByCategory.forEach { (key, stores) ->
+        if (normalized.contains(key) || key.contains(normalized)) return stores
+    }
+    return pizzaStores
+}
+
 @Composable
 fun PublicShopSubcategoryScreen(
     title: String,
@@ -79,8 +127,7 @@ fun PublicShopSubcategoryScreen(
     onShop: () -> Unit,
     onViewLocal: () -> Unit,
 ) {
-    var selectedFilter by remember { mutableStateOf(SubcategoryFilter.Nearby) }
-    var statusMessage by remember { mutableStateOf("Elegí un local para ver su menú.") }
+    val stores = remember(title) { storesForSubcategory(title) }
 
     PublicShell(
         current = PublicBottomDestination.Shop,
@@ -102,38 +149,16 @@ fun PublicShopSubcategoryScreen(
                 )
             }
             item {
-                FilterRow(
-                    selected = selectedFilter,
-                    onSelected = {
-                        selectedFilter = it
-                        statusMessage = "Filtro ${it.label} aplicado localmente."
-                    },
-                )
-            }
-            item {
                 Text(
-                    text = "${pizzaStores.size} locales encontrados",
+                    text = "${stores.size} locales encontrados",
                     color = PediloMuted,
                     fontSize = 16.sp,
                 )
             }
-            items(pizzaStores) { store ->
+            items(stores) { store ->
                 RelatedStoreCard(
                     store = store,
                     onView = onViewLocal,
-                )
-            }
-            item {
-                Text(
-                    text = statusMessage,
-                    color = PediloMuted,
-                    fontSize = 12.sp,
-                    lineHeight = 15.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(PediloPanel, RoundedCornerShape(10.dp))
-                        .border(1.dp, PediloLine, RoundedCornerShape(10.dp))
-                        .padding(12.dp),
                 )
             }
         }
@@ -156,14 +181,6 @@ private fun SubcategoryHeader(
                 lineHeight = 32.sp,
                 fontWeight = FontWeight.ExtraBold,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = "Locales relacionados con esta categoría",
-                color = PediloMuted,
-                fontSize = 13.sp,
-                lineHeight = 16.sp,
-                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }

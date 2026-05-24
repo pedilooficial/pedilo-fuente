@@ -141,8 +141,6 @@ fun PublicShopScreen(
     onTracking: (String) -> Unit,
     onSubcategory: (String) -> Unit,
 ) {
-    var statusMessage by remember { mutableStateOf("Seleccioná una categoría para ver locales relacionados.") }
-
     PublicShell(
         current = PublicBottomDestination.Shop,
         onHome = onHome,
@@ -163,7 +161,6 @@ fun PublicShopScreen(
             items(shopGroups) { group ->
                 CategoryGroupCard(group = group, onPending = { onSubcategory(it.title) })
             }
-            item { ShopStatusNote(statusMessage) }
         }
     }
 }
@@ -184,14 +181,6 @@ private fun ShopHeader() {
                 fontSize = 42.sp,
                 lineHeight = 42.sp,
                 fontWeight = FontWeight.ExtraBold,
-            )
-            Text(
-                text = "Explorá categorías, locales y productos",
-                color = PediloText,
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
             )
         }
         Row(
@@ -245,20 +234,26 @@ private fun ShopSearchCard(onPending: () -> Unit) {
 
 @Composable
 private fun TrackingLookupCard(onPending: (String) -> Unit) {
-    var code by remember { mutableStateOf("PDL-123456") }
+    var code by remember { mutableStateOf("") }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PediloOverlay, RoundedCornerShape(12.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(12.dp))
-            .padding(11.dp),
+            .background(Brush.horizontalGradient(listOf(PediloPanel, PediloOrangeDark.copy(alpha = 0.24f))), RoundedCornerShape(14.dp))
+            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .padding(13.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            ShopIcon(ShopIconKind.Tracking, tint = PediloOrange, modifier = Modifier.size(20.dp))
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .background(PediloPanelSoft, RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                ShopIcon(ShopIconKind.Tracking, tint = PediloOrange, modifier = Modifier.size(24.dp))
+            }
             Spacer(Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text("Consultá el estado de tu pedido", color = PediloText, fontSize = 15.sp, lineHeight = 17.sp, fontWeight = FontWeight.Bold)
-                Text("Ingresá tu número para verlo.", color = PediloMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         Spacer(Modifier.height(8.dp))

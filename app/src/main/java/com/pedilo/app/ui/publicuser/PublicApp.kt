@@ -135,7 +135,7 @@ fun PublicApp() {
                 onShop = { goShop() },
                 onSearch = { navigateTo(PublicRoute.ShopSearch("", PublicBottomDestination.Home)) },
                 onConventions = { navigateTo(PublicRoute.Conventions) },
-                onCategory = { navigateTo(PublicRoute.ShopSearch(it, PublicBottomDestination.Home)) },
+                onCategory = { navigateTo(PublicRoute.HomeListing(it, it)) },
                 onOffer = {
                     localOrderPlaced = false
                     navigateTo(PublicRoute.Local)

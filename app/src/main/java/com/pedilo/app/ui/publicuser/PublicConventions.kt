@@ -83,9 +83,9 @@ fun PublicConventionsScreen(
         onShop = onShop,
     ) {
         val options = listOf(
-            ConventionOption("Información del día", "Novedades, horarios y avisos públicos.", "Leer", ConventionIconKind.Info, onInfo),
-            ConventionOption("Reclamo", "Dejá un aviso o registro para revisión.", "Aviso", ConventionIconKind.Claim, onClaim),
-            ConventionOption("Seguimiento del pedido", "Ingresá tu número y consultá el estado.", "Pedido", ConventionIconKind.Tracking, onTracking),
+            ConventionOption("Información del día", "", "Leer", ConventionIconKind.Info, onInfo),
+            ConventionOption("Reclamo", "", "Aviso", ConventionIconKind.Claim, onClaim),
+            ConventionOption("Seguimiento del pedido", "", "Pedido", ConventionIconKind.Tracking, onTracking),
         )
         LazyColumn(
             modifier = Modifier
@@ -95,20 +95,9 @@ fun PublicConventionsScreen(
             contentPadding = PaddingValues(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 132.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item {
-                ConventionHeader(
-                    title = "Convenciones",
-                    subtitle = "Información pública y ayuda para tus pedidos",
-                )
-            }
             item { TodayHighlightCard() }
             options.forEach { option ->
                 item { ConventionOptionCard(option) }
-            }
-            item {
-                ConventionNotice(
-                    text = "Consultá información, dejá un aviso o revisá el estado de un pedido.",
-                )
             }
         }
     }
@@ -135,12 +124,6 @@ fun PublicConventionsInfoScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                ConventionHeader(
-                    title = "Información del día",
-                    subtitle = "Novedades útiles antes de hacer tu pedido",
-                )
-            }
-            item {
                 InformationCard(
                     icon = ConventionIconKind.Alert,
                     title = "Aviso importante",
@@ -160,7 +143,7 @@ fun PublicConventionsInfoScreen(
                 InformationCard(
                     icon = ConventionIconKind.Info,
                     title = "Novedad",
-                    body = "Las consultas de seguimiento público se realizan con el número del pedido.",
+                    body = "Usá el número que recibiste al confirmar tu pedido para consultar el estado.",
                     accent = PediloPink,
                 )
             }
@@ -194,12 +177,6 @@ fun PublicConventionsClaimScreen(
             contentPadding = PaddingValues(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 132.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item {
-                ConventionHeader(
-                    title = "Reclamo",
-                    subtitle = "Dejá un aviso público de revisión",
-                )
-            }
             item {
                 ClaimIntroCard(sent = sent)
             }
@@ -259,9 +236,7 @@ fun PublicConventionsClaimScreen(
             }
             if (sent) {
                 item {
-                    ConventionNotice(
-                        text = "Reclamo enviado localmente. No se abrió soporte real, chat ni panel interno.",
-                    )
+                    ConventionNotice(text = "Tu reclamo quedó registrado.")
                 }
             }
         }
@@ -276,7 +251,6 @@ fun PublicConventionsTrackingEntryScreen(
     onSubmit: (String) -> Unit,
 ) {
     var orderNumber by remember { mutableStateOf("") }
-    var status by remember { mutableStateOf("Ingresá un número para consultar el seguimiento público.") }
 
     PublicShell(
         current = PublicBottomDestination.Home,
@@ -293,12 +267,6 @@ fun PublicConventionsTrackingEntryScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                ConventionHeader(
-                    title = "Seguimiento del pedido",
-                    subtitle = "Cargá tu número para ver el estado público",
-                )
-            }
-            item {
                 TrackingEntryCard()
             }
             item {
@@ -306,15 +274,12 @@ fun PublicConventionsTrackingEntryScreen(
                     label = "Número de pedido",
                     value = orderNumber,
                     placeholder = "PDL-123456",
-                    onValueChange = {
-                        orderNumber = it
-                        status = "Ingresá el número completo para consultar el estado."
-                    },
+                    onValueChange = { orderNumber = it },
                 )
             }
             item {
                 ConventionPrimaryAction(
-                    label = "Consultar seguimiento",
+                    label = "Consultar pedido",
                     icon = ConventionIconKind.Tracking,
                     enabled = true,
                     onClick = {
@@ -322,9 +287,6 @@ fun PublicConventionsTrackingEntryScreen(
                         onSubmit(normalized)
                     },
                 )
-            }
-            item {
-                ConventionNotice(text = status)
             }
         }
     }
@@ -375,12 +337,6 @@ private fun TodayHighlightCard() {
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text("Día activo", color = PediloText, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-            Text(
-                "Revisá avisos, registrá un reclamo o consultá un pedido.",
-                color = PediloMuted,
-                fontSize = 13.sp,
-                lineHeight = 17.sp,
-            )
         }
     }
 }
@@ -408,8 +364,10 @@ private fun ConventionOptionCard(option: ConventionOption) {
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(option.title, color = PediloText, fontSize = 18.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(3.dp))
-            Text(option.subtitle, color = PediloMuted, fontSize = 12.sp, lineHeight = 15.sp)
+            if (option.subtitle.isNotBlank()) {
+                Spacer(Modifier.height(3.dp))
+                Text(option.subtitle, color = PediloMuted, fontSize = 12.sp, lineHeight = 15.sp)
+            }
         }
         Spacer(Modifier.width(10.dp))
         Text(
@@ -469,43 +427,25 @@ private fun ClaimIntroCard(sent: Boolean) {
             ConventionIcon(if (sent) ConventionIconKind.Check else ConventionIconKind.Note, tint = if (sent) PediloGreen else PediloOrange, modifier = Modifier.size(28.dp))
             Spacer(Modifier.width(10.dp))
             Text(
-                text = if (sent) "Reclamo enviado" else "Registro de aviso",
+                text = if (sent) "Tu reclamo quedó registrado." else "Registro de aviso",
                 color = PediloText,
                 fontSize = 19.sp,
                 fontWeight = FontWeight.Bold,
             )
         }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = if (sent) "Recibimos tu aviso. Gracias por contarnos qué pasó." else "Completá los datos para dejar un aviso.",
-            color = PediloMuted,
-            fontSize = 13.sp,
-            lineHeight = 18.sp,
-        )
     }
 }
 
 @Composable
 private fun TrackingEntryCard() {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(Brush.horizontalGradient(listOf(PediloPanel, PediloOrangeDark.copy(alpha = 0.28f))), RoundedCornerShape(16.dp))
             .border(1.dp, PediloLine, RoundedCornerShape(16.dp))
             .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        ConventionIcon(ConventionIconKind.Tracking, tint = PediloOrange, modifier = Modifier.size(50.dp))
-        Spacer(Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text("Carga de número", color = PediloText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Text(
-                "Esta pantalla solo toma el número y deriva al seguimiento público común.",
-                color = PediloMuted,
-                fontSize = 13.sp,
-                lineHeight = 17.sp,
-            )
-        }
+        Text("Carga de número", color = PediloText, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
     }
 }
 

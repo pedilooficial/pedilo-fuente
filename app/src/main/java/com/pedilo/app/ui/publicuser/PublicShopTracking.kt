@@ -69,7 +69,6 @@ fun PublicShopTrackingScreen(
     onPlus: () -> Unit,
     onShop: () -> Unit,
 ) {
-    var statusMessage by remember { mutableStateOf("Consultá el estado de tu pedido cuando lo necesites.") }
     val tracking = remember(orderNumber) {
         PublicTrackingData(
             orderNumber = orderNumber.ifBlank { "PDL-123456" },
@@ -96,7 +95,6 @@ fun PublicShopTrackingScreen(
             contentPadding = PaddingValues(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 132.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { TrackingHeader() }
             item { OrderNumberCard(tracking.orderNumber) }
             item { TrackingProgressCard(tracking) }
             item {
@@ -119,7 +117,7 @@ fun PublicShopTrackingScreen(
                     label = "Cancelar pedido",
                     icon = TrackingIconKind.Cancel,
                     filled = true,
-                    onClick = { statusMessage = "Recibimos tu solicitud de cancelación. Te avisaremos por este mismo pedido." },
+                    onClick = { },
                 )
             }
             item {
@@ -127,20 +125,7 @@ fun PublicShopTrackingScreen(
                     label = "Reportar problema",
                     icon = TrackingIconKind.Warning,
                     filled = false,
-                    onClick = { statusMessage = "Recibimos tu reporte. Vamos a revisarlo cuanto antes." },
-                )
-            }
-            item {
-                Text(
-                    text = statusMessage,
-                    color = PediloMuted,
-                    fontSize = 12.sp,
-                    lineHeight = 15.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(PediloPanel, RoundedCornerShape(10.dp))
-                        .border(1.dp, PediloLine, RoundedCornerShape(10.dp))
-                        .padding(12.dp),
+                    onClick = { },
                 )
             }
         }

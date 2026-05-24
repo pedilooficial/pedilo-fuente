@@ -149,10 +149,10 @@ fun PublicShopSearchScreen(
 ) {
     var selectedFilter by remember { mutableStateOf(SearchFilter.Nearby) }
     var activeQuery by remember(query) { mutableStateOf(query) }
-    var statusMessage by remember { mutableStateOf("Escribí para ver resultados relacionados.") }
     val hasQuery = activeQuery.isNotBlank()
     val relatedStores = storesForQuery(activeQuery)
     val hasRelatedStores = relatedStores.isNotEmpty()
+    val listingMode = titleOverride != null
 
     PublicShell(
         current = current,
@@ -174,30 +174,17 @@ fun PublicShopSearchScreen(
                     titleOverride = titleOverride,
                 )
             }
-            item {
-                ActiveSearchBox(
-                    query = activeQuery,
-                    onQueryChange = {
-                        activeQuery = it
-                        statusMessage = if (it.isBlank()) "Escribí para ver resultados relacionados." else "Resultados para ${it.trim()}."
-                    },
-                    onClear = {
-                        activeQuery = ""
-                        statusMessage = "Escribí para ver resultados relacionados."
-                    },
-                )
+            if (!listingMode) {
+                item {
+                    ActiveSearchBox(
+                        query = activeQuery,
+                        onQueryChange = { activeQuery = it },
+                        onClear = { activeQuery = "" },
+                    )
+                }
             }
-            if (hasQuery) {
+            if (listingMode || hasQuery) {
                 if (hasRelatedStores) {
-                    item {
-                        SearchFilterRow(
-                            selected = selectedFilter,
-                            onSelected = {
-                                selectedFilter = it
-                                statusMessage = "Filtro ${it.label} aplicado."
-                            },
-                        )
-                    }
                     items(relatedStores) { store ->
                         SearchResultCard(
                             store = store,
@@ -206,31 +193,9 @@ fun PublicShopSearchScreen(
                     }
                 } else {
                     item {
-                        SearchNoResults(query = activeQuery)
+                        SearchNoResults()
                     }
                 }
-            } else {
-                item {
-                    SearchEmptyState(
-                        onSuggestion = {
-                            activeQuery = it
-                            statusMessage = "Resultados para $it."
-                        },
-                    )
-                }
-            }
-            item {
-                Text(
-                    text = if (hasQuery && !hasRelatedStores) "Probá con otra búsqueda o una sugerencia popular." else statusMessage,
-                    color = PediloMuted,
-                    fontSize = 12.sp,
-                    lineHeight = 15.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(PediloPanel, RoundedCornerShape(10.dp))
-                        .border(1.dp, PediloLine, RoundedCornerShape(10.dp))
-                        .padding(12.dp),
-                )
             }
         }
     }
@@ -245,7 +210,7 @@ private fun SearchHeader(query: String, titleOverride: String?) {
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = titleOverride ?: if (hasQuery) "Resultado: ${query.trim()}" else "Buscar en Pédilo!",
+                text = titleOverride ?: if (hasQuery) "Resultado: ${query.trim()}" else "Pédilo!",
                 color = PediloText,
                 fontSize = 24.sp,
                 lineHeight = 27.sp,
@@ -253,13 +218,15 @@ private fun SearchHeader(query: String, titleOverride: String?) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                text = if (hasQuery) "Locales relacionados" else "Buscá productos, locales o categorías",
-                color = PediloMuted,
-                fontSize = 13.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (hasQuery && titleOverride == null) {
+                Text(
+                    text = "Locales relacionados",
+                    color = PediloMuted,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -315,7 +282,7 @@ private fun ActiveSearchBox(
 }
 
 @Composable
-private fun SearchNoResults(query: String) {
+private fun SearchNoResults() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -324,65 +291,12 @@ private fun SearchNoResults(query: String) {
             .padding(16.dp),
     ) {
         Text(
-            text = "No encontramos resultados para esta búsqueda.",
+            text = "No encontramos resultados.",
             color = PediloText,
             fontSize = 19.sp,
             lineHeight = 22.sp,
             fontWeight = FontWeight.Bold,
         )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "Probá con otra palabra.",
-            color = PediloMuted,
-            fontSize = 13.sp,
-            lineHeight = 17.sp,
-        )
-    }
-}
-
-@Composable
-private fun SearchEmptyState(
-    onSuggestion: (String) -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(PediloOverlay, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
-            .padding(16.dp),
-    ) {
-        Text(
-            text = "Buscá productos, locales o categorías",
-            color = PediloText,
-            fontSize = 19.sp,
-            lineHeight = 22.sp,
-            fontWeight = FontWeight.Bold,
-        )
-        Spacer(Modifier.height(12.dp))
-        Text("Sugerencias populares", color = PediloMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(8.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(
-                listOf("Pizzas", "Hamburguesas"),
-                listOf("Heladería", "Farmacia"),
-            ).forEach { rowSuggestions ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    rowSuggestions.forEach { suggestion ->
-                        Box(
-                            modifier = Modifier
-                                .height(36.dp)
-                                .background(PediloPanel, RoundedCornerShape(18.dp))
-                                .border(1.dp, PediloLine, RoundedCornerShape(18.dp))
-                                .clickable(role = Role.Button) { onSuggestion(suggestion) }
-                                .padding(horizontal = 12.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(suggestion, color = PediloText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 
