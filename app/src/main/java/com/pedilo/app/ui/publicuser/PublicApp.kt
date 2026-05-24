@@ -40,6 +40,7 @@ private sealed interface PublicRoute {
     data class ShopSubcategory(val name: String) : PublicRoute
     data class ShopSearch(val query: String, val origin: PublicBottomDestination) : PublicRoute
     data class ShopTracking(val orderNumber: String) : PublicRoute
+    data class HomeListing(val title: String, val query: String) : PublicRoute
     data object Local : PublicRoute
     data class LocalProductDetail(val product: LocalProduct) : PublicRoute
     data object LocalCart : PublicRoute
@@ -134,6 +135,17 @@ fun PublicApp() {
                 onShop = { goShop() },
                 onSearch = { navigateTo(PublicRoute.ShopSearch("", PublicBottomDestination.Home)) },
                 onConventions = { navigateTo(PublicRoute.Conventions) },
+                onCategory = { navigateTo(PublicRoute.ShopSearch(it, PublicBottomDestination.Home)) },
+                onOffer = {
+                    localOrderPlaced = false
+                    navigateTo(PublicRoute.Local)
+                },
+                onAllOffers = { navigateTo(PublicRoute.HomeListing("Ofertas", "Ofertas")) },
+                onLocal = {
+                    localOrderPlaced = false
+                    navigateTo(PublicRoute.Local)
+                },
+                onAllLocals = { navigateTo(PublicRoute.HomeListing("Nuevos locales", "Nuevos locales")) },
             )
             PublicRoute.Plus -> PublicPlusChoiceScreen(
                 onHome = { goHome() },
@@ -203,6 +215,18 @@ fun PublicApp() {
                 onHome = { goHome() },
                 onPlus = { goPlus() },
                 onShop = { goShop() },
+            )
+            is PublicRoute.HomeListing -> PublicShopSearchScreen(
+                query = (route as PublicRoute.HomeListing).query,
+                current = PublicBottomDestination.Home,
+                titleOverride = (route as PublicRoute.HomeListing).title,
+                onHome = { goHome() },
+                onPlus = { goPlus() },
+                onShop = { goShop() },
+                onViewLocal = {
+                    localOrderPlaced = false
+                    navigateTo(PublicRoute.Local)
+                },
             )
             PublicRoute.Conventions -> PublicConventionsScreen(
                 onHome = { goHome() },
@@ -344,7 +368,7 @@ private fun PublicPhasePlaceholder(
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                text = "Pedilo",
+                text = "Pédilo!",
                 color = PediloOrange,
                 fontSize = 44.sp,
                 fontWeight = FontWeight.ExtraBold,

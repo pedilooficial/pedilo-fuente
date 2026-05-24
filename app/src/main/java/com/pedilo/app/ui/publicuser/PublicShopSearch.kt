@@ -62,16 +62,80 @@ private data class SearchStore(
     val eta: String,
     val delivery: String,
     val badge: String? = null,
+    val icon: SearchIconKind = SearchIconKind.Shop,
 )
 
 private val pizzaSearchStores = listOf(
-    SearchStore("Pizzería Roma", "Pizza a la piedra", "4.6", "2.451", "0.8 km", "20-30 min", "$1200", "10% OFF"),
-    SearchStore("La Esquina Pizzería", "Pizza al molde y a la piedra", "4.6", "820", "1.2 km", "25-35 min", "$1300"),
-    SearchStore("Pizza & Co.", "Pizzas artesanales", "4.7", "1.050", "1.5 km", "30-40 min", "$1200"),
-    SearchStore("Don Pietro Pizzería", "Tradición italiana desde 1990", "4.5", "743", "1.0 km", "20-30 min", "$1.100"),
-    SearchStore("Napoli Pizza", "Estilo napolitano auténtico", "4.7", "591", "1.3 km", "25-35 min", "$1200", "TOP"),
-    SearchStore("La Nonna Pizzas", "Recetas caseras desde 1985", "4.4", "612", "1.8 km", "30-45 min", "$1.350"),
+    SearchStore("Pizzería Roma", "Pizza a la piedra", "4.6", "2.451", "0.8 km", "20-30 min", "$1200", "10% OFF", SearchIconKind.Pizza),
+    SearchStore("La Esquina Pizzería", "Pizza al molde y a la piedra", "4.6", "820", "1.2 km", "25-35 min", "$1300", icon = SearchIconKind.Pizza),
+    SearchStore("Pizza & Co.", "Pizzas artesanales", "4.7", "1.050", "1.5 km", "30-40 min", "$1200", icon = SearchIconKind.Pizza),
+    SearchStore("Don Pietro Pizzería", "Tradición italiana desde 1990", "4.5", "743", "1.0 km", "20-30 min", "$1.100", icon = SearchIconKind.Pizza),
+    SearchStore("Napoli Pizza", "Estilo napolitano auténtico", "4.7", "591", "1.3 km", "25-35 min", "$1200", "TOP", SearchIconKind.Pizza),
+    SearchStore("La Nonna Pizzas", "Recetas caseras desde 1985", "4.4", "612", "1.8 km", "30-45 min", "$1.350", icon = SearchIconKind.Pizza),
 )
+
+private val coherentStores = mapOf(
+    "hamburguesas" to listOf(
+        SearchStore("Burger House", "Hamburguesas clásicas", "4.7", "1.208", "0.9 km", "20-30 min", "$1.100", "20% OFF"),
+        SearchStore("Big Burger", "Combos y papas", "4.5", "684", "1.4 km", "25-35 min", "$1.250"),
+    ),
+    "farmacia" to listOf(
+        SearchStore("Farmacia Central", "Farmacia y perfumería", "4.8", "932", "0.7 km", "15-25 min", "$900", icon = SearchIconKind.Pharmacy),
+        SearchStore("Salud Norte", "Medicamentos y cuidado personal", "4.6", "518", "1.6 km", "20-35 min", "$1.100", icon = SearchIconKind.Pharmacy),
+    ),
+    "mascotas" to listOf(
+        SearchStore("Pet Shop Norte", "Alimentos y accesorios", "4.8", "721", "1.0 km", "20-30 min", "$1.000", icon = SearchIconKind.Paw),
+        SearchStore("Veterinaria Patitas", "Cuidado y alimentos", "4.7", "466", "1.8 km", "25-40 min", "$1.200", icon = SearchIconKind.Paw),
+    ),
+    "bebidas" to listOf(
+        SearchStore("Bebidas Express", "Gaseosas, aguas y jugos", "4.6", "690", "0.8 km", "15-25 min", "$900", icon = SearchIconKind.Drink),
+        SearchStore("Kiosco La Esquina", "Bebidas frías y snacks", "4.4", "385", "1.1 km", "20-30 min", "$850", icon = SearchIconKind.Drink),
+    ),
+    "supermercado" to listOf(
+        SearchStore("Supermercado Sol", "Almacén y frescos", "4.5", "1.020", "1.2 km", "25-40 min", "$1.300"),
+        SearchStore("Almacén Don Luis", "Despensa de barrio", "4.6", "544", "0.6 km", "20-30 min", "$950"),
+    ),
+    "sushi" to listOf(
+        SearchStore("Sushi Zen", "Rolls y piezas combinadas", "4.7", "812", "1.5 km", "30-40 min", "$1.500"),
+        SearchStore("Nikkei Club", "Sushi y cocina japonesa", "4.6", "430", "2.1 km", "35-45 min", "$1.700"),
+    ),
+    "panaderia" to listOf(
+        SearchStore("Dulce Hogar", "Panadería y facturas", "4.9", "755", "0.9 km", "20-30 min", "$850"),
+        SearchStore("La Espiga", "Panificados artesanales", "4.6", "389", "1.4 km", "25-35 min", "$950"),
+    ),
+    "panadería" to listOf(
+        SearchStore("Dulce Hogar", "Panadería y facturas", "4.9", "755", "0.9 km", "20-30 min", "$850"),
+        SearchStore("La Espiga", "Panificados artesanales", "4.6", "389", "1.4 km", "25-35 min", "$950"),
+    ),
+    "cafeteria" to listOf(
+        SearchStore("Café Central", "Café y pastelería", "4.8", "903", "0.7 km", "20-30 min", "$900"),
+        SearchStore("Barista Club", "Café de especialidad", "4.7", "612", "1.3 km", "25-35 min", "$1.000"),
+    ),
+    "cafetería" to listOf(
+        SearchStore("Café Central", "Café y pastelería", "4.8", "903", "0.7 km", "20-30 min", "$900"),
+        SearchStore("Barista Club", "Café de especialidad", "4.7", "612", "1.3 km", "25-35 min", "$1.000"),
+    ),
+    "ofertas" to listOf(
+        SearchStore("Burger House", "Hamburguesas clásicas", "4.7", "1.208", "0.9 km", "20-30 min", "$1.100", "20% OFF"),
+        SearchStore("Pizzería Roma", "Pizzas seleccionadas", "4.6", "2.451", "0.8 km", "20-30 min", "$1200", "15% OFF"),
+        SearchStore("Fruta Viva", "Jugos naturales", "4.5", "408", "1.2 km", "20-30 min", "$900", "25% OFF"),
+    ),
+    "nuevos locales" to listOf(
+        SearchStore("Café Central", "Cafetería", "4.8", "903", "0.7 km", "20-30 min", "$900", "Nuevo"),
+        SearchStore("Sushi Zen", "Sushi", "4.7", "812", "1.5 km", "30-40 min", "$1.500", "Nuevo"),
+        SearchStore("Verde Vivo", "Comida saludable", "4.6", "377", "1.1 km", "20-30 min", "$1.100", "Nuevo"),
+    ),
+)
+
+private fun storesForQuery(query: String): List<SearchStore> {
+    val normalized = query.trim().lowercase()
+    if (normalized.isBlank()) return emptyList()
+    if (listOf("p", "pi", "piz", "pizz", "pizza", "pizzas").any { normalized == it || "pizzas".startsWith(normalized) }) return pizzaSearchStores
+    coherentStores.forEach { (key, stores) ->
+        if (key.startsWith(normalized) || normalized.contains(key) || key.contains(normalized)) return stores
+    }
+    return emptyList()
+}
 
 @Composable
 fun PublicShopSearchScreen(
@@ -81,13 +145,14 @@ fun PublicShopSearchScreen(
     onPlus: () -> Unit,
     onShop: () -> Unit,
     onViewLocal: () -> Unit,
+    titleOverride: String? = null,
 ) {
     var selectedFilter by remember { mutableStateOf(SearchFilter.Nearby) }
     var activeQuery by remember(query) { mutableStateOf(query) }
     var statusMessage by remember { mutableStateOf("Escribí para ver resultados relacionados.") }
     val hasQuery = activeQuery.isNotBlank()
-    val normalizedQuery = activeQuery.trim().lowercase()
-    val hasRelatedStores = hasQuery && listOf("p", "pi", "piz", "pizz", "pizza", "pizzas").any { normalizedQuery == it || "pizzas".startsWith(normalizedQuery) }
+    val relatedStores = storesForQuery(activeQuery)
+    val hasRelatedStores = relatedStores.isNotEmpty()
 
     PublicShell(
         current = current,
@@ -106,6 +171,7 @@ fun PublicShopSearchScreen(
             item {
                 SearchHeader(
                     query = activeQuery,
+                    titleOverride = titleOverride,
                 )
             }
             item {
@@ -113,7 +179,7 @@ fun PublicShopSearchScreen(
                     query = activeQuery,
                     onQueryChange = {
                         activeQuery = it
-                        statusMessage = if (it.isBlank()) "Escribí para ver resultados relacionados." else "Resultados locales para ${it.trim()}."
+                        statusMessage = if (it.isBlank()) "Escribí para ver resultados relacionados." else "Resultados para ${it.trim()}."
                     },
                     onClear = {
                         activeQuery = ""
@@ -122,17 +188,17 @@ fun PublicShopSearchScreen(
                 )
             }
             if (hasQuery) {
-                item {
-                    SearchFilterRow(
-                        selected = selectedFilter,
-                        onSelected = {
-                            selectedFilter = it
-                            statusMessage = "Filtro ${it.label} aplicado localmente."
-                        },
-                    )
-                }
                 if (hasRelatedStores) {
-                    items(pizzaSearchStores) { store ->
+                    item {
+                        SearchFilterRow(
+                            selected = selectedFilter,
+                            onSelected = {
+                                selectedFilter = it
+                                statusMessage = "Filtro ${it.label} aplicado."
+                            },
+                        )
+                    }
+                    items(relatedStores) { store ->
                         SearchResultCard(
                             store = store,
                             onView = onViewLocal,
@@ -148,7 +214,7 @@ fun PublicShopSearchScreen(
                     SearchEmptyState(
                         onSuggestion = {
                             activeQuery = it
-                            statusMessage = "Resultados locales para $it."
+                            statusMessage = "Resultados para $it."
                         },
                     )
                 }
@@ -171,9 +237,7 @@ fun PublicShopSearchScreen(
 }
 
 @Composable
-private fun SearchHeader(
-    query: String,
-) {
+private fun SearchHeader(query: String, titleOverride: String?) {
     val hasQuery = query.isNotBlank()
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -181,7 +245,7 @@ private fun SearchHeader(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = if (hasQuery) "Resultado: ${query.trim()}" else "Buscar en Pedilo",
+                text = titleOverride ?: if (hasQuery) "Resultado: ${query.trim()}" else "Buscar en Pédilo!",
                 color = PediloText,
                 fontSize = 24.sp,
                 lineHeight = 27.sp,
@@ -190,7 +254,7 @@ private fun SearchHeader(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = if (hasQuery) "Locales relacionados con tu búsqueda" else "Buscá productos, locales o categorías",
+                text = if (hasQuery) "Locales relacionados" else "Buscá productos, locales o categorías",
                 color = PediloMuted,
                 fontSize = 13.sp,
                 maxLines = 1,
@@ -227,7 +291,7 @@ private fun ActiveSearchBox(
             decorationBox = { innerTextField ->
                 if (query.isEmpty()) {
                     Text(
-                        text = "Qué estás buscando?",
+                        text = "¿Qué estás buscando?",
                         color = PediloMuted,
                         fontSize = 18.sp,
                         maxLines = 1,
@@ -260,7 +324,7 @@ private fun SearchNoResults(query: String) {
             .padding(16.dp),
     ) {
         Text(
-            text = "No encontramos locales para “${query.trim()}”",
+            text = "No encontramos resultados para esta búsqueda.",
             color = PediloText,
             fontSize = 19.sp,
             lineHeight = 22.sp,
@@ -268,7 +332,7 @@ private fun SearchNoResults(query: String) {
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Probá con otra palabra o elegí una sugerencia popular.",
+            text = "Probá con otra palabra.",
             color = PediloMuted,
             fontSize = 13.sp,
             lineHeight = 17.sp,
@@ -294,14 +358,7 @@ private fun SearchEmptyState(
             lineHeight = 22.sp,
             fontWeight = FontWeight.Bold,
         )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "Escribí una palabra para ver locales relacionados cerca tuyo.",
-            color = PediloMuted,
-            fontSize = 13.sp,
-            lineHeight = 17.sp,
-        )
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(12.dp))
         Text("Sugerencias populares", color = PediloMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -443,7 +500,7 @@ private fun SearchStoreThumbnail(store: SearchStore) {
             ),
         contentAlignment = Alignment.Center,
     ) {
-        SearchIcon(SearchIconKind.Pizza, tint = Color.White, modifier = Modifier.size(62.dp))
+        SearchIcon(store.icon, tint = Color.White, modifier = Modifier.size(62.dp))
         store.badge?.let { badge ->
             Text(
                 text = badge,
@@ -466,6 +523,10 @@ private enum class SearchIconKind {
     Star,
     Delivery,
     Pizza,
+    Shop,
+    Paw,
+    Pharmacy,
+    Drink,
 }
 
 @Composable
@@ -517,6 +578,30 @@ private fun SearchIcon(
                 drawPath(slice, tint, style = stroke)
                 drawCircle(tint, size.minDimension * 0.05f, Offset(size.width * 0.48f, size.height * 0.44f))
                 drawCircle(tint, size.minDimension * 0.05f, Offset(size.width * 0.58f, size.height * 0.58f))
+            }
+            SearchIconKind.Shop -> {
+                drawRoundRect(tint, Offset(size.width * 0.18f, size.height * 0.36f), Size(size.width * 0.64f, size.height * 0.46f), CornerRadius(size.width * 0.06f), style = stroke)
+                drawLine(tint, Offset(size.width * 0.22f, size.height * 0.36f), Offset(size.width * 0.32f, size.height * 0.18f), strokeWidth = stroke.width, cap = StrokeCap.Round)
+                drawLine(tint, Offset(size.width * 0.78f, size.height * 0.36f), Offset(size.width * 0.68f, size.height * 0.18f), strokeWidth = stroke.width, cap = StrokeCap.Round)
+                drawLine(tint, Offset(size.width * 0.32f, size.height * 0.18f), Offset(size.width * 0.68f, size.height * 0.18f), strokeWidth = stroke.width, cap = StrokeCap.Round)
+            }
+            SearchIconKind.Paw -> {
+                drawCircle(tint, size.minDimension * 0.11f, Offset(size.width * 0.5f, size.height * 0.62f))
+                drawCircle(tint, size.minDimension * 0.07f, Offset(size.width * 0.32f, size.height * 0.42f))
+                drawCircle(tint, size.minDimension * 0.07f, Offset(size.width * 0.46f, size.height * 0.32f))
+                drawCircle(tint, size.minDimension * 0.07f, Offset(size.width * 0.6f, size.height * 0.32f))
+                drawCircle(tint, size.minDimension * 0.07f, Offset(size.width * 0.74f, size.height * 0.42f))
+            }
+            SearchIconKind.Pharmacy -> {
+                drawRoundRect(tint, Offset(size.width * 0.2f, size.height * 0.24f), Size(size.width * 0.6f, size.height * 0.56f), CornerRadius(size.width * 0.08f), style = stroke)
+                drawLine(tint, Offset(size.width * 0.5f, size.height * 0.36f), Offset(size.width * 0.5f, size.height * 0.68f), strokeWidth = stroke.width, cap = StrokeCap.Round)
+                drawLine(tint, Offset(size.width * 0.34f, size.height * 0.52f), Offset(size.width * 0.66f, size.height * 0.52f), strokeWidth = stroke.width, cap = StrokeCap.Round)
+            }
+            SearchIconKind.Drink -> {
+                drawRoundRect(tint, Offset(size.width * 0.34f, size.height * 0.18f), Size(size.width * 0.32f, size.height * 0.66f), CornerRadius(size.width * 0.08f), style = stroke)
+                drawLine(tint, Offset(size.width * 0.42f, size.height * 0.18f), Offset(size.width * 0.42f, size.height * 0.08f), strokeWidth = stroke.width, cap = StrokeCap.Round)
+                drawLine(tint, Offset(size.width * 0.42f, size.height * 0.08f), Offset(size.width * 0.66f, size.height * 0.08f), strokeWidth = stroke.width, cap = StrokeCap.Round)
+                drawLine(tint, Offset(size.width * 0.38f, size.height * 0.52f), Offset(size.width * 0.62f, size.height * 0.52f), strokeWidth = stroke.width, cap = StrokeCap.Round)
             }
         }
     }

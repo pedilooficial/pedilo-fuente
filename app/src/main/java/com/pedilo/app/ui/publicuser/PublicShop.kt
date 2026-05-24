@@ -84,7 +84,7 @@ private data class ShopCategoryItem(
 
 private val shopGroups = listOf(
     ShopCategoryGroup(
-        title = "Rapido y al paso",
+        title = "Rápido y al paso",
         icon = ShopIconKind.Lightning,
         accent = PediloOrange,
         items = listOf(
@@ -113,8 +113,8 @@ private val shopGroups = listOf(
         accent = PediloPink,
         items = listOf(
             ShopCategoryItem("Heladería", ShopIconKind.Cake, isNew = true),
-            ShopCategoryItem("Panaderia", ShopIconKind.Sandwich),
-            ShopCategoryItem("Cafeteria", ShopIconKind.Coffee),
+            ShopCategoryItem("Panadería", ShopIconKind.Sandwich),
+            ShopCategoryItem("Cafetería", ShopIconKind.Coffee),
             ShopCategoryItem("Especialidades", ShopIconKind.Cake),
         ),
     ),
@@ -186,7 +186,7 @@ private fun ShopHeader() {
                 fontWeight = FontWeight.ExtraBold,
             )
             Text(
-                text = "Explora categorías, locales y productos",
+                text = "Explorá categorías, locales y productos",
                 color = PediloText,
                 fontSize = 12.sp,
                 maxLines = 1,
@@ -200,7 +200,7 @@ private fun ShopHeader() {
         ) {
             Text("i", color = PediloOrange, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.width(5.dp))
-            Text("Operador", color = PediloOrange, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text("Ayuda", color = PediloOrange, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -257,8 +257,8 @@ private fun TrackingLookupCard(onPending: (String) -> Unit) {
             ShopIcon(ShopIconKind.Tracking, tint = PediloOrange, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("Consulta el estado de tu pedido", color = PediloText, fontSize = 15.sp, lineHeight = 17.sp, fontWeight = FontWeight.Bold)
-                Text("Ingresa tu numero para ver su estado.", color = PediloMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("Consultá el estado de tu pedido", color = PediloText, fontSize = 15.sp, lineHeight = 17.sp, fontWeight = FontWeight.Bold)
+                Text("Ingresá tu número para verlo.", color = PediloMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         Spacer(Modifier.height(8.dp))

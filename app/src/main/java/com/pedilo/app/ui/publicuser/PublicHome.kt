@@ -79,6 +79,7 @@ private enum class PediloIconKind {
 private data class QuickAccess(
     val title: String,
     val icon: PediloIconKind,
+    val query: String,
 )
 
 private data class OfferItem(
@@ -99,10 +100,10 @@ private data class LocalItem(
 )
 
 private val quickAccessItems = listOf(
-    QuickAccess("Supermercado", PediloIconKind.Cart),
-    QuickAccess("Bebidas", PediloIconKind.Bottle),
-    QuickAccess("Farmacia", PediloIconKind.Pill),
-    QuickAccess("Mascotas", PediloIconKind.Paw),
+    QuickAccess("Supermercado", PediloIconKind.Cart, "Supermercado"),
+    QuickAccess("Bebidas", PediloIconKind.Bottle, "Bebidas"),
+    QuickAccess("Farmacia", PediloIconKind.Pill, "Farmacia"),
+    QuickAccess("Mascotas", PediloIconKind.Paw, "Mascotas"),
 )
 
 private val offerItems = listOf(
@@ -113,10 +114,10 @@ private val offerItems = listOf(
 )
 
 private val localItems = listOf(
-    LocalItem("Cafe Central", "Cafeteria", "4,8", "20-30 min", PediloIconKind.Shop),
+    LocalItem("Café Central", "Cafetería", "4,8", "20-30 min", PediloIconKind.Shop),
     LocalItem("Sushi Zen", "Sushi", "4,7", "30-40 min", PediloIconKind.Tag),
     LocalItem("Verde Vivo", "Saludable", "4,6", "20-30 min", PediloIconKind.Paw),
-    LocalItem("Dulce Hogar", "Panaderia", "4,9", "20-30 min", PediloIconKind.Shop),
+    LocalItem("Dulce Hogar", "Panadería", "4,9", "20-30 min", PediloIconKind.Shop),
 )
 
 @Composable
@@ -126,6 +127,11 @@ fun PublicHomeScreen(
     onShop: () -> Unit,
     onSearch: () -> Unit,
     onConventions: () -> Unit,
+    onCategory: (String) -> Unit,
+    onOffer: (String) -> Unit,
+    onAllOffers: () -> Unit,
+    onLocal: (String) -> Unit,
+    onAllLocals: () -> Unit,
 ) {
     PublicShell(
         current = PublicBottomDestination.Home,
@@ -143,9 +149,9 @@ fun PublicHomeScreen(
         ) {
             item { PublicHeader() }
             item { SearchBlock(onSearch = onSearch) }
-            item { QuickAccessSection() }
-            item { OffersSection() }
-            item { LocalsSection() }
+            item { QuickAccessSection(onCategory = onCategory) }
+            item { OffersSection(onOffer = onOffer, onAllOffers = onAllOffers) }
+            item { LocalsSection(onLocal = onLocal, onAllLocals = onAllLocals) }
             item { HomeBanner() }
             item { ConventionsSection(onConventions = onConventions) }
         }
@@ -187,7 +193,7 @@ private fun PublicHeader() {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text = "Pedilo",
+                text = "Pédilo!",
                 color = PediloOrange,
                 fontSize = 44.sp,
                 lineHeight = 44.sp,
@@ -209,7 +215,7 @@ private fun PublicHeader() {
         ) {
             PediloLineIcon(PediloIconKind.Info, tint = PediloOrange, modifier = Modifier.size(17.dp))
             Spacer(Modifier.width(4.dp))
-            Text("Operador", color = PediloOrange, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text("Ayuda", color = PediloOrange, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -259,24 +265,25 @@ private fun SearchInput(onSearch: () -> Unit) {
 }
 
 @Composable
-private fun QuickAccessSection() {
+private fun QuickAccessSection(onCategory: (String) -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         quickAccessItems.forEach { item ->
-            QuickAccessCard(item, modifier = Modifier.weight(1f))
+            QuickAccessCard(item, onClick = { onCategory(item.query) }, modifier = Modifier.weight(1f))
         }
     }
 }
 
 @Composable
-private fun QuickAccessCard(item: QuickAccess, modifier: Modifier = Modifier) {
+private fun QuickAccessCard(item: QuickAccess, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .height(78.dp)
             .background(PediloPanel, RoundedCornerShape(10.dp))
             .border(1.dp, PediloLine, RoundedCornerShape(10.dp))
+            .clickable(role = Role.Button, onClick = onClick)
             .semantics { contentDescription = item.title }
             .padding(horizontal = 4.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -298,23 +305,24 @@ private fun QuickAccessCard(item: QuickAccess, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun OffersSection() {
-    SectionHeader(icon = PediloIconKind.Tag, title = "Ofertas", action = "Ver todas")
+private fun OffersSection(onOffer: (String) -> Unit, onAllOffers: () -> Unit) {
+    SectionHeader(icon = PediloIconKind.Tag, title = "Ofertas", action = "Ver todas", onAction = onAllOffers)
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         items(offerItems) { offer ->
-            OfferCard(offer)
+            OfferCard(offer, onClick = { onOffer(offer.store) })
         }
     }
 }
 
 @Composable
-private fun OfferCard(offer: OfferItem) {
+private fun OfferCard(offer: OfferItem, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .width(118.dp)
             .height(160.dp)
             .background(PediloPanel, RoundedCornerShape(10.dp))
             .border(1.dp, PediloLine, RoundedCornerShape(10.dp))
+            .clickable(role = Role.Button, onClick = onClick)
             .padding(7.dp),
     ) {
         Box(
@@ -355,23 +363,24 @@ private fun OfferCard(offer: OfferItem) {
 }
 
 @Composable
-private fun LocalsSection() {
-    SectionHeader(icon = PediloIconKind.Shop, title = "Nuevos locales", action = "Ver todos")
+private fun LocalsSection(onLocal: (String) -> Unit, onAllLocals: () -> Unit) {
+    SectionHeader(icon = PediloIconKind.Shop, title = "Nuevos locales", action = "Ver todos", onAction = onAllLocals)
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         items(localItems) { local ->
-            LocalCard(local)
+            LocalCard(local, onClick = { onLocal(local.name) })
         }
     }
 }
 
 @Composable
-private fun LocalCard(local: LocalItem) {
+private fun LocalCard(local: LocalItem, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .width(132.dp)
             .height(142.dp)
             .background(PediloPanel, RoundedCornerShape(10.dp))
             .border(1.dp, PediloLine, RoundedCornerShape(10.dp))
+            .clickable(role = Role.Button, onClick = onClick)
             .padding(7.dp),
     ) {
         Box(
@@ -417,10 +426,10 @@ private fun HomeBanner() {
     ) {
         Column(modifier = Modifier.align(Alignment.CenterStart).fillMaxWidth().padding(end = 82.dp)) {
             Text("¡Envíos más rápidos!", color = Color.White, fontSize = 18.sp, lineHeight = 20.sp, fontWeight = FontWeight.ExtraBold)
-            Text("Tus locales favoritos, ahora mas cerca que nunca.", color = Color.White, fontSize = 11.sp, lineHeight = 14.sp)
+            Text("Tus locales favoritos, ahora más cerca que nunca.", color = Color.White, fontSize = 11.sp, lineHeight = 14.sp)
             Spacer(Modifier.height(10.dp))
             Text(
-                text = "Ver mas",
+                text = "Ver más",
                 color = PediloOrangeDark,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
@@ -494,7 +503,7 @@ private fun ConventionIconRow(label: String, icon: PediloIconKind) {
 }
 
 @Composable
-private fun SectionHeader(icon: PediloIconKind, title: String, action: String) {
+private fun SectionHeader(icon: PediloIconKind, title: String, action: String, onAction: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -502,8 +511,13 @@ private fun SectionHeader(icon: PediloIconKind, title: String, action: String) {
         PediloLineIcon(icon, tint = PediloOrange, modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(8.dp))
         Text(title, color = PediloText, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-        Text(action, color = PediloOrange, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        Text(" >", color = PediloOrange, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.clickable(role = Role.Button, onClick = onAction),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(action, color = PediloOrange, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Text(" >", color = PediloOrange, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        }
     }
 }
 

@@ -435,8 +435,8 @@ private fun ChoiceHeroCard() {
         }
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text("Solicitud directa", color = PediloText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Text("Elegí si necesitás comprar algo o mover un paquete.", color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp)
+            Text("¿Qué necesitás hacer?", color = PediloText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("Elegí una opción para continuar.", color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp)
         }
     }
 }
