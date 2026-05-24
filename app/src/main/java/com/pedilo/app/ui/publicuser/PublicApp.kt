@@ -1,17 +1,27 @@
 package com.pedilo.app.ui.publicuser
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.EaseInOutCubic
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -19,10 +29,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pedilo.app.R
+import kotlinx.coroutines.delay
 
 private sealed interface PublicRoute {
     data object Home : PublicRoute
@@ -52,6 +67,12 @@ private sealed interface PublicRoute {
 @Composable
 fun PublicApp() {
     PublicTheme {
+        var showSplash by remember { mutableStateOf(true) }
+        if (showSplash) {
+            PublicBrandSplash(onFinished = { showSplash = false })
+            return@PublicTheme
+        }
+
         var route by remember { mutableStateOf<PublicRoute>(PublicRoute.Home) }
         val history = remember { mutableStateListOf<PublicRoute>() }
         val localCart = remember { mutableStateListOf<LocalCartItem>() }
@@ -341,6 +362,84 @@ fun PublicApp() {
                     }
                 },
             )
+        }
+    }
+}
+
+@Composable
+private fun PublicBrandSplash(onFinished: () -> Unit) {
+    var showLogo by remember { mutableStateOf(false) }
+    var showWordmark by remember { mutableStateOf(false) }
+    var leaving by remember { mutableStateOf(false) }
+    val logoScale by animateFloatAsState(
+        targetValue = if (showLogo) 1f else 0.94f,
+        animationSpec = tween(durationMillis = 760, easing = EaseInOutCubic),
+        label = "pediloLogoScale",
+    )
+    val screenAlpha by animateFloatAsState(
+        targetValue = if (leaving) 0f else 1f,
+        animationSpec = tween(durationMillis = 520, easing = EaseInOutCubic),
+        label = "pediloSplashExit",
+    )
+
+    LaunchedEffect(Unit) {
+        delay(120)
+        showLogo = true
+        delay(980)
+        showLogo = false
+        delay(260)
+        showWordmark = true
+        delay(1300)
+        leaving = true
+        delay(520)
+        onFinished()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(PediloBg)
+            .alpha(screenAlpha),
+        contentAlignment = Alignment.Center,
+    ) {
+        AnimatedVisibility(
+            visible = showLogo,
+            enter = fadeIn(animationSpec = tween(durationMillis = 620, easing = EaseInOutCubic)),
+            exit = fadeOut(animationSpec = tween(durationMillis = 420, easing = EaseInOutCubic)),
+        ) {
+            Image(
+                painter = painterResource(R.drawable.pedilo_logo_mark),
+                contentDescription = "Pédilo!",
+                modifier = Modifier
+                    .size(154.dp)
+                    .scale(logoScale),
+            )
+        }
+
+        AnimatedVisibility(
+            visible = showWordmark,
+            enter = fadeIn(animationSpec = tween(durationMillis = 620, easing = EaseInOutCubic)),
+            exit = fadeOut(animationSpec = tween(durationMillis = 420, easing = EaseInOutCubic)),
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "Pédilo!",
+                    color = PediloOrange,
+                    fontSize = 46.sp,
+                    lineHeight = 48.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = "todos tus pedidos en un solo lugar",
+                    color = PediloText,
+                    fontSize = 15.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }
