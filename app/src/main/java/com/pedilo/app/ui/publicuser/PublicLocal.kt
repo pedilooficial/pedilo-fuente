@@ -307,7 +307,7 @@ fun PublicLocalConfirmationScreen(
             item { LocalInfoCard("Pago", listOf(orderData.payment, "Total ${formatLocalMoney(localGrandTotal(cartItems))}"), LocalIconKind.Cart) }
             item { LocalSecondaryButton("Editar datos", LocalIconKind.Person, onEditData) }
             item { LocalPrimaryButton("Confirmar pedido", LocalIconKind.Check, onConfirm) }
-            item { LocalNotice("Esta confirmación no crea pedido real ni escribe datos en Firebase.") }
+            item { LocalNotice("Revisá los datos antes de confirmar.") }
         }
     }
 }
@@ -353,7 +353,7 @@ fun PublicLocalTicketScreen(
             item { LocalInfoCard("Entrega", listOf(orderData.address, orderData.payment), LocalIconKind.Location) }
             item { LocalPrimaryButton("Ver seguimiento", LocalIconKind.Tracking) { onTracking(orderNumber) } }
             item { LocalSecondaryButton("Volver al inicio", LocalIconKind.Check, onHome) }
-            item { LocalNotice("Ticket visual de muestra. No hay pago real, WhatsApp real ni tracking persistente.") }
+            item { LocalNotice("Guardá este número para consultar el estado del pedido.") }
         }
     }
 }

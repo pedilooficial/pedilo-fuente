@@ -218,7 +218,7 @@ private fun PublicHeader() {
 private fun SearchBlock(onSearch: () -> Unit) {
     SurfacePanel {
         Text(
-            text = "Que necesitas?",
+            text = "¿Qué necesitás?",
             color = PediloText,
             fontSize = 20.sp,
             lineHeight = 22.sp,
@@ -416,7 +416,7 @@ private fun HomeBanner() {
             .padding(16.dp),
     ) {
         Column(modifier = Modifier.align(Alignment.CenterStart).fillMaxWidth().padding(end = 82.dp)) {
-            Text("Envios mas rapidos!", color = Color.White, fontSize = 18.sp, lineHeight = 20.sp, fontWeight = FontWeight.ExtraBold)
+            Text("¡Envíos más rápidos!", color = Color.White, fontSize = 18.sp, lineHeight = 20.sp, fontWeight = FontWeight.ExtraBold)
             Text("Tus locales favoritos, ahora mas cerca que nunca.", color = Color.White, fontSize = 11.sp, lineHeight = 14.sp)
             Spacer(Modifier.height(10.dp))
             Text(

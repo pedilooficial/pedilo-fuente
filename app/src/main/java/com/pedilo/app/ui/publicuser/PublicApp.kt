@@ -1,6 +1,5 @@
 package com.pedilo.app.ui.publicuser
 
-import android.app.Activity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -18,7 +17,6 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -53,13 +51,11 @@ private sealed interface PublicRoute {
 @Composable
 fun PublicApp() {
     PublicTheme {
-        val activity = LocalContext.current as? Activity
         var route by remember { mutableStateOf<PublicRoute>(PublicRoute.Home) }
         val history = remember { mutableStateListOf<PublicRoute>() }
         val localCart = remember { mutableStateListOf<LocalCartItem>() }
         var localCategory by remember { mutableStateOf(LocalCategory.Featured) }
         var localOrderPlaced by remember { mutableStateOf(false) }
-        var showExitConfirmation by remember { mutableStateOf(false) }
         var pendingLocalExit by remember { mutableStateOf<PublicRoute?>(null) }
 
         fun isLocalRoute(target: PublicRoute): Boolean = when (target) {
@@ -88,7 +84,6 @@ fun PublicApp() {
             }
             history.clear()
             route = PublicRoute.Home
-            showExitConfirmation = false
         }
 
         fun goShop() {
@@ -98,7 +93,6 @@ fun PublicApp() {
             }
             history.clear()
             route = PublicRoute.Shop
-            showExitConfirmation = false
         }
 
         fun goPlus() {
@@ -116,7 +110,6 @@ fun PublicApp() {
             pendingLocalExit = null
             history.clear()
             route = target
-            showExitConfirmation = false
         }
 
         fun handleNativeBack() {
@@ -125,16 +118,12 @@ fun PublicApp() {
                 pendingLocalExit = previous ?: PublicRoute.Home
             } else if (history.isNotEmpty()) {
                 route = history.removeAt(history.lastIndex)
-                showExitConfirmation = false
             } else if (route != PublicRoute.Home) {
                 route = PublicRoute.Home
-                showExitConfirmation = false
-            } else {
-                showExitConfirmation = true
             }
         }
 
-        BackHandler {
+        BackHandler(enabled = route != PublicRoute.Home || history.isNotEmpty()) {
             handleNativeBack()
         }
 
@@ -305,28 +294,6 @@ fun PublicApp() {
                 },
                 onPlus = { goPlus() },
                 onShop = { goShop() },
-            )
-        }
-
-        if (showExitConfirmation) {
-            AlertDialog(
-                onDismissRequest = { showExitConfirmation = false },
-                title = {
-                    Text("Salir de Pedilo")
-                },
-                text = {
-                    Text("Queres cerrar la app?")
-                },
-                confirmButton = {
-                    TextButton(onClick = { activity?.finish() }) {
-                        Text("Salir")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showExitConfirmation = false }) {
-                        Text("Seguir")
-                    }
-                },
             )
         }
 

@@ -141,7 +141,7 @@ fun PublicShopScreen(
     onTracking: (String) -> Unit,
     onSubcategory: (String) -> Unit,
 ) {
-    var statusMessage by remember { mutableStateOf("Seleccioná una categoría para explorar en una fase posterior.") }
+    var statusMessage by remember { mutableStateOf("Seleccioná una categoría para ver locales relacionados.") }
 
     PublicShell(
         current = PublicBottomDestination.Shop,

@@ -80,7 +80,7 @@ fun PublicShopSubcategoryScreen(
     onViewLocal: () -> Unit,
 ) {
     var selectedFilter by remember { mutableStateOf(SubcategoryFilter.Nearby) }
-    var statusMessage by remember { mutableStateOf("Elegir un local se habilitara en una fase posterior.") }
+    var statusMessage by remember { mutableStateOf("Elegí un local para ver su menú.") }
 
     PublicShell(
         current = PublicBottomDestination.Shop,
@@ -269,7 +269,7 @@ private fun RelatedStoreCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 SubcategoryIcon(SubcategoryIconKind.Delivery, tint = PediloOrange, modifier = Modifier.size(15.dp))
                 Spacer(Modifier.width(5.dp))
-                Text("Envio ${store.delivery}", color = PediloMuted, fontSize = 12.sp)
+                Text("Envío ${store.delivery}", color = PediloMuted, fontSize = 12.sp)
                 Spacer(Modifier.weight(1f))
                 Box(
                     modifier = Modifier

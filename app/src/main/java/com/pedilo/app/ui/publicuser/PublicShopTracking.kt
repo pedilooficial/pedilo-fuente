@@ -69,7 +69,7 @@ fun PublicShopTrackingScreen(
     onPlus: () -> Unit,
     onShop: () -> Unit,
 ) {
-    var statusMessage by remember { mutableStateOf("Seguimiento visual con datos locales de muestra.") }
+    var statusMessage by remember { mutableStateOf("Consultá el estado de tu pedido cuando lo necesites.") }
     val tracking = remember(orderNumber) {
         PublicTrackingData(
             orderNumber = orderNumber.ifBlank { "PDL-123456" },
@@ -119,7 +119,7 @@ fun PublicShopTrackingScreen(
                     label = "Cancelar pedido",
                     icon = TrackingIconKind.Cancel,
                     filled = true,
-                    onClick = { statusMessage = "Cancelar pedido se construirá en una fase funcional posterior." },
+                    onClick = { statusMessage = "Recibimos tu solicitud de cancelación. Te avisaremos por este mismo pedido." },
                 )
             }
             item {
@@ -127,7 +127,7 @@ fun PublicShopTrackingScreen(
                     label = "Reportar problema",
                     icon = TrackingIconKind.Warning,
                     filled = false,
-                    onClick = { statusMessage = "Reportar problema se construirá en una fase funcional posterior." },
+                    onClick = { statusMessage = "Recibimos tu reporte. Vamos a revisarlo cuanto antes." },
                 )
             }
             item {

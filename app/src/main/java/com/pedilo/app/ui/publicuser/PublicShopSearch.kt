@@ -86,6 +86,8 @@ fun PublicShopSearchScreen(
     var activeQuery by remember(query) { mutableStateOf(query) }
     var statusMessage by remember { mutableStateOf("Escribí para ver resultados relacionados.") }
     val hasQuery = activeQuery.isNotBlank()
+    val normalizedQuery = activeQuery.trim().lowercase()
+    val hasRelatedStores = hasQuery && listOf("p", "pi", "piz", "pizz", "pizza", "pizzas").any { normalizedQuery == it || "pizzas".startsWith(normalizedQuery) }
 
     PublicShell(
         current = current,
@@ -129,11 +131,17 @@ fun PublicShopSearchScreen(
                         },
                     )
                 }
-                items(pizzaSearchStores) { store ->
-                    SearchResultCard(
-                        store = store,
-                        onView = onViewLocal,
-                    )
+                if (hasRelatedStores) {
+                    items(pizzaSearchStores) { store ->
+                        SearchResultCard(
+                            store = store,
+                            onView = onViewLocal,
+                        )
+                    }
+                } else {
+                    item {
+                        SearchNoResults(query = activeQuery)
+                    }
                 }
             } else {
                 item {
@@ -147,7 +155,7 @@ fun PublicShopSearchScreen(
             }
             item {
                 Text(
-                    text = statusMessage,
+                    text = if (hasQuery && !hasRelatedStores) "Probá con otra búsqueda o una sugerencia popular." else statusMessage,
                     color = PediloMuted,
                     fontSize = 12.sp,
                     lineHeight = 15.sp,
@@ -204,7 +212,7 @@ private fun ActiveSearchBox(
             .height(58.dp)
             .background(PediloPanel, RoundedCornerShape(14.dp))
             .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
-            .semantics { contentDescription = "Busqueda activa de Tienda" }
+            .semantics { contentDescription = "Búsqueda activa" }
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -234,11 +242,37 @@ private fun ActiveSearchBox(
             modifier = Modifier
                 .size(40.dp)
                 .clickable(role = Role.Button, onClick = onClear)
-                .semantics { contentDescription = "Limpiar busqueda" },
+                .semantics { contentDescription = "Limpiar búsqueda" },
             contentAlignment = Alignment.Center,
         ) {
             SearchIcon(SearchIconKind.Close, tint = PediloText, modifier = Modifier.size(24.dp))
         }
+    }
+}
+
+@Composable
+private fun SearchNoResults(query: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(PediloOverlay, RoundedCornerShape(14.dp))
+            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .padding(16.dp),
+    ) {
+        Text(
+            text = "No encontramos locales para “${query.trim()}”",
+            color = PediloText,
+            fontSize = 19.sp,
+            lineHeight = 22.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "Probá con otra palabra o elegí una sugerencia popular.",
+            color = PediloMuted,
+            fontSize = 13.sp,
+            lineHeight = 17.sp,
+        )
     }
 }
 
@@ -262,7 +296,7 @@ private fun SearchEmptyState(
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Escribí una palabra para ver locales relacionados. La búsqueda de esta fase usa datos locales de muestra.",
+            text = "Escribí una palabra para ver locales relacionados cerca tuyo.",
             color = PediloMuted,
             fontSize = 13.sp,
             lineHeight = 17.sp,
@@ -379,7 +413,7 @@ private fun SearchResultCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 SearchIcon(SearchIconKind.Delivery, tint = PediloOrange, modifier = Modifier.size(15.dp))
                 Spacer(Modifier.width(5.dp))
-                Text("${store.distance} · Envio ${store.delivery}", color = PediloMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${store.distance} · Envío ${store.delivery}", color = PediloMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         Spacer(Modifier.width(6.dp))

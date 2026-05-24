@@ -132,7 +132,7 @@ fun PublicPlusChoiceScreen(
                     onClick = onPickupShipping,
                 )
             }
-            item { PlusNotice("No abre locales, no crea carrito de local y no genera pedidos reales.") }
+            item { PlusNotice("Usá este acceso para pedir una compra directa o un retiro puntual.") }
         }
     }
 }
@@ -330,7 +330,7 @@ fun PublicPlusConfirmationScreen(
             item {
                 DetailLineCard(
                     title = "Pago",
-                    lines = listOf(request.payment, "Importe de muestra ${request.amount}", "Horario: ${request.schedule}"),
+                    lines = listOf(request.payment, "Importe estimado ${request.amount}", "Horario: ${request.schedule}"),
                     icon = PlusIconKind.Wallet,
                 )
             }
@@ -341,7 +341,7 @@ fun PublicPlusConfirmationScreen(
                     onClick = { onConfirm(request) },
                 )
             }
-            item { PlusNotice("Esta confirmación no crea pedido real ni escribe datos en Firebase.") }
+            item { PlusNotice("Revisá los datos antes de confirmar.") }
         }
     }
 }
@@ -368,7 +368,7 @@ fun PublicPlusTicketScreen(
             item {
                 DetailLineCard(
                     title = "Estado inicial",
-                    lines = listOf("Recibido", request.payment, "Total de muestra ${request.amount}"),
+                    lines = listOf("Recibido", request.payment, "Total estimado ${request.amount}"),
                     icon = PlusIconKind.Ticket,
                 )
             }
@@ -386,7 +386,7 @@ fun PublicPlusTicketScreen(
                     onClick = onHome,
                 )
             }
-            item { PlusNotice("Ticket visual de muestra. No hay pago real, WhatsApp real ni tracking persistente.") }
+            item { PlusNotice("Guardá este número para consultar el estado del pedido.") }
         }
     }
 }
@@ -582,7 +582,7 @@ private fun RequestSummaryCard(request: PublicPlusRequest, expanded: Boolean) {
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(request.type.label, color = PediloText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text("Número de muestra ${request.orderNumber}", color = PediloMuted, fontSize = 12.sp)
+                Text("Número ${request.orderNumber}", color = PediloMuted, fontSize = 12.sp)
             }
         }
         Spacer(Modifier.height(10.dp))

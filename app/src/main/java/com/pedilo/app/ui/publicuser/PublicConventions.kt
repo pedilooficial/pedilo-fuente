@@ -107,7 +107,7 @@ fun PublicConventionsScreen(
             }
             item {
                 ConventionNotice(
-                    text = "Este espacio no genera pedidos ni tickets nuevos. Las consultas usan datos locales de muestra.",
+                    text = "Consultá información, dejá un aviso o revisá el estado de un pedido.",
                 )
             }
         }
@@ -308,7 +308,7 @@ fun PublicConventionsTrackingEntryScreen(
                     placeholder = "PDL-123456",
                     onValueChange = {
                         orderNumber = it
-                        status = "Número editable. La consulta usa datos locales de muestra."
+                        status = "Ingresá el número completo para consultar el estado."
                     },
                 )
             }
@@ -477,7 +477,7 @@ private fun ClaimIntroCard(sent: Boolean) {
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            text = if (sent) "Quedó guardado como estado local de esta fase." else "Completá los datos para dejar un aviso. No se conecta a soporte real.",
+            text = if (sent) "Recibimos tu aviso. Gracias por contarnos qué pasó." else "Completá los datos para dejar un aviso.",
             color = PediloMuted,
             fontSize = 13.sp,
             lineHeight = 18.sp,
