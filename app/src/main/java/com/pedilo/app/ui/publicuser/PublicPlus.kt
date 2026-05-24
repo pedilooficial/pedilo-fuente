@@ -143,18 +143,16 @@ fun PublicPlusBuyScreen(
     onShop: () -> Unit,
     onContinue: (PublicPlusRequest) -> Unit,
 ) {
-    var productName by remember { mutableStateOf("Coca-Cola 1.5L") }
-    var productDetail by remember { mutableStateOf("2 unidades") }
-    val products = remember {
-        mutableStateListOf(
-            PublicPlusItem("Pan francés 1kg", "Para entregar hoy"),
-        )
-    }
-    var source by remember { mutableStateOf("Supermercado o almacén cercano") }
-    var notes by remember { mutableStateOf("Si no hay marca, aceptar similar.") }
-    var contactName by remember { mutableStateOf("Persona solicitante") }
-    var phone by remember { mutableStateOf("11 5555 5555") }
-    var address by remember { mutableStateOf("Av. Siempre Viva 1234") }
+    var productName by remember { mutableStateOf("") }
+    var productDetail by remember { mutableStateOf("") }
+    val products = remember { mutableStateListOf<PublicPlusItem>() }
+    var source by remember { mutableStateOf("") }
+    var notes by remember { mutableStateOf("") }
+    var contactName by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var address by remember { mutableStateOf("") }
+    val canAddProduct = productName.isNotBlank() && productDetail.isNotBlank()
+    val canContinue = products.isNotEmpty() && source.isNotBlank() && contactName.isNotBlank() && phone.isNotBlank() && address.isNotBlank()
 
     PublicShell(current = PublicBottomDestination.Plus, onHome = onHome, onPlus = onPlus, onShop = onShop) {
         LazyColumn(
@@ -176,10 +174,9 @@ fun PublicPlusBuyScreen(
                 PlusActionButton(
                     label = "Agregar producto",
                     icon = PlusIconKind.Plus,
+                    enabled = canAddProduct,
                     onClick = {
-                        val cleanName = productName.ifBlank { "Producto sin nombre" }
-                        val cleanDetail = productDetail.ifBlank { "Sin detalle" }
-                        products.add(PublicPlusItem(cleanName, cleanDetail))
+                        products.add(PublicPlusItem(productName, productDetail))
                         productName = ""
                         productDetail = ""
                     },
@@ -197,23 +194,21 @@ fun PublicPlusBuyScreen(
                 PlusActionButton(
                     label = "Continuar a confirmación",
                     icon = PlusIconKind.Check,
+                    enabled = canContinue,
                     onClick = {
-                        val requestProducts = products.ifEmpty {
-                            listOf(PublicPlusItem("Coca-Cola 1.5L", "1 unidad"))
-                        }
                         onContinue(
                             PublicPlusRequest(
                                 type = PublicPlusRequestType.Buy,
-                                items = requestProducts.toList(),
-                                source = source.ifBlank { "Comercio cercano" },
-                                destination = address.ifBlank { "Dirección pendiente" },
-                                contactName = contactName.ifBlank { "Persona solicitante" },
-                                phone = phone.ifBlank { "WhatsApp pendiente" },
+                                items = products.toList(),
+                                source = source,
+                                destination = address,
+                                contactName = contactName,
+                                phone = phone,
                                 schedule = "Lo antes posible",
                                 alreadyPaid = false,
                                 payment = "Efectivo o transferencia al recibir",
                                 amount = "$18.500",
-                                notes = notes.ifBlank { "Sin observaciones" },
+                                notes = notes,
                             ),
                         )
                     },
@@ -230,14 +225,20 @@ fun PublicPlusPickupShippingScreen(
     onShop: () -> Unit,
     onContinue: (PublicPlusRequest) -> Unit,
 ) {
-    var pickupAddress by remember { mutableStateOf("Av. Corrientes 123") }
-    var destination by remember { mutableStateOf("Av. Siempre Viva 1234") }
+    var pickupAddress by remember { mutableStateOf("") }
+    var destination by remember { mutableStateOf("") }
     var schedule by remember { mutableStateOf("Ahora") }
-    var contactName by remember { mutableStateOf("Persona solicitante") }
-    var phone by remember { mutableStateOf("11 5555 5555") }
+    var contactName by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
     var alreadyPaid by remember { mutableStateOf(false) }
-    var amount by remember { mutableStateOf("$7.800") }
-    var description by remember { mutableStateOf("Sobre cerrado para retirar en recepción") }
+    var amount by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    val canContinue = pickupAddress.isNotBlank() &&
+        destination.isNotBlank() &&
+        contactName.isNotBlank() &&
+        phone.isNotBlank() &&
+        description.isNotBlank() &&
+        (alreadyPaid || amount.isNotBlank())
 
     PublicShell(current = PublicBottomDestination.Plus, onHome = onHome, onPlus = onPlus, onShop = onShop) {
         LazyColumn(
@@ -277,20 +278,21 @@ fun PublicPlusPickupShippingScreen(
                 PlusActionButton(
                     label = "Continuar a confirmación",
                     icon = PlusIconKind.Check,
+                    enabled = canContinue,
                     onClick = {
                         onContinue(
                             PublicPlusRequest(
                                 type = PublicPlusRequestType.PickupShipping,
-                                items = listOf(PublicPlusItem(description.ifBlank { "Objeto a retirar" }, "Operación logística")),
-                                source = pickupAddress.ifBlank { "Retiro pendiente" },
-                                destination = destination.ifBlank { "Entrega pendiente" },
-                                contactName = contactName.ifBlank { "Persona solicitante" },
-                                phone = phone.ifBlank { "WhatsApp pendiente" },
+                                items = listOf(PublicPlusItem(description, "Operación logística")),
+                                source = pickupAddress,
+                                destination = destination,
+                                contactName = contactName,
+                                phone = phone,
                                 schedule = schedule,
                                 alreadyPaid = alreadyPaid,
                                 payment = if (alreadyPaid) "Ya está pago" else "Pagar al retirar",
-                                amount = if (alreadyPaid) "$0" else amount.ifBlank { "Monto a confirmar" },
-                                notes = description.ifBlank { "Sin descripción" },
+                                amount = if (alreadyPaid) "$0" else amount,
+                                notes = description,
                             ),
                         )
                     },
@@ -680,14 +682,17 @@ private fun PlusInput(
 }
 
 @Composable
-private fun PlusActionButton(label: String, icon: PlusIconKind, onClick: () -> Unit) {
+private fun PlusActionButton(label: String, icon: PlusIconKind, enabled: Boolean = true, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(58.dp)
-            .background(Brush.verticalGradient(listOf(PediloOrangeSoft, PediloOrange)), RoundedCornerShape(14.dp))
-            .border(1.dp, PediloOrange, RoundedCornerShape(14.dp))
-            .clickable(role = Role.Button, onClick = onClick)
+            .background(
+                if (enabled) Brush.verticalGradient(listOf(PediloOrangeSoft, PediloOrange)) else Brush.verticalGradient(listOf(PediloLine, PediloLine)),
+                RoundedCornerShape(14.dp),
+            )
+            .border(1.dp, if (enabled) PediloOrange else PediloLine, RoundedCornerShape(14.dp))
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = label },
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,

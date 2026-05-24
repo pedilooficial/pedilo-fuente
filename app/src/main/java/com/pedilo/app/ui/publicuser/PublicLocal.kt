@@ -168,7 +168,7 @@ fun PublicLocalProductScreen(
     var quantity by remember { mutableIntStateOf(1) }
     var extraCheese by remember { mutableStateOf(true) }
     var extraSauce by remember { mutableStateOf(false) }
-    var notes by remember { mutableStateOf("Cortar en 8 porciones") }
+    var notes by remember { mutableStateOf("") }
     val extras = buildList {
         if (extraCheese) add("Extra queso")
         if (extraSauce) add("Salsa aparte")
@@ -230,7 +230,7 @@ fun PublicLocalCartScreen(
             items(cartItems) { item -> CartItemCard(item) }
             item { TotalsCard(cartItems) }
             item { LocalSecondaryButton("Agregar más productos", LocalIconKind.Plus, onMoreProducts) }
-            item { LocalPrimaryButton("Continuar", LocalIconKind.Check, onContinue) }
+            item { LocalPrimaryButton("Continuar", LocalIconKind.Check, onClick = onContinue) }
         }
     }
 }
@@ -243,11 +243,12 @@ fun PublicLocalDataScreen(
     onPlus: () -> Unit,
     onShop: () -> Unit,
 ) {
-    var name by remember { mutableStateOf("Persona solicitante") }
-    var phone by remember { mutableStateOf("11 5555 5555") }
-    var address by remember { mutableStateOf("Av. Siempre Viva 1234") }
+    var name by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var address by remember { mutableStateOf("") }
     var payment by remember { mutableStateOf("Efectivo al recibir") }
-    var notes by remember { mutableStateOf("Tocar timbre y esperar abajo") }
+    var notes by remember { mutableStateOf("") }
+    val canContinue = cartItems.isNotEmpty() && name.isNotBlank() && phone.isNotBlank() && address.isNotBlank() && payment.isNotBlank()
 
     PublicShell(current = PublicBottomDestination.Shop, onHome = onHome, onPlus = onPlus, onShop = onShop) {
         LazyColumn(
@@ -266,14 +267,14 @@ fun PublicLocalDataScreen(
             item { LocalInput("Observaciones finales", notes, "Referencia de entrega", minHeight = 90.dp, singleLine = false, onValueChange = { notes = it }) }
             item { CompactOrderCard(cartItems) }
             item {
-                LocalPrimaryButton("Continuar", LocalIconKind.Check) {
+                LocalPrimaryButton("Continuar", LocalIconKind.Check, enabled = canContinue) {
                     onContinue(
                         LocalOrderData(
-                            fullName = name.ifBlank { "Persona solicitante" },
-                            phone = phone.ifBlank { "WhatsApp pendiente" },
-                            address = address.ifBlank { "Dirección pendiente" },
+                            fullName = name,
+                            phone = phone,
+                            address = address,
                             payment = payment,
-                            notes = notes.ifBlank { "Sin observaciones" },
+                            notes = notes,
                         ),
                     )
                 }
@@ -306,7 +307,7 @@ fun PublicLocalConfirmationScreen(
             item { LocalInfoCard("Entrega", listOf(orderData.fullName, orderData.phone, orderData.address, orderData.notes), LocalIconKind.Location) }
             item { LocalInfoCard("Pago", listOf(orderData.payment, "Total ${formatLocalMoney(localGrandTotal(cartItems))}"), LocalIconKind.Cart) }
             item { LocalSecondaryButton("Editar datos", LocalIconKind.Person, onEditData) }
-            item { LocalPrimaryButton("Confirmar pedido", LocalIconKind.Check, onConfirm) }
+            item { LocalPrimaryButton("Confirmar pedido", LocalIconKind.Check, onClick = onConfirm) }
         }
     }
 }
@@ -711,14 +712,17 @@ private fun LocalInput(label: String, value: String, placeholder: String, onValu
 }
 
 @Composable
-private fun LocalPrimaryButton(label: String, icon: LocalIconKind, onClick: () -> Unit) {
+private fun LocalPrimaryButton(label: String, icon: LocalIconKind, enabled: Boolean = true, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .background(Brush.verticalGradient(listOf(PediloOrangeSoft, PediloOrange)), RoundedCornerShape(14.dp))
-            .border(1.dp, PediloOrange, RoundedCornerShape(14.dp))
-            .clickable(role = Role.Button, onClick = onClick)
+            .background(
+                if (enabled) Brush.verticalGradient(listOf(PediloOrangeSoft, PediloOrange)) else Brush.verticalGradient(listOf(PediloLine, PediloLine)),
+                RoundedCornerShape(14.dp),
+            )
+            .border(1.dp, if (enabled) PediloOrange else PediloLine, RoundedCornerShape(14.dp))
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = label },
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,

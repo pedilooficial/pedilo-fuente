@@ -230,7 +230,7 @@ fun PublicConventionsClaimScreen(
                 ConventionPrimaryAction(
                     label = if (sent) "Reclamo registrado" else "Enviar reclamo",
                     icon = if (sent) ConventionIconKind.Check else ConventionIconKind.Claim,
-                    enabled = !sent,
+                    enabled = !sent && description.isNotBlank() && phone.isNotBlank(),
                     onClick = { sent = true },
                 )
             }
@@ -281,11 +281,8 @@ fun PublicConventionsTrackingEntryScreen(
                 ConventionPrimaryAction(
                     label = "Consultar pedido",
                     icon = ConventionIconKind.Tracking,
-                    enabled = true,
-                    onClick = {
-                        val normalized = orderNumber.ifBlank { "PDL-123456" }
-                        onSubmit(normalized)
-                    },
+                    enabled = orderNumber.isNotBlank(),
+                    onClick = { onSubmit(orderNumber) },
                 )
             }
         }
@@ -320,8 +317,8 @@ private fun TodayHighlightCard() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Brush.horizontalGradient(listOf(PediloOrangeDark.copy(alpha = 0.42f), PediloPanel)), RoundedCornerShape(16.dp))
-            .border(1.dp, PediloOrangeDark, RoundedCornerShape(16.dp))
+            .background(Brush.horizontalGradient(listOf(PediloOrangeDark, PediloPanel)), RoundedCornerShape(16.dp))
+            .border(1.dp, PediloOrange, RoundedCornerShape(16.dp))
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -336,7 +333,11 @@ private fun TodayHighlightCard() {
         }
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text("Día activo", color = PediloText, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Text("Día activo", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(3.dp))
+            Text("¡Envíos más rápidos!", color = Color.White, fontSize = 19.sp, lineHeight = 22.sp, fontWeight = FontWeight.ExtraBold)
+            Spacer(Modifier.height(4.dp))
+            Text("Hoy priorizamos los locales con mejor disponibilidad para que tus pedidos lleguen antes.", color = Color.White, fontSize = 12.sp, lineHeight = 16.sp)
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.pedilo.app.ui.publicuser
 
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.EaseInOutCubic
@@ -29,7 +30,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -134,18 +134,56 @@ fun PublicApp() {
             route = target
         }
 
+        fun logicalParent(current: PublicRoute): PublicRoute? = when (current) {
+            PublicRoute.Home -> null
+            PublicRoute.Shop -> PublicRoute.Home
+            PublicRoute.Conventions -> PublicRoute.Home
+            PublicRoute.ConventionsInfo,
+            PublicRoute.ConventionsClaim,
+            PublicRoute.ConventionsTrackingEntry -> PublicRoute.Conventions
+            is PublicRoute.PublicTracking -> when (current.current) {
+                PublicBottomDestination.Home -> PublicRoute.ConventionsTrackingEntry
+                PublicBottomDestination.Shop -> PublicRoute.Shop
+                PublicBottomDestination.Plus -> PublicRoute.Plus
+            }
+            PublicRoute.Plus -> history.lastOrNull()?.takeIf { it is PublicRoute.Shop || it is PublicRoute.Conventions || it is PublicRoute.Home } ?: PublicRoute.Home
+            PublicRoute.PlusBuy,
+            PublicRoute.PlusPickupShipping -> PublicRoute.Plus
+            is PublicRoute.PlusConfirmation -> when (current.request.type) {
+                PublicPlusRequestType.Buy -> PublicRoute.PlusBuy
+                PublicPlusRequestType.PickupShipping -> PublicRoute.PlusPickupShipping
+            }
+            is PublicRoute.PlusTicket -> PublicRoute.Home
+            is PublicRoute.ShopSubcategory -> PublicRoute.Shop
+            is PublicRoute.ShopSearch -> when (current.origin) {
+                PublicBottomDestination.Home -> PublicRoute.Home
+                PublicBottomDestination.Shop -> PublicRoute.Shop
+                PublicBottomDestination.Plus -> PublicRoute.Plus
+            }
+            is PublicRoute.ShopTracking -> PublicRoute.Shop
+            is PublicRoute.HomeListing -> PublicRoute.Home
+            PublicRoute.Local -> history.lastOrNull()?.takeIf { !isLocalRoute(it) } ?: PublicRoute.Shop
+            is PublicRoute.LocalProductDetail -> PublicRoute.Local
+            PublicRoute.LocalCart -> PublicRoute.Local
+            PublicRoute.LocalData -> PublicRoute.LocalCart
+            is PublicRoute.LocalConfirmation -> PublicRoute.LocalData
+            is PublicRoute.LocalTicket -> PublicRoute.Home
+        }
+
         fun handleNativeBack() {
-            val previous = history.lastOrNull()
-            if (isLocalRoute(route) && hasActiveLocalCart() && (previous == null || !isLocalRoute(previous))) {
-                pendingLocalExit = previous ?: PublicRoute.Home
-            } else if (history.isNotEmpty()) {
-                route = history.removeAt(history.lastIndex)
-            } else if (route != PublicRoute.Home) {
-                route = PublicRoute.Home
+            val parent = logicalParent(route)
+            if (parent == null) {
+                return
+            }
+            if (isLocalRoute(route) && hasActiveLocalCart() && !isLocalRoute(parent)) {
+                pendingLocalExit = parent
+            } else {
+                route = parent
+                history.clear()
             }
         }
 
-        BackHandler(enabled = route != PublicRoute.Home || history.isNotEmpty()) {
+        BackHandler(enabled = route != PublicRoute.Home) {
             handleNativeBack()
         }
 
@@ -368,38 +406,36 @@ fun PublicApp() {
 
 @Composable
 private fun PublicBrandSplash(onFinished: () -> Unit) {
+    val nativeSplashShowsLogo = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     var showLogo by remember { mutableStateOf(false) }
     var showWordmark by remember { mutableStateOf(false) }
-    var leaving by remember { mutableStateOf(false) }
     val logoScale by animateFloatAsState(
         targetValue = if (showLogo) 1f else 0.94f,
         animationSpec = tween(durationMillis = 760, easing = EaseInOutCubic),
         label = "pediloLogoScale",
     )
-    val screenAlpha by animateFloatAsState(
-        targetValue = if (leaving) 0f else 1f,
-        animationSpec = tween(durationMillis = 520, easing = EaseInOutCubic),
-        label = "pediloSplashExit",
-    )
 
     LaunchedEffect(Unit) {
-        delay(120)
-        showLogo = true
-        delay(980)
-        showLogo = false
-        delay(260)
-        showWordmark = true
-        delay(1300)
-        leaving = true
-        delay(520)
+        if (!nativeSplashShowsLogo) {
+            delay(120)
+            showLogo = true
+            delay(1130)
+            showWordmark = true
+            delay(400)
+            showLogo = false
+        } else {
+            showWordmark = true
+        }
+        delay(1250)
+        showWordmark = false
+        delay(60)
         onFinished()
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(PediloBg)
-            .alpha(screenAlpha),
+            .background(PediloBg),
         contentAlignment = Alignment.Center,
     ) {
         AnimatedVisibility(
@@ -418,8 +454,8 @@ private fun PublicBrandSplash(onFinished: () -> Unit) {
 
         AnimatedVisibility(
             visible = showWordmark,
-            enter = fadeIn(animationSpec = tween(durationMillis = 620, easing = EaseInOutCubic)),
-            exit = fadeOut(animationSpec = tween(durationMillis = 420, easing = EaseInOutCubic)),
+            enter = fadeIn(animationSpec = tween(durationMillis = 420, easing = EaseInOutCubic)),
+            exit = fadeOut(animationSpec = tween(durationMillis = 320, easing = EaseInOutCubic)),
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(

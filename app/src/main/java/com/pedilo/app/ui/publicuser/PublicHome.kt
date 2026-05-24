@@ -421,8 +421,7 @@ private fun HomeBanner(onConventions: () -> Unit) {
             .height(112.dp)
             .background(Brush.horizontalGradient(listOf(PediloOrangeDark, PediloPanel)), RoundedCornerShape(12.dp))
             .border(1.dp, PediloOrange, RoundedCornerShape(12.dp))
-            .clickable(role = Role.Button, onClick = onConventions)
-            .semantics { contentDescription = "Abrir Convenciones" }
+            .semantics { contentDescription = "Aviso de envíos más rápidos" }
             .padding(16.dp),
     ) {
         Column(modifier = Modifier.align(Alignment.CenterStart).fillMaxWidth().padding(end = 82.dp)) {

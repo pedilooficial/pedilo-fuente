@@ -284,7 +284,7 @@ private fun TrackingLookupCard(onPending: (String) -> Unit) {
                     .height(40.dp)
                     .width(90.dp)
                     .background(Brush.verticalGradient(listOf(PediloOrangeSoft, PediloOrange)), RoundedCornerShape(10.dp))
-                    .clickable(role = Role.Button, onClick = { onPending(code.ifBlank { "PDL-123456" }) }),
+                    .clickable(enabled = code.isNotBlank(), role = Role.Button, onClick = { onPending(code) }),
                 contentAlignment = Alignment.Center,
             ) {
                 Text("Consultar", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
