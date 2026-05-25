@@ -40,11 +40,13 @@ import androidx.compose.ui.unit.sp
 import com.pedilo.app.R
 import com.pedilo.app.core.firebase.FirebasePublicPlusOrderAdapter
 import com.pedilo.app.core.firebase.FirebasePublicOrderAdapter
+import com.pedilo.app.core.firebase.FirebasePublicTrackingAdapter
 import com.pedilo.app.core.model.PublicOrderTicket
 import com.pedilo.app.core.result.CoreError
 import com.pedilo.app.core.result.CoreResult
 import com.pedilo.app.core.usecase.CreatePublicPlusOrderUseCase
 import com.pedilo.app.core.usecase.CreatePublicOrderUseCase
+import com.pedilo.app.core.usecase.GetPublicTrackingUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -65,7 +67,6 @@ private sealed interface PublicRoute {
     data class PublicTracking(val orderNumber: String, val current: PublicBottomDestination) : PublicRoute
     data class ShopSubcategory(val name: String) : PublicRoute
     data class ShopSearch(val query: String, val origin: PublicBottomDestination) : PublicRoute
-    data class ShopTracking(val orderNumber: String) : PublicRoute
     data class HomeListing(val title: String, val query: String) : PublicRoute
     data object Local : PublicRoute
     data class LocalProductDetail(val product: LocalProduct) : PublicRoute
@@ -83,6 +84,7 @@ fun PublicApp() {
         val scope = rememberCoroutineScope()
         val createLocalOrder = remember { CreatePublicOrderUseCase(FirebasePublicOrderAdapter()) }
         val createPlusOrder = remember { CreatePublicPlusOrderUseCase(FirebasePublicPlusOrderAdapter()) }
+        val getPublicTracking = remember { GetPublicTrackingUseCase(FirebasePublicTrackingAdapter()) }
 
         LaunchedEffect(Unit) {
             catalogState = withContext(Dispatchers.IO) { loadPublicCatalogState() }
@@ -184,7 +186,6 @@ fun PublicApp() {
                 PublicBottomDestination.Shop -> PublicRoute.Shop
                 PublicBottomDestination.Plus -> PublicRoute.Plus
             }
-            is PublicRoute.ShopTracking -> PublicRoute.Shop
             is PublicRoute.HomeListing -> PublicRoute.Home
             PublicRoute.Local -> history.lastOrNull()?.takeIf { !isLocalRoute(it) } ?: PublicRoute.Shop
             is PublicRoute.LocalProductDetail -> PublicRoute.Local
@@ -298,7 +299,7 @@ fun PublicApp() {
                 onPlus = { goPlus() },
                 onShop = { goShop() },
                 onSearch = { navigateTo(PublicRoute.ShopSearch(it, PublicBottomDestination.Shop)) },
-                onTracking = { navigateTo(PublicRoute.ShopTracking(it)) },
+                onTracking = { navigateTo(PublicRoute.PublicTracking(it, PublicBottomDestination.Shop)) },
                 onSubcategory = { navigateTo(PublicRoute.ShopSubcategory(it)) },
                 onViewLocal = {
                     localOrderPlaced = false
@@ -327,13 +328,6 @@ fun PublicApp() {
                     localOrderPlaced = false
                     navigateTo(PublicRoute.Local)
                 },
-            )
-            is PublicRoute.ShopTracking -> PublicShopTrackingScreen(
-                orderNumber = (route as PublicRoute.ShopTracking).orderNumber,
-                current = PublicBottomDestination.Shop,
-                onHome = { goHome() },
-                onPlus = { goPlus() },
-                onShop = { goShop() },
             )
             is PublicRoute.HomeListing -> PublicShopSearchScreen(
                 query = (route as PublicRoute.HomeListing).query,
@@ -375,6 +369,7 @@ fun PublicApp() {
             is PublicRoute.PublicTracking -> PublicShopTrackingScreen(
                 orderNumber = (route as PublicRoute.PublicTracking).orderNumber,
                 current = (route as PublicRoute.PublicTracking).current,
+                getTracking = getPublicTracking,
                 onHome = { goHome() },
                 onPlus = { goPlus() },
                 onShop = { goShop() },

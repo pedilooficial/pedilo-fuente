@@ -10,7 +10,7 @@ class GetPublicTrackingUseCase(
     private val trackingPort: PublicTrackingPort,
 ) {
     suspend operator fun invoke(trackingNumber: String): CoreResult<PublicTrackingState> {
-        val cleanTrackingNumber = trackingNumber.trim()
+        val cleanTrackingNumber = trackingNumber.trim().uppercase()
         if (cleanTrackingNumber.isBlank() || cleanTrackingNumber.isPlaceholder()) {
             return CoreResult.Failure(
                 CoreError.Validation(

@@ -98,6 +98,9 @@ if [ -d functions ]; then
   if ! rg -n "exports[.]createPlusOrder" functions/index.js >/dev/null; then
     fail "functions must expose the createPlusOrder callable"
   fi
+  if ! rg -n "exports[.]getPublicOrderTracking" functions/index.js >/dev/null; then
+    fail "functions must expose the getPublicOrderTracking callable"
+  fi
   if rg -n "collection[(][\"'](users|roles|payments|order_tracking)[\"'][)]|whatsapp|WhatsApp|driverId" functions >/tmp/pedilo_guard_match.txt; then
     cat /tmp/pedilo_guard_match.txt >&2
     fail "public order functions must not touch users, roles, payments, WhatsApp or tracking collections"

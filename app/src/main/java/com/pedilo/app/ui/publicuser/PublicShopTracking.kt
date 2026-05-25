@@ -20,11 +20,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,10 +42,19 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pedilo.app.core.model.PublicOrderStatus
+import com.pedilo.app.core.model.PublicTrackingState
+import com.pedilo.app.core.result.CoreError
+import com.pedilo.app.core.result.CoreResult
+import com.pedilo.app.core.usecase.GetPublicTrackingUseCase
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private enum class PublicOrderStep(val label: String) {
     Received("Recibido"),
@@ -65,20 +77,43 @@ private data class PublicTrackingData(
 fun PublicShopTrackingScreen(
     orderNumber: String,
     current: PublicBottomDestination = PublicBottomDestination.Shop,
+    getTracking: GetPublicTrackingUseCase,
     onHome: () -> Unit,
     onPlus: () -> Unit,
     onShop: () -> Unit,
 ) {
-    val tracking = remember(orderNumber) {
-        PublicTrackingData(
-            orderNumber = orderNumber.ifBlank { "PDL-123456" },
-            mainStatus = "Tu pedido va en camino",
-            subtitle = "Estamos por llegar a tu dirección",
-            activeStep = PublicOrderStep.OnTheWay,
-            eta = "10-15 min",
-            address = "Av. Siempre Viva 1234",
-            city = "CABA, Argentina",
-        )
+    val scope = rememberCoroutineScope()
+    var query by remember(orderNumber) { mutableStateOf(orderNumber) }
+    var tracking by remember { mutableStateOf<PublicTrackingState?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    fun submitTracking() {
+        val clean = query.trim()
+        if (clean.isBlank()) {
+            error = "Ingresá el número de pedido."
+            tracking = null
+            return
+        }
+        scope.launch {
+            isLoading = true
+            error = null
+            val result = withContext(Dispatchers.IO) { getTracking(clean) }
+            isLoading = false
+            when (result) {
+                is CoreResult.Success -> tracking = result.value
+                is CoreResult.Failure -> {
+                    tracking = null
+                    error = result.error.toTrackingMessage()
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(orderNumber) {
+        if (orderNumber.isNotBlank()) {
+            submitTracking()
+        }
     }
 
     PublicShell(
@@ -95,38 +130,89 @@ fun PublicShopTrackingScreen(
             contentPadding = PaddingValues(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 132.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { OrderNumberCard(tracking.orderNumber) }
-            item { TrackingProgressCard(tracking) }
-            item {
-                TrackingInfoCard(
-                    icon = TrackingIconKind.Clock,
-                    label = "Tiempo estimado de llegada",
-                    value = tracking.eta,
+            item { TrackingHeader() }
+            item { TrackingLookupForm(query, isLoading, onQueryChange = { query = it }, onSubmit = { submitTracking() }) }
+            error?.let { item { TrackingMessageCard("No pudimos consultar", it, TrackingIconKind.Warning) } }
+            if (isLoading) {
+                item { TrackingMessageCard("Consultando", "Estamos buscando el estado actual del pedido.", TrackingIconKind.Clock) }
+            }
+            tracking?.let { state ->
+                item { OrderNumberCard(state.trackingNumber) }
+                if (state.found) {
+                    item { TrackingProgressCard(state.toTrackingData()) }
+                    item {
+                        TrackingInfoCard(
+                            icon = TrackingIconKind.Clock,
+                            label = "Estado actual",
+                            value = state.publicStatus,
+                            detail = state.humanMessage,
+                        )
+                    }
+                    if (!state.isClosed && state.summary.isNotBlank()) {
+                        item {
+                            TrackingInfoCard(
+                                icon = TrackingIconKind.Box,
+                                label = state.orderType.ifBlank { "Pedido" },
+                                value = state.summary,
+                                detail = state.storeName.takeIf { it.isNotBlank() },
+                            )
+                        }
+                    }
+                } else {
+                    item { TrackingMessageCard(state.publicStatus, state.humanMessage, TrackingIconKind.Warning) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrackingLookupForm(
+    value: String,
+    isLoading: Boolean,
+    onQueryChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(PediloPanel, RoundedCornerShape(14.dp))
+            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .padding(14.dp),
+    ) {
+        Text("Número de pedido", color = PediloMuted, fontSize = 13.sp)
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(46.dp)
+                    .background(PediloPanelSoft, RoundedCornerShape(10.dp))
+                    .border(1.dp, PediloLine, RoundedCornerShape(10.dp))
+                    .padding(horizontal = 12.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                if (value.isBlank()) {
+                    Text("PDL-XXXXXX", color = PediloMuted, fontSize = 14.sp)
+                }
+                BasicTextField(
+                    value = value,
+                    onValueChange = onQueryChange,
+                    textStyle = TextStyle(color = PediloText, fontSize = 15.sp, fontWeight = FontWeight.Bold),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
-            item {
-                TrackingInfoCard(
-                    icon = TrackingIconKind.Pin,
-                    label = "Dirección de entrega",
-                    value = tracking.address,
-                    detail = tracking.city,
-                )
-            }
-            item {
-                TrackingActionButton(
-                    label = "Cancelar pedido",
-                    icon = TrackingIconKind.Cancel,
-                    filled = true,
-                    onClick = { },
-                )
-            }
-            item {
-                TrackingActionButton(
-                    label = "Reportar problema",
-                    icon = TrackingIconKind.Warning,
-                    filled = false,
-                    onClick = { },
-                )
+            Spacer(Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .height(46.dp)
+                    .width(104.dp)
+                    .background(Brush.verticalGradient(listOf(PediloOrangeSoft, PediloOrange)), RoundedCornerShape(10.dp))
+                    .clickable(enabled = value.isNotBlank() && !isLoading, role = Role.Button, onClick = onSubmit),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(if (isLoading) "..." else "Consultar", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -151,6 +237,57 @@ private fun TrackingHeader() {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+private fun PublicTrackingState.toTrackingData(): PublicTrackingData =
+    PublicTrackingData(
+        orderNumber = trackingNumber,
+        mainStatus = publicStatus,
+        subtitle = humanMessage,
+        activeStep = when (status) {
+            PublicOrderStatus.RECEIVED -> PublicOrderStep.Received
+            PublicOrderStatus.PREPARING -> PublicOrderStep.Preparing
+            PublicOrderStatus.ON_THE_WAY -> PublicOrderStep.OnTheWay
+            PublicOrderStatus.DELIVERED -> PublicOrderStep.Delivered
+            PublicOrderStatus.CANCELLED,
+            PublicOrderStatus.UNDER_REVIEW -> PublicOrderStep.Received
+        },
+        eta = publicStatus,
+        address = summary,
+        city = orderType,
+    )
+
+private fun CoreError.toTrackingMessage(): String = when (this) {
+    is CoreError.Validation -> "Ingresá un número de pedido válido."
+    CoreError.IncompleteData -> "Ingresá el número de pedido."
+    CoreError.NotAvailable -> "No pudimos consultar el pedido. Probá de nuevo."
+    CoreError.Unknown -> "Ocurrió un error al consultar el pedido."
+}
+
+@Composable
+private fun TrackingMessageCard(title: String, message: String, icon: TrackingIconKind) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(PediloOverlay, RoundedCornerShape(14.dp))
+            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(54.dp)
+                .background(PediloPanelSoft, RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            TrackingIcon(icon, tint = PediloOrange, modifier = Modifier.size(30.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, color = PediloText, fontSize = 18.sp, lineHeight = 21.sp, fontWeight = FontWeight.Bold)
+            Text(message, color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp)
+        }
     }
 }
 

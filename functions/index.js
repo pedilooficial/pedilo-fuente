@@ -113,6 +113,34 @@ exports.createPlusOrder = onCall({region: REGION}, async (request) => {
   };
 });
 
+exports.getPublicOrderTracking = onCall({region: REGION}, async (request) => {
+  const trackingNumber = normalizeTrackingNumber(request.data && request.data.trackingNumber);
+  if (!trackingNumber || isPlaceholder(trackingNumber)) {
+    throw new HttpsError("invalid-argument", "Ingresá un número de pedido válido.");
+  }
+
+  const byTracking = await db.collection(ORDERS).where("trackingNumber", "==", trackingNumber).limit(1).get();
+  const snapshot = byTracking.empty
+    ? await db.collection(ORDERS).where("publicOrderNumber", "==", trackingNumber).limit(1).get()
+    : byTracking;
+
+  if (snapshot.empty) {
+    return {
+      found: false,
+      trackingNumber,
+      publicStatus: "No encontramos ese pedido",
+      status: "UNDER_REVIEW",
+      humanMessage: "Revisá el número e intentá de nuevo.",
+      orderType: "",
+      storeName: "",
+      summary: "",
+      isClosed: false,
+    };
+  }
+
+  return publicTrackingResponse(snapshot.docs[0].data(), trackingNumber);
+});
+
 function cleanOrderPayload(payload) {
   const storeId = cleanText(payload.storeId);
   const storeName = cleanText(payload.storeName);
@@ -264,6 +292,77 @@ function cleanItem(item) {
 function publicNumberFor(orderId) {
   const suffix = orderId.replace(/[^a-z0-9]/gi, "").slice(0, 6).toUpperCase();
   return `PDL-${suffix}`;
+}
+
+function normalizeTrackingNumber(value) {
+  return cleanText(value).replace(/\s+/g, "").toUpperCase();
+}
+
+function publicTrackingResponse(order, requestedTrackingNumber) {
+  const status = publicStatusCode(order.status);
+  const terminal = isTerminalStatus(order.status);
+  const trackingNumber = cleanText(order.trackingNumber || order.publicOrderNumber || requestedTrackingNumber);
+  const publicStatus = terminal ? "Pedido cerrado" : cleanText(order.publicStatus) || PUBLIC_STATUS;
+
+  if (terminal) {
+    return {
+      found: true,
+      trackingNumber,
+      publicStatus,
+      status,
+      humanMessage: "Gracias por tu pedido. Este pedido ya fue cerrado.",
+      orderType: publicOrderType(order),
+      storeName: "",
+      summary: "",
+      isClosed: true,
+    };
+  }
+
+  return {
+    found: true,
+    trackingNumber,
+    publicStatus,
+    status,
+    humanMessage: "Estamos siguiendo tu pedido con el estado actual disponible.",
+    orderType: publicOrderType(order),
+    storeName: cleanText(order.storeName),
+    summary: publicOrderSummary(order),
+    isClosed: false,
+  };
+}
+
+function publicStatusCode(status) {
+  const clean = cleanText(status).toLowerCase();
+  if (["preparing", "in_preparation"].includes(clean)) return "PREPARING";
+  if (["on_the_way", "shipping", "delivering"].includes(clean)) return "ON_THE_WAY";
+  if (["delivered", "closed", "archived"].includes(clean)) return "DELIVERED";
+  if (["cancelled", "canceled"].includes(clean)) return "CANCELLED";
+  if (["under_review", "review"].includes(clean)) return "UNDER_REVIEW";
+  return "RECEIVED";
+}
+
+function isTerminalStatus(status) {
+  return ["delivered", "closed", "archived", "cancelled", "canceled"].includes(cleanText(status).toLowerCase());
+}
+
+function publicOrderType(order) {
+  if (order.source === LOCAL_SOURCE) return "Local";
+  if (order.source === PLUS_BUY_SOURCE) return "Compra";
+  if (order.source === PLUS_PICKUP_SHIPPING_SOURCE) return "Retiro / Envío";
+  return "Pedido";
+}
+
+function publicOrderSummary(order) {
+  if (order.source === LOCAL_SOURCE && Array.isArray(order.items)) {
+    return order.items.map((item) => cleanText(item.name)).filter(Boolean).slice(0, 3).join(", ");
+  }
+  if (order.source === PLUS_BUY_SOURCE && order.purchase) {
+    return cleanText(order.purchase.itemsText).split("\n").filter(Boolean).slice(0, 3).join(", ");
+  }
+  if (order.source === PLUS_PICKUP_SHIPPING_SOURCE && order.pickupShipping) {
+    return cleanText(order.pickupShipping.packageDescription);
+  }
+  return "";
 }
 
 function cleanText(value) {
