@@ -83,7 +83,7 @@ test("createLocalOrder validates and writes only orders", () => {
   assert.match(source, /rawItems\.length === 0/);
   assert.match(source, /isValidPhone/);
   assert.match(source, /collection\(ORDERS\)\.doc\(\)/);
-  assert.match(source, /source: SOURCE/);
+  assert.match(source, /source: LOCAL_SOURCE/);
   assert.match(source, /status: STATUS/);
   assert.match(source, /publicStatus: PUBLIC_STATUS/);
   assert.match(source, /trackingNumber/);

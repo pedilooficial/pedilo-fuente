@@ -10,7 +10,9 @@ const REGION = "southamerica-east1";
 const ORDERS = "orders";
 const STORES = "stores";
 const PRODUCTS = "products";
-const SOURCE = "public_local";
+const LOCAL_SOURCE = "public_local";
+const PLUS_BUY_SOURCE = "public_plus_buy";
+const PLUS_PICKUP_SHIPPING_SOURCE = "public_plus_pickup_shipping";
 const STATUS = "created";
 const PUBLIC_STATUS = "Pedido recibido";
 
@@ -61,7 +63,7 @@ exports.createLocalOrder = onCall({region: REGION}, async (request) => {
   const now = admin.firestore.FieldValue.serverTimestamp();
 
   await orderRef.set({
-    source: SOURCE,
+    source: LOCAL_SOURCE,
     status: STATUS,
     publicStatus: PUBLIC_STATUS,
     storeId: clean.storeId,
@@ -87,6 +89,27 @@ exports.createLocalOrder = onCall({region: REGION}, async (request) => {
     status: "RECEIVED",
     storeName,
     itemCount: items.reduce((sum, item) => sum + item.quantity, 0),
+  };
+});
+
+exports.createPlusOrder = onCall({region: REGION}, async (request) => {
+  const payload = request.data || {};
+  const clean = cleanPlusOrderPayload(payload);
+  const orderRef = db.collection(ORDERS).doc();
+  const trackingNumber = publicNumberFor(orderRef.id);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const orderData = plusOrderData(clean, trackingNumber, now);
+
+  await orderRef.set(orderData);
+
+  return {
+    orderId: orderRef.id,
+    trackingNumber,
+    publicOrderNumber: trackingNumber,
+    publicStatus: PUBLIC_STATUS,
+    status: "RECEIVED",
+    requestLabel: clean.requestType === "buy" ? "Compra" : "Retiro / Envío",
+    itemCount: clean.items.length,
   };
 });
 
@@ -123,6 +146,111 @@ function cleanOrderPayload(payload) {
   };
 }
 
+function cleanPlusOrderPayload(payload) {
+  const requestType = cleanText(payload.requestType);
+  const source = cleanText(payload.source);
+  const contact = payload.contact || {};
+  const name = cleanText(contact.name);
+  const phone = cleanText(contact.phone);
+  const sourceReference = cleanText(payload.sourceReference);
+  const destination = cleanText(payload.destination);
+  const note = cleanText(payload.note);
+  const paymentMethod = cleanText(payload.paymentMethod);
+  const amount = cleanText(payload.amount);
+  const schedule = cleanText(payload.schedule);
+  const rawItems = Array.isArray(payload.items) ? payload.items : [];
+
+  if (!["buy", "pickup_shipping"].includes(requestType) || !name || !isValidPhone(phone) || !paymentMethod) {
+    throw new HttpsError("invalid-argument", "Faltan datos para confirmar el pedido.");
+  }
+  if (hasPlaceholder([name, phone, sourceReference, destination, paymentMethod])) {
+    throw new HttpsError("invalid-argument", "Revisá los datos antes de confirmar.");
+  }
+
+  const items = rawItems.map(cleanPlusItem);
+  if (requestType === "buy") {
+    if (source !== PLUS_BUY_SOURCE || !sourceReference || !destination || items.length === 0) {
+      throw new HttpsError("invalid-argument", "Faltan datos para confirmar la compra.");
+    }
+    if (items.some((item) => !item.name || !item.detail || hasPlaceholder([item.name, item.detail]))) {
+      throw new HttpsError("invalid-argument", "Revisá los productos antes de confirmar.");
+    }
+  } else {
+    if (source !== PLUS_PICKUP_SHIPPING_SOURCE || !sourceReference || !destination || items.length !== 1 || !items[0].name) {
+      throw new HttpsError("invalid-argument", "Faltan datos para confirmar el retiro.");
+    }
+    if (hasPlaceholder([sourceReference, destination, items[0].name])) {
+      throw new HttpsError("invalid-argument", "Revisá los datos antes de confirmar.");
+    }
+  }
+
+  return {
+    source,
+    requestType,
+    customer: {name, phone},
+    items,
+    sourceReference,
+    destination,
+    note,
+    paymentMethod,
+    amount,
+    schedule,
+  };
+}
+
+function cleanPlusItem(item) {
+  return {
+    name: cleanText(item.name),
+    detail: cleanText(item.detail),
+  };
+}
+
+function plusOrderData(clean, trackingNumber, now) {
+  const base = {
+    source: clean.source,
+    status: STATUS,
+    publicStatus: PUBLIC_STATUS,
+    requestType: clean.requestType,
+    customer: clean.customer,
+    note: clean.note,
+    paymentMethod: clean.paymentMethod,
+    amount: clean.amount,
+    schedule: clean.schedule,
+    trackingNumber,
+    publicOrderNumber: trackingNumber,
+    isPublicCreated: true,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  if (clean.requestType === "buy") {
+    return {
+      ...base,
+      purchase: {
+        itemsText: clean.items.map((item) => `${item.name} - ${item.detail}`).join("\n"),
+        items: clean.items,
+        storeReference: clean.sourceReference,
+        whereToBuy: clean.sourceReference,
+      },
+      customer: {
+        ...clean.customer,
+        address: clean.destination,
+      },
+    };
+  }
+
+  return {
+    ...base,
+    pickupShipping: {
+      pickupAddress: clean.sourceReference,
+      deliveryAddress: clean.destination,
+      packageDescription: clean.items[0].name,
+      receiverName: clean.items[0].detail,
+      referenceName: clean.items[0].detail,
+    },
+  };
+}
+
 function cleanItem(item) {
   return {
     productId: cleanText(item.productId),
@@ -151,6 +279,10 @@ function isValidPhone(value) {
 }
 
 function isPlaceholder(value) {
-  return ["nombre", "tu nombre", "telefono", "teléfono", "direccion", "dirección", "pedido", "producto"]
+  return ["nombre", "tu nombre", "telefono", "teléfono", "direccion", "dirección", "pedido", "producto", "paquete"]
     .includes(cleanText(value).toLowerCase());
+}
+
+function hasPlaceholder(values) {
+  return values.some(isPlaceholder);
 }

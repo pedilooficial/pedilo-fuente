@@ -50,6 +50,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pedilo.app.core.model.PublicOrderTicket
+import com.pedilo.app.core.model.PublicPlusOrderDraft
+import com.pedilo.app.core.model.PublicPlusOrderItem
+import com.pedilo.app.core.model.publicPlusBuyOrderDraft
+import com.pedilo.app.core.model.publicPlusPickupShippingOrderDraft
 
 enum class PublicPlusRequestType(val label: String) {
     Buy("Compra"),
@@ -73,8 +78,37 @@ data class PublicPlusRequest(
     val payment: String,
     val amount: String,
     val notes: String,
-    val orderNumber: String = "PDL-123456",
+    val orderNumber: String = "",
 )
+
+fun buildPlusOrderDraft(request: PublicPlusRequest): PublicPlusOrderDraft =
+    when (request.type) {
+        PublicPlusRequestType.Buy -> publicPlusBuyOrderDraft(
+            contactName = request.contactName.trim(),
+            contactPhone = request.phone.trim(),
+            deliveryAddress = request.destination.trim(),
+            items = request.items.map {
+                PublicPlusOrderItem(name = it.name.trim(), detail = it.detail.trim())
+            },
+            whereToBuy = request.source.trim(),
+            note = request.notes.trim(),
+            paymentMethod = request.payment.trim(),
+            amount = request.amount.trim(),
+            schedule = request.schedule.trim(),
+        )
+        PublicPlusRequestType.PickupShipping -> publicPlusPickupShippingOrderDraft(
+            contactName = request.contactName.trim(),
+            contactPhone = request.phone.trim(),
+            pickupAddress = request.source.trim(),
+            deliveryAddress = request.destination.trim(),
+            packageDescription = request.items.firstOrNull()?.name.orEmpty().trim(),
+            referenceName = request.items.firstOrNull()?.detail.orEmpty().trim(),
+            note = request.notes.trim(),
+            paymentMethod = request.payment.trim(),
+            amount = request.amount.trim(),
+            schedule = request.schedule.trim(),
+        )
+    }
 
 private enum class PlusIconKind {
     Buy,
@@ -305,6 +339,8 @@ fun PublicPlusPickupShippingScreen(
 @Composable
 fun PublicPlusConfirmationScreen(
     request: PublicPlusRequest,
+    isSubmitting: Boolean,
+    submitError: String?,
     onHome: () -> Unit,
     onPlus: () -> Unit,
     onShop: () -> Unit,
@@ -336,9 +372,13 @@ fun PublicPlusConfirmationScreen(
                 )
             }
             item {
+                submitError?.let { PlusNotice(it) }
+            }
+            item {
                 PlusActionButton(
-                    label = "Confirmar pedido",
+                    label = if (isSubmitting) "Confirmando..." else "Confirmar pedido",
                     icon = PlusIconKind.Check,
+                    enabled = !isSubmitting,
                     onClick = { onConfirm(request) },
                 )
             }
@@ -349,6 +389,7 @@ fun PublicPlusConfirmationScreen(
 @Composable
 fun PublicPlusTicketScreen(
     request: PublicPlusRequest,
+    ticket: PublicOrderTicket,
     onHome: () -> Unit,
     onPlus: () -> Unit,
     onShop: () -> Unit,
@@ -363,12 +404,12 @@ fun PublicPlusTicketScreen(
             contentPadding = PaddingValues(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 132.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { TicketHero(request) }
-            item { RequestSummaryCard(request = request, expanded = false) }
+            item { TicketHero(ticket) }
+            item { RequestSummaryCard(request = request.copy(orderNumber = ticket.trackingNumber), expanded = false) }
             item {
                 DetailLineCard(
                     title = "Estado inicial",
-                    lines = listOf("Recibido", request.payment, "Total estimado ${request.amount}"),
+                    lines = listOf(ticket.publicStatus, request.payment, "Total estimado ${request.amount}"),
                     icon = PlusIconKind.Ticket,
                 )
             }
@@ -376,7 +417,7 @@ fun PublicPlusTicketScreen(
                 PlusActionButton(
                     label = "Ver seguimiento",
                     icon = PlusIconKind.Tracking,
-                    onClick = { onTracking(request.orderNumber) },
+                    onClick = { onTracking(ticket.trackingNumber) },
                 )
             }
             item {
@@ -573,7 +614,9 @@ private fun RequestSummaryCard(request: PublicPlusRequest, expanded: Boolean) {
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(request.type.label, color = PediloText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text("Número ${request.orderNumber}", color = PediloMuted, fontSize = 12.sp)
+                if (request.orderNumber.isNotBlank()) {
+                    Text("Número ${request.orderNumber}", color = PediloMuted, fontSize = 12.sp)
+                }
             }
         }
         Spacer(Modifier.height(10.dp))
@@ -611,7 +654,7 @@ private fun DetailLineCard(title: String, lines: List<String>, icon: PlusIconKin
 }
 
 @Composable
-private fun TicketHero(request: PublicPlusRequest) {
+private fun TicketHero(ticket: PublicOrderTicket) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -625,10 +668,10 @@ private fun TicketHero(request: PublicPlusRequest) {
         }
         Spacer(Modifier.height(12.dp))
         Text("Pedido recibido", color = PediloText, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
-        Text(request.orderNumber, color = PediloOrange, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text(ticket.trackingNumber, color = PediloOrange, fontSize = 24.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(6.dp))
         Text("Guardá este número para consultar el estado del pedido.", color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp, textAlign = TextAlign.Center)
-        Text("Estado inicial: Recibido", color = PediloMuted, fontSize = 14.sp)
+        Text("Estado inicial: ${ticket.publicStatus}", color = PediloMuted, fontSize = 14.sp)
     }
 }
 

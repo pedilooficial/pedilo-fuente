@@ -38,10 +38,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pedilo.app.R
+import com.pedilo.app.core.firebase.FirebasePublicPlusOrderAdapter
 import com.pedilo.app.core.firebase.FirebasePublicOrderAdapter
 import com.pedilo.app.core.model.PublicOrderTicket
 import com.pedilo.app.core.result.CoreError
 import com.pedilo.app.core.result.CoreResult
+import com.pedilo.app.core.usecase.CreatePublicPlusOrderUseCase
 import com.pedilo.app.core.usecase.CreatePublicOrderUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -54,7 +56,7 @@ private sealed interface PublicRoute {
     data object PlusBuy : PublicRoute
     data object PlusPickupShipping : PublicRoute
     data class PlusConfirmation(val request: PublicPlusRequest) : PublicRoute
-    data class PlusTicket(val request: PublicPlusRequest) : PublicRoute
+    data class PlusTicket(val request: PublicPlusRequest, val ticket: PublicOrderTicket) : PublicRoute
     data object Shop : PublicRoute
     data object Conventions : PublicRoute
     data object ConventionsInfo : PublicRoute
@@ -80,6 +82,7 @@ fun PublicApp() {
         var catalogState by remember { mutableStateOf(PublicCatalogState()) }
         val scope = rememberCoroutineScope()
         val createLocalOrder = remember { CreatePublicOrderUseCase(FirebasePublicOrderAdapter()) }
+        val createPlusOrder = remember { CreatePublicPlusOrderUseCase(FirebasePublicPlusOrderAdapter()) }
 
         LaunchedEffect(Unit) {
             catalogState = withContext(Dispatchers.IO) { loadPublicCatalogState() }
@@ -98,6 +101,8 @@ fun PublicApp() {
         var pendingLocalExit by remember { mutableStateOf<PublicRoute?>(null) }
         var isSubmittingLocalOrder by remember { mutableStateOf(false) }
         var localOrderError by remember { mutableStateOf<String?>(null) }
+        var isSubmittingPlusOrder by remember { mutableStateOf(false) }
+        var plusOrderError by remember { mutableStateOf<String?>(null) }
 
         fun isLocalRoute(target: PublicRoute): Boolean = when (target) {
             PublicRoute.Local,
@@ -237,23 +242,51 @@ fun PublicApp() {
                 onHome = { goHome() },
                 onPlus = { goPlus() },
                 onShop = { goShop() },
-                onContinue = { navigateTo(PublicRoute.PlusConfirmation(it)) },
+                onContinue = {
+                    plusOrderError = null
+                    navigateTo(PublicRoute.PlusConfirmation(it))
+                },
             )
             PublicRoute.PlusPickupShipping -> PublicPlusPickupShippingScreen(
                 onHome = { goHome() },
                 onPlus = { goPlus() },
                 onShop = { goShop() },
-                onContinue = { navigateTo(PublicRoute.PlusConfirmation(it)) },
+                onContinue = {
+                    plusOrderError = null
+                    navigateTo(PublicRoute.PlusConfirmation(it))
+                },
             )
             is PublicRoute.PlusConfirmation -> PublicPlusConfirmationScreen(
                 request = (route as PublicRoute.PlusConfirmation).request,
+                isSubmitting = isSubmittingPlusOrder,
+                submitError = plusOrderError,
                 onHome = { goHome() },
                 onPlus = { goPlus() },
                 onShop = { goShop() },
-                onConfirm = { navigateTo(PublicRoute.PlusTicket(it)) },
+                onConfirm = {
+                    if (!isSubmittingPlusOrder) {
+                        val currentRoute = route as PublicRoute.PlusConfirmation
+                        val draft = buildPlusOrderDraft(currentRoute.request)
+                        scope.launch {
+                            isSubmittingPlusOrder = true
+                            plusOrderError = null
+                            val result = withContext(Dispatchers.IO) { createPlusOrder(draft) }
+                            isSubmittingPlusOrder = false
+                            when (result) {
+                                is CoreResult.Success -> {
+                                    navigateTo(PublicRoute.PlusTicket(currentRoute.request, result.value))
+                                }
+                                is CoreResult.Failure -> {
+                                    plusOrderError = result.error.toLocalOrderMessage()
+                                }
+                            }
+                        }
+                    }
+                },
             )
             is PublicRoute.PlusTicket -> PublicPlusTicketScreen(
                 request = (route as PublicRoute.PlusTicket).request,
+                ticket = (route as PublicRoute.PlusTicket).ticket,
                 onHome = { goHome() },
                 onPlus = { goPlus() },
                 onShop = { goShop() },

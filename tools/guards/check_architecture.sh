@@ -93,11 +93,14 @@ fi
 
 if [ -d functions ]; then
   if ! rg -n "exports[.]createLocalOrder" functions/index.js >/dev/null; then
-    fail "functions must expose only the createLocalOrder callable"
+    fail "functions must expose the createLocalOrder callable"
+  fi
+  if ! rg -n "exports[.]createPlusOrder" functions/index.js >/dev/null; then
+    fail "functions must expose the createPlusOrder callable"
   fi
   if rg -n "collection[(][\"'](users|roles|payments|order_tracking)[\"'][)]|whatsapp|WhatsApp|driverId" functions >/tmp/pedilo_guard_match.txt; then
     cat /tmp/pedilo_guard_match.txt >&2
-    fail "createLocalOrder must not touch users, roles, payments, WhatsApp or tracking collections"
+    fail "public order functions must not touch users, roles, payments, WhatsApp or tracking collections"
   fi
 fi
 

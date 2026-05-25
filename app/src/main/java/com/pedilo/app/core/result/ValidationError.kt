@@ -11,6 +11,8 @@ data class ValidationError(
         ITEMS,
         STORE,
         PAYMENT,
+        SOURCE,
+        PICKUP_ADDRESS,
         TRACKING_NUMBER,
     }
 
