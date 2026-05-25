@@ -7,7 +7,7 @@ const {spawnSync} = require("node:child_process");
 
 function copyProjectForGuard() {
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "pedilo-guard-"));
-  for (const item of ["app", "firestore.rules", "firestore.indexes.json", "firebase.json", "README.md", "tools"]) {
+  for (const item of ["app", "functions", "firestore.rules", "firestore.indexes.json", "firebase.json", "README.md", "tools"]) {
     fs.cpSync(item, path.join(tmpRoot, item), {recursive: true});
   }
   return tmpRoot;
@@ -35,17 +35,16 @@ test("architecture guard fails if Android writes directly to orders", () => {
   fs.appendFileSync(target, "\n// db.collection(\"orders\").document(\"x\").set(mapOf())\n");
   const result = runGuard(root);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /forbidden pattern|Android must not write directly/);
+  assert.match(result.stderr, /forbidden pattern|UI must not write directly/);
 });
 
-test("architecture guard fails if backend deploy config returns", () => {
+test("architecture guard fails if functions config is missing", () => {
   const root = copyProjectForGuard();
   const target = path.join(root, "firebase.json");
-  const source = fs.readFileSync(target, "utf8");
-  fs.writeFileSync(target, source.replace(/\n  \}/, "\n  },\n  \"functions\": []"));
+  fs.writeFileSync(target, JSON.stringify({firestore: {rules: "firestore.rules", indexes: "firestore.indexes.json"}}, null, 2));
   const result = runGuard(root);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /legacy functions deploy config remains/);
+  assert.match(result.stderr, /functions deploy config/);
 });
 
 test("architecture guard fails if clean core imports platform code", () => {

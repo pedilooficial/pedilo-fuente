@@ -9,6 +9,8 @@ data class ValidationError(
         PHONE,
         ADDRESS,
         ITEMS,
+        STORE,
+        PAYMENT,
         TRACKING_NUMBER,
     }
 

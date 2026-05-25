@@ -58,6 +58,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("com.google.firebase:firebase-functions-ktx")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")

@@ -8,16 +8,33 @@ import com.pedilo.app.core.result.ValidationError
 class ValidatePublicOrderDraftUseCase {
     operator fun invoke(draft: PublicOrderDraft): CoreResult<Unit> {
         val errors = buildList {
+            if (draft.source != "public_local") {
+                add(ValidationError(ValidationError.Field.STORE, ValidationError.Reason.INVALID))
+            }
+            if (draft.storeId.isBlankOrPlaceholder() || draft.storeName.isBlankOrPlaceholder()) {
+                add(ValidationError(ValidationError.Field.STORE, ValidationError.Reason.REQUIRED))
+            }
             if (draft.contact.name.isBlankOrPlaceholder()) {
                 add(ValidationError(ValidationError.Field.NAME, ValidationError.Reason.REQUIRED))
             }
             if (draft.contact.phone.isBlankOrPlaceholder()) {
                 add(ValidationError(ValidationError.Field.PHONE, ValidationError.Reason.REQUIRED))
+            } else if (draft.contact.phone.count { it.isDigit() } < 6) {
+                add(ValidationError(ValidationError.Field.PHONE, ValidationError.Reason.INVALID))
             }
             if (draft.deliveryLocation?.addressLine.isNullOrBlankOrPlaceholder()) {
                 add(ValidationError(ValidationError.Field.ADDRESS, ValidationError.Reason.REQUIRED))
             }
-            if (draft.items.isEmpty() || draft.items.any { it.name.isBlankOrPlaceholder() || it.quantity <= 0 }) {
+            if (draft.paymentMethod == com.pedilo.app.core.model.PaymentMethod.NotSpecified) {
+                add(ValidationError(ValidationError.Field.PAYMENT, ValidationError.Reason.REQUIRED))
+            }
+            if (draft.items.isEmpty() || draft.items.any {
+                    it.productId.isBlankOrPlaceholder() ||
+                        it.storeId != draft.storeId ||
+                        it.name.isBlankOrPlaceholder() ||
+                        it.quantity <= 0
+                }
+            ) {
                 add(ValidationError(ValidationError.Field.ITEMS, ValidationError.Reason.REQUIRED))
             }
         }

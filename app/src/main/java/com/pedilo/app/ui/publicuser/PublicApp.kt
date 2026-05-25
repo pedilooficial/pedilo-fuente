@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,8 +38,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pedilo.app.R
+import com.pedilo.app.core.firebase.FirebasePublicOrderAdapter
+import com.pedilo.app.core.model.PublicOrderTicket
+import com.pedilo.app.core.result.CoreError
+import com.pedilo.app.core.result.CoreResult
+import com.pedilo.app.core.usecase.CreatePublicOrderUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private sealed interface PublicRoute {
@@ -63,7 +70,7 @@ private sealed interface PublicRoute {
     data object LocalCart : PublicRoute
     data object LocalData : PublicRoute
     data class LocalConfirmation(val orderData: LocalOrderData) : PublicRoute
-    data class LocalTicket(val orderData: LocalOrderData) : PublicRoute
+    data class LocalTicket(val orderData: LocalOrderData, val ticket: PublicOrderTicket) : PublicRoute
 }
 
 @Composable
@@ -71,6 +78,8 @@ fun PublicApp() {
     PublicTheme {
         var showSplash by remember { mutableStateOf(true) }
         var catalogState by remember { mutableStateOf(PublicCatalogState()) }
+        val scope = rememberCoroutineScope()
+        val createLocalOrder = remember { CreatePublicOrderUseCase(FirebasePublicOrderAdapter()) }
 
         LaunchedEffect(Unit) {
             catalogState = withContext(Dispatchers.IO) { loadPublicCatalogState() }
@@ -87,6 +96,8 @@ fun PublicApp() {
         var localCategory by remember { mutableStateOf(LocalCategory.Featured) }
         var localOrderPlaced by remember { mutableStateOf(false) }
         var pendingLocalExit by remember { mutableStateOf<PublicRoute?>(null) }
+        var isSubmittingLocalOrder by remember { mutableStateOf(false) }
+        var localOrderError by remember { mutableStateOf<String?>(null) }
 
         fun isLocalRoute(target: PublicRoute): Boolean = when (target) {
             PublicRoute.Local,
@@ -375,10 +386,33 @@ fun PublicApp() {
             is PublicRoute.LocalConfirmation -> PublicLocalConfirmationScreen(
                 cartItems = localCart,
                 orderData = (route as PublicRoute.LocalConfirmation).orderData,
+                isSubmitting = isSubmittingLocalOrder,
+                submitError = localOrderError,
                 onEditData = { navigateTo(PublicRoute.LocalData) },
                 onConfirm = {
-                    localOrderPlaced = true
-                    navigateTo(PublicRoute.LocalTicket((route as PublicRoute.LocalConfirmation).orderData))
+                    if (!isSubmittingLocalOrder) {
+                        val currentRoute = route as PublicRoute.LocalConfirmation
+                        val draft = buildLocalOrderDraft(
+                            store = catalogState.romaStoreForOrder(),
+                            cartItems = localCart,
+                            orderData = currentRoute.orderData,
+                        )
+                        scope.launch {
+                            isSubmittingLocalOrder = true
+                            localOrderError = null
+                            val result = withContext(Dispatchers.IO) { createLocalOrder(draft) }
+                            isSubmittingLocalOrder = false
+                            when (result) {
+                                is CoreResult.Success -> {
+                                    localOrderPlaced = true
+                                    navigateTo(PublicRoute.LocalTicket(currentRoute.orderData, result.value))
+                                }
+                                is CoreResult.Failure -> {
+                                    localOrderError = result.error.toLocalOrderMessage()
+                                }
+                            }
+                        }
+                    }
                 },
                 onHome = { goHome() },
                 onPlus = { goPlus() },
@@ -387,6 +421,7 @@ fun PublicApp() {
             is PublicRoute.LocalTicket -> PublicLocalTicketScreen(
                 cartItems = localCart,
                 orderData = (route as PublicRoute.LocalTicket).orderData,
+                ticket = (route as PublicRoute.LocalTicket).ticket,
                 onTracking = { navigateTo(PublicRoute.PublicTracking(it, PublicBottomDestination.Shop)) },
                 onHome = {
                     localCart.clear()
@@ -420,6 +455,16 @@ fun PublicApp() {
             )
         }
     }
+}
+
+private fun PublicCatalogState.romaStoreForOrder() =
+    stores.firstOrNull { it.id == "pizzeria-roma" } ?: stores.firstOrNull()
+
+private fun CoreError.toLocalOrderMessage(): String = when (this) {
+    is CoreError.Validation -> "Revisá los datos del pedido antes de confirmar."
+    CoreError.IncompleteData -> "Faltan datos para confirmar el pedido."
+    CoreError.NotAvailable -> "No pudimos confirmar el pedido. Probá de nuevo."
+    CoreError.Unknown -> "Ocurrió un error al confirmar el pedido."
 }
 
 @Composable

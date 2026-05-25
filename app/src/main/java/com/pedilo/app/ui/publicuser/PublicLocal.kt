@@ -51,7 +51,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pedilo.app.core.model.PublicProductSummary
+import com.pedilo.app.core.model.PublicOrderDraft
+import com.pedilo.app.core.model.PublicOrderItem
+import com.pedilo.app.core.model.PublicOrderTicket
 import com.pedilo.app.core.model.PublicStoreSummary
+import com.pedilo.app.core.model.PaymentMethod
+import com.pedilo.app.core.model.publicLocalOrderDraft
 
 enum class LocalCategory(val label: String) {
     Featured("Destacados"),
@@ -61,6 +66,8 @@ enum class LocalCategory(val label: String) {
 }
 
 data class LocalProduct(
+    val id: String,
+    val storeId: String,
     val name: String,
     val description: String,
     val price: Int,
@@ -111,6 +118,8 @@ private fun productsFor(category: LocalCategory, catalogState: PublicCatalogStat
 
 private fun PublicProductSummary.toLocalProduct(): LocalProduct =
     LocalProduct(
+        id = id,
+        storeId = storeId,
         name = name,
         description = description,
         price = ((priceCents ?: 0L) / 100L).toInt(),
@@ -120,6 +129,36 @@ private fun PublicProductSummary.toLocalProduct(): LocalProduct =
             else -> LocalCategory.Pizzas
         },
         badge = if (name.contains("promo", ignoreCase = true)) "Especial" else "",
+    )
+
+fun buildLocalOrderDraft(
+    store: PublicStoreSummary?,
+    cartItems: List<LocalCartItem>,
+    orderData: LocalOrderData,
+): PublicOrderDraft =
+    publicLocalOrderDraft(
+        storeId = store?.id.orEmpty(),
+        storeName = store?.name.orEmpty(),
+        contactName = orderData.fullName.trim(),
+        contactPhone = orderData.phone.trim(),
+        addressLine = orderData.address.trim(),
+        addressNotes = orderData.notes.trim(),
+        items = cartItems.map { item ->
+            PublicOrderItem(
+                productId = item.product.id,
+                storeId = item.product.storeId,
+                name = item.product.name,
+                quantity = item.quantity,
+                unitPriceCents = item.product.price.toLong() * 100L,
+                notes = item.notes,
+            )
+        },
+        paymentMethod = when (orderData.payment) {
+            "Efectivo al recibir" -> PaymentMethod.Cash
+            "Transferencia" -> PaymentMethod.Transfer
+            else -> PaymentMethod.NotSpecified
+        },
+        notes = orderData.notes.trim(),
     )
 
 private fun PublicCatalogState.romaStore(): PublicStoreSummary? =
@@ -314,6 +353,8 @@ fun PublicLocalDataScreen(
 fun PublicLocalConfirmationScreen(
     cartItems: List<LocalCartItem>,
     orderData: LocalOrderData,
+    isSubmitting: Boolean,
+    submitError: String?,
     onEditData: () -> Unit,
     onConfirm: () -> Unit,
     onHome: () -> Unit,
@@ -333,8 +374,16 @@ fun PublicLocalConfirmationScreen(
             item { CompactOrderCard(cartItems) }
             item { LocalInfoCard("Entrega", listOf(orderData.fullName, orderData.phone, orderData.address, orderData.notes), LocalIconKind.Location) }
             item { LocalInfoCard("Pago", listOf(orderData.payment, "Total ${formatLocalMoney(localGrandTotal(cartItems))}"), LocalIconKind.Cart) }
+            submitError?.let { item { LocalStatusCard(it) } }
             item { LocalSecondaryButton("Editar datos", LocalIconKind.Person, onEditData) }
-            item { LocalPrimaryButton("Confirmar pedido", LocalIconKind.Check, onClick = onConfirm) }
+            item {
+                LocalPrimaryButton(
+                    label = if (isSubmitting) "Confirmando..." else "Confirmar pedido",
+                    icon = LocalIconKind.Check,
+                    enabled = !isSubmitting,
+                    onClick = onConfirm,
+                )
+            }
         }
     }
 }
@@ -343,12 +392,13 @@ fun PublicLocalConfirmationScreen(
 fun PublicLocalTicketScreen(
     cartItems: List<LocalCartItem>,
     orderData: LocalOrderData,
+    ticket: PublicOrderTicket,
     onTracking: (String) -> Unit,
     onHome: () -> Unit,
     onPlus: () -> Unit,
     onShop: () -> Unit,
 ) {
-    val orderNumber = "PDL-240518"
+    val orderNumber = ticket.trackingNumber
     PublicShell(current = PublicBottomDestination.Shop, onHome = onHome, onPlus = onPlus, onShop = onShop) {
         LazyColumn(
             modifier = Modifier
@@ -375,10 +425,10 @@ fun PublicLocalTicketScreen(
                     Text(orderNumber, color = PediloOrange, fontSize = 23.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(6.dp))
                     Text("Guardá este número para consultar el estado del pedido.", color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp, textAlign = TextAlign.Center)
-                    Text("Estado inicial: Recibido", color = PediloMuted, fontSize = 14.sp)
+                    Text("Estado inicial: ${ticket.publicStatus}", color = PediloMuted, fontSize = 14.sp)
                 }
             }
-            item { LocalInfoCard("Pedido de local", listOf("${cartItems.sumOf { it.quantity }} productos", "Total ${formatLocalMoney(localGrandTotal(cartItems))}"), LocalIconKind.Ticket) }
+            item { LocalInfoCard("Pedido de local", listOf(ticket.storeName.ifBlank { "Local" }, "${cartItems.sumOf { it.quantity }} productos", "Total ${formatLocalMoney(localGrandTotal(cartItems))}"), LocalIconKind.Ticket) }
             item { LocalInfoCard("Entrega", listOf(orderData.address, orderData.payment), LocalIconKind.Location) }
             item { LocalPrimaryButton("Ver seguimiento", LocalIconKind.Tracking) { onTracking(orderNumber) } }
             item { LocalSecondaryButton("Volver al inicio", LocalIconKind.Check, onHome) }

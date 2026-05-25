@@ -41,8 +41,7 @@ done
 
 for removed_path in \
   app/src/main/java/com/pedilo/app/data \
-  app/src/main/java/com/pedilo/app/domain \
-  functions
+  app/src/main/java/com/pedilo/app/domain
 do
   if [ -e "$removed_path" ]; then
     fail "removed legacy path exists: $removed_path"
@@ -63,9 +62,9 @@ do
   fi
 done
 
-if rg -n "collection[(][\"']orders[\"'][)].*[.](set|update|delete|add)|document[(].*orders.*[)].*[.](set|update|delete)" app/src/main >/tmp/pedilo_guard_match.txt; then
+if rg -n "collection[(][\"']orders[\"'][)].*[.](set|update|delete|add)|document[(].*orders.*[)].*[.](set|update|delete)" app/src/main/java/com/pedilo/app/ui >/tmp/pedilo_guard_match.txt; then
   cat /tmp/pedilo_guard_match.txt >&2
-  fail "Android must not write directly to orders"
+  fail "UI must not write directly to orders"
 fi
 
 pure_core_paths=(
@@ -87,9 +86,19 @@ if [ -d app/src/main/java/com/pedilo/app/core ]; then
   fi
 fi
 
-if rg -n '"functions"[[:space:]]*:' firebase.json >/tmp/pedilo_guard_match.txt; then
+if ! rg -n '"source"[[:space:]]*:[[:space:]]*"functions"' firebase.json >/dev/null; then
   cat /tmp/pedilo_guard_match.txt >&2
-  fail "legacy functions deploy config remains"
+  fail "functions deploy config must only point to the local functions source"
+fi
+
+if [ -d functions ]; then
+  if ! rg -n "exports[.]createLocalOrder" functions/index.js >/dev/null; then
+    fail "functions must expose only the createLocalOrder callable"
+  fi
+  if rg -n "collection[(][\"'](users|roles|payments|order_tracking)[\"'][)]|whatsapp|WhatsApp|driverId" functions >/tmp/pedilo_guard_match.txt; then
+    cat /tmp/pedilo_guard_match.txt >&2
+    fail "createLocalOrder must not touch users, roles, payments, WhatsApp or tracking collections"
+  fi
 fi
 
 if rg -n "isOwner|owner|customer" firestore.rules >/tmp/pedilo_guard_match.txt; then
