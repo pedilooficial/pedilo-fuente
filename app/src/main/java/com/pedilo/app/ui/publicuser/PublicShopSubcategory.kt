@@ -148,6 +148,7 @@ private fun RelatedStoreCard(store: PublicStoreSummary, onView: () -> Unit) {
             .height(148.dp)
             .background(PediloOverlay, RoundedCornerShape(14.dp))
             .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .clickable(role = Role.Button, onClick = onView)
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

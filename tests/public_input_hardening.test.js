@@ -12,6 +12,7 @@ const local = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicLocal.kt";
 const plus = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicPlus.kt";
 const conventions = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicConventions.kt";
 const shop = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicShop.kt";
+const subcategory = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicShopSubcategory.kt";
 const tracking = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicShopTracking.kt";
 const manifest = "app/src/main/AndroidManifest.xml";
 
@@ -65,6 +66,12 @@ test("public inputs use a light cursor and muted placeholders", () => {
 
 test("portrait orientation is locked to avoid activity recreation during public flows", () => {
   assert.match(read(manifest), /android:screenOrientation="portrait"/);
+});
+
+test("subcategory store card opens from the whole visible card", () => {
+  const source = read(subcategory);
+
+  assert.match(source, /\.fillMaxWidth\(\)[\s\S]*\.height\(148\.dp\)[\s\S]*\.clickable\(role = Role\.Button, onClick = onView\)/);
 });
 
 test("public UI has no technical user-facing strings or direct order writes", () => {
