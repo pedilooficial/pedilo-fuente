@@ -10,9 +10,10 @@ test("app and backend source stay free of removed public identity terms", () => 
     "id" + "Token",
     "isOwner",
   ];
+  const paths = ["app/src/main", "firestore.rules"];
 
   for (const term of forbidden) {
-    const result = spawnSync("rg", ["-n", "--fixed-strings", term, "app/src/main", "functions/src", "firestore.rules"], {
+    const result = spawnSync("rg", ["-n", "--fixed-strings", term, ...paths], {
       encoding: "utf8",
     });
     assert.notEqual(result.status, 0, result.stdout);

@@ -12,9 +12,9 @@ fail() {
 architecture_paths=(
   app/src/main
   app/build.gradle.kts
-  functions/src
   firestore.rules
   firestore.indexes.json
+  firebase.json
   README.md
 )
 
@@ -41,32 +41,38 @@ do
   fi
 done
 
+for removed_path in \
+  app/src/main/java/com/pedilo/app/data \
+  app/src/main/java/com/pedilo/app/domain \
+  functions
+do
+  if [ -e "$removed_path" ]; then
+    fail "removed legacy path exists: $removed_path"
+  fi
+done
+
+for removed_symbol in \
+  "Pedilo""Screen" \
+  "Pedilo""ViewModel" \
+  "Firebase""Pedilo""Repository" \
+  "Pedilo""Repository" \
+  "com.pedilo.app.""data" \
+  "com.pedilo.app.""domain"
+do
+  if rg -n --fixed-strings "$removed_symbol" app/src/main tests >/tmp/pedilo_guard_match.txt; then
+    cat /tmp/pedilo_guard_match.txt >&2
+    fail "removed legacy symbol found"
+  fi
+done
+
 if rg -n "collection[(][\"']orders[\"'][)].*[.](set|update|delete|add)|document[(].*orders.*[)].*[.](set|update|delete)" app/src/main >/tmp/pedilo_guard_match.txt; then
   cat /tmp/pedilo_guard_match.txt >&2
   fail "Android must not write directly to orders"
 fi
 
-create_order_block="$(awk '
-  /export const createOrder/ {inside=1}
-  inside {print}
-  inside && /^\}\);/ {inside=0}
-' functions/src/index.ts)"
-
-if printf '%s\n' "$create_order_block" | rg -n "request[.]auth|requireAuth" >/tmp/pedilo_guard_match.txt; then
+if rg -n '"functions"[[:space:]]*:' firebase.json >/tmp/pedilo_guard_match.txt; then
   cat /tmp/pedilo_guard_match.txt >&2
-  fail "createOrder must not depend on auth"
-fi
-
-if ! rg -n --fixed-strings 'actorRole: "public"' functions/src >/dev/null; then
-  fail "public createOrder event actor is missing"
-fi
-
-if ! rg -n --fixed-strings 'type: "order_created"' functions/src >/dev/null; then
-  fail "initial order event is missing"
-fi
-
-if ! rg -n --fixed-strings 'status: "created"' functions/src >/dev/null; then
-  fail "initial order status is missing"
+  fail "legacy functions deploy config remains"
 fi
 
 if rg -n "isOwner|owner|customer" firestore.rules >/tmp/pedilo_guard_match.txt; then

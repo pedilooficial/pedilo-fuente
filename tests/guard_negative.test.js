@@ -7,10 +7,9 @@ const {spawnSync} = require("node:child_process");
 
 function copyProjectForGuard() {
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "pedilo-guard-"));
-  for (const item of ["app", "functions", "firestore.rules", "firestore.indexes.json", "README.md", "tools"]) {
+  for (const item of ["app", "firestore.rules", "firestore.indexes.json", "firebase.json", "README.md", "tools"]) {
     fs.cpSync(item, path.join(tmpRoot, item), {recursive: true});
   }
-  fs.rmSync(path.join(tmpRoot, "functions", "node_modules"), {recursive: true, force: true});
   return tmpRoot;
 }
 
@@ -23,7 +22,7 @@ function runGuard(root) {
 
 test("architecture guard fails if legacy public identity returns", () => {
   const root = copyProjectForGuard();
-  const target = path.join(root, "app/src/main/java/com/pedilo/app/domain/UserRole.kt");
+  const target = path.join(root, "app/src/main/java/com/pedilo/app/MainActivity.kt");
   fs.appendFileSync(target, "\n// signIn" + "Anonymously\n");
   const result = runGuard(root);
   assert.notEqual(result.status, 0);
@@ -32,25 +31,19 @@ test("architecture guard fails if legacy public identity returns", () => {
 
 test("architecture guard fails if Android writes directly to orders", () => {
   const root = copyProjectForGuard();
-  const target = path.join(root, "app/src/main/java/com/pedilo/app/data/FirebasePediloRepository.kt");
+  const target = path.join(root, "app/src/main/java/com/pedilo/app/MainActivity.kt");
   fs.appendFileSync(target, "\n// db.collection(\"orders\").document(\"x\").set(mapOf())\n");
   const result = runGuard(root);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /forbidden pattern|Android must not write directly/);
 });
 
-test("architecture guard fails if createOrder reads auth", () => {
+test("architecture guard fails if backend deploy config returns", () => {
   const root = copyProjectForGuard();
-  const target = path.join(root, "functions/src/index.ts");
+  const target = path.join(root, "firebase.json");
   const source = fs.readFileSync(target, "utf8");
-  fs.writeFileSync(
-    target,
-    source.replace(
-      "return createOrderFlow(db, request.data);",
-      "const uid = request.auth?.uid;\n  return createOrderFlow(db, {...request.data, uid});"
-    )
-  );
+  fs.writeFileSync(target, source.replace(/\n  \}/, "\n  },\n  \"functions\": []"));
   const result = runGuard(root);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /createOrder must not depend on auth/);
+  assert.match(result.stderr, /legacy functions deploy config remains/);
 });

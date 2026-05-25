@@ -17,10 +17,10 @@ if find app/src/main/res -type f -path '*/drawable*/*' -name 'plan_*.png' | rg .
 fi
 
 for pattern in \
-  "R.drawable.plan_" \
-  "PlanScreen" \
-  "PlanPhoneScreen" \
-  "TapZone" \
+  "R.drawable.""plan_" \
+  "Plan""Screen" \
+  "Plan""Phone""Screen" \
+  "Tap""Zone" \
   "ContentScale.FillHeight" \
   "ContentScale.FillBounds"
 do
