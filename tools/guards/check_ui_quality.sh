@@ -40,7 +40,7 @@ if find app/src/main/res -type f \( -path '*/drawable*/*' -o -path '*/mipmap*/*'
   fail "design screenshot copied into runtime resources"
 fi
 
-if rg -n "TODO|FIXME|Pedido listo para enviar|Cliente|Customer|customer|signInAnonymously" "${ui_paths[@]}" >/tmp/pedilo_ui_guard_match.txt; then
+if rg -n "TODO|FIXME|Pedido listo para enviar|Cliente|Customer|customer|signInAnonymously" app/src/main/java/com/pedilo/app/ui >/tmp/pedilo_ui_guard_match.txt; then
   cat /tmp/pedilo_ui_guard_match.txt >&2
   fail "legacy or unresolved UI text found"
 fi

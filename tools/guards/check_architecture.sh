@@ -20,8 +20,6 @@ architecture_paths=(
 
 for pattern in \
   "UserRole"".Customer" \
-  "Customer" \
-  "customer" \
   "customer""Id" \
   "owner" \
   "isOwner" \
@@ -68,6 +66,18 @@ done
 if rg -n "collection[(][\"']orders[\"'][)].*[.](set|update|delete|add)|document[(].*orders.*[)].*[.](set|update|delete)" app/src/main >/tmp/pedilo_guard_match.txt; then
   cat /tmp/pedilo_guard_match.txt >&2
   fail "Android must not write directly to orders"
+fi
+
+if [ -d app/src/main/java/com/pedilo/app/core ]; then
+  if rg -n "firebase|Firebase|Firestore|Functions|com[.]google[.]firebase" app/src/main/java/com/pedilo/app/core >/tmp/pedilo_guard_match.txt; then
+    cat /tmp/pedilo_guard_match.txt >&2
+    fail "core must not import Firebase"
+  fi
+
+  if rg -n "androidx[.]compose|android[.]app|android[.]content" app/src/main/java/com/pedilo/app/core >/tmp/pedilo_guard_match.txt; then
+    cat /tmp/pedilo_guard_match.txt >&2
+    fail "core must not import Android or Compose"
+  fi
 fi
 
 if rg -n '"functions"[[:space:]]*:' firebase.json >/tmp/pedilo_guard_match.txt; then

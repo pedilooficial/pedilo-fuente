@@ -23,7 +23,7 @@ function runGuard(root) {
 test("architecture guard fails if legacy public identity returns", () => {
   const root = copyProjectForGuard();
   const target = path.join(root, "app/src/main/java/com/pedilo/app/MainActivity.kt");
-  fs.appendFileSync(target, "\n// signIn" + "Anonymously\n");
+  fs.appendFileSync(target, "\n// UserRole" + ".Customer\n");
   const result = runGuard(root);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /forbidden pattern/);
@@ -46,4 +46,14 @@ test("architecture guard fails if backend deploy config returns", () => {
   const result = runGuard(root);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /legacy functions deploy config remains/);
+});
+
+test("architecture guard fails if clean core imports platform code", () => {
+  const root = copyProjectForGuard();
+  const coreDir = path.join(root, "app/src/main/java/com/pedilo/app/core/model");
+  fs.mkdirSync(coreDir, {recursive: true});
+  fs.writeFileSync(path.join(coreDir, "BrokenCore.kt"), "package com.pedilo.app.core.model\nimport androidx.compose.runtime.Composable\n");
+  const result = runGuard(root);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /core must not import Android or Compose/);
 });
