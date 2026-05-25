@@ -183,13 +183,14 @@ private fun ShopHeader() {
                 fontWeight = FontWeight.ExtraBold,
             )
         }
-        Row(
-            modifier = Modifier.padding(top = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Box(
+            modifier = Modifier
+                .padding(top = 10.dp)
+                .background(PediloOrange, RoundedCornerShape(18.dp))
+                .padding(horizontal = 13.dp, vertical = 7.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            Text("i", color = PediloOrange, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.width(5.dp))
-            Text("Ayuda", color = PediloOrange, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text("Equipo", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
         }
     }
 }
