@@ -20,8 +20,8 @@ test("Firebase catalog adapter is read-only and targets catalog collections", ()
   const source = read(adapterPath);
   assert.match(source, /class FirebasePublicCatalogAdapter/);
   assert.match(source, /PublicCatalogPort/);
-  assert.match(source, /collection\(STORES\)\.get\(\)\.await\(\)/);
-  assert.match(source, /collection\(PRODUCTS\)[\s\S]*?\.get\(\)[\s\S]*?\.await\(\)/);
+  assert.match(source, /collection\(STORES\)[\s\S]*?whereEqualTo\(VISIBLE, true\)[\s\S]*?\.get\(\)[\s\S]*?\.await\(\)/);
+  assert.match(source, /collection\(PRODUCTS\)[\s\S]*?whereEqualTo\(VISIBLE, true\)[\s\S]*?whereEqualTo\(AVAILABLE, true\)[\s\S]*?\.get\(\)[\s\S]*?\.await\(\)/);
   assert.doesNotMatch(source, /\.(set|update|delete|add)\(/);
   assert.doesNotMatch(source, /collection\("orders"\)|collection\(ORDERS\)/);
 });

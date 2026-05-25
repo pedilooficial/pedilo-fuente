@@ -15,7 +15,10 @@ class FirebasePublicCatalogAdapter(
 ) : PublicCatalogPort {
     override suspend fun getVisibleStores(): CoreResult<List<PublicStoreSummary>> =
         runCatching {
-            db.collection(STORES).get().await()
+            db.collection(STORES)
+                .whereEqualTo(VISIBLE, true)
+                .get()
+                .await()
                 .documents
                 .mapNotNull { it.toPublicStoreSummaryOrNull() }
         }.fold(
@@ -31,6 +34,8 @@ class FirebasePublicCatalogAdapter(
             db.collection(STORES)
                 .document(cleanStoreId)
                 .collection(PRODUCTS)
+                .whereEqualTo(VISIBLE, true)
+                .whereEqualTo(AVAILABLE, true)
                 .get()
                 .await()
                 .documents
@@ -44,5 +49,7 @@ class FirebasePublicCatalogAdapter(
     private companion object {
         const val STORES = "stores"
         const val PRODUCTS = "products"
+        const val VISIBLE = "visible"
+        const val AVAILABLE = "available"
     }
 }
