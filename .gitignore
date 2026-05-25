@@ -1,5 +1,6 @@
 .gradle/
 build/
+node_modules/
 local.properties
 *.iml
 .idea/
@@ -7,4 +8,5 @@ app/google-services.json
 functions/lib/
 functions/node_modules/
 functions/.runtimeconfig.json
+tools/node_modules/
 reports/
