@@ -134,12 +134,14 @@ private val shopGroups = listOf(
 
 @Composable
 fun PublicShopScreen(
+    catalogState: PublicCatalogState = PublicCatalogState(isLoading = false),
     onHome: () -> Unit,
     onPlus: () -> Unit,
     onShop: () -> Unit,
     onSearch: (String) -> Unit,
     onTracking: (String) -> Unit,
     onSubcategory: (String) -> Unit,
+    onViewLocal: () -> Unit,
 ) {
     PublicShell(
         current = PublicBottomDestination.Shop,

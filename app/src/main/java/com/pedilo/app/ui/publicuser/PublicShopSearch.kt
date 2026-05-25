@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pedilo.app.core.model.PublicProductSummary
 import com.pedilo.app.core.model.PublicStoreSummary
 
 private enum class SearchFilter(val label: String) {
@@ -66,90 +67,22 @@ private data class SearchStore(
     val icon: SearchIconKind = SearchIconKind.Shop,
 )
 
-private val pizzaSearchStores = listOf(
-    SearchStore("Pizzería Roma", "Pizza a la piedra", "4.6", "2.451", "0.8 km", "20-30 min", "$1200", "10% OFF", SearchIconKind.Pizza),
-    SearchStore("La Esquina Pizzería", "Pizza al molde y a la piedra", "4.6", "820", "1.2 km", "25-35 min", "$1300", icon = SearchIconKind.Pizza),
-    SearchStore("Pizza & Co.", "Pizzas artesanales", "4.7", "1.050", "1.5 km", "30-40 min", "$1200", icon = SearchIconKind.Pizza),
-    SearchStore("Don Pietro Pizzería", "Tradición italiana desde 1990", "4.5", "743", "1.0 km", "20-30 min", "$1.100", icon = SearchIconKind.Pizza),
-    SearchStore("Napoli Pizza", "Estilo napolitano auténtico", "4.7", "591", "1.3 km", "25-35 min", "$1200", "TOP", SearchIconKind.Pizza),
-    SearchStore("La Nonna Pizzas", "Recetas caseras desde 1985", "4.4", "612", "1.8 km", "30-45 min", "$1.350", icon = SearchIconKind.Pizza),
-)
-
-private val coherentStores = mapOf(
-    "hamburguesas" to listOf(
-        SearchStore("Burger House", "Hamburguesas clásicas", "4.7", "1.208", "0.9 km", "20-30 min", "$1.100", "20% OFF"),
-        SearchStore("Big Burger", "Combos y papas", "4.5", "684", "1.4 km", "25-35 min", "$1.250"),
-    ),
-    "farmacia" to listOf(
-        SearchStore("Farmacia Central", "Farmacia y perfumería", "4.8", "932", "0.7 km", "15-25 min", "$900", icon = SearchIconKind.Pharmacy),
-        SearchStore("Salud Norte", "Medicamentos y cuidado personal", "4.6", "518", "1.6 km", "20-35 min", "$1.100", icon = SearchIconKind.Pharmacy),
-    ),
-    "mascotas" to listOf(
-        SearchStore("Pet Shop Norte", "Alimentos y accesorios", "4.8", "721", "1.0 km", "20-30 min", "$1.000", icon = SearchIconKind.Paw),
-        SearchStore("Veterinaria Patitas", "Cuidado y alimentos", "4.7", "466", "1.8 km", "25-40 min", "$1.200", icon = SearchIconKind.Paw),
-    ),
-    "bebidas" to listOf(
-        SearchStore("Bebidas Express", "Gaseosas, aguas y jugos", "4.6", "690", "0.8 km", "15-25 min", "$900", icon = SearchIconKind.Drink),
-        SearchStore("Kiosco La Esquina", "Bebidas frías y snacks", "4.4", "385", "1.1 km", "20-30 min", "$850", icon = SearchIconKind.Drink),
-    ),
-    "supermercado" to listOf(
-        SearchStore("Supermercado Sol", "Almacén y frescos", "4.5", "1.020", "1.2 km", "25-40 min", "$1.300"),
-        SearchStore("Almacén Don Luis", "Despensa de barrio", "4.6", "544", "0.6 km", "20-30 min", "$950"),
-    ),
-    "sushi" to listOf(
-        SearchStore("Sushi Zen", "Rolls y piezas combinadas", "4.7", "812", "1.5 km", "30-40 min", "$1.500"),
-        SearchStore("Nikkei Club", "Sushi y cocina japonesa", "4.6", "430", "2.1 km", "35-45 min", "$1.700"),
-    ),
-    "panaderia" to listOf(
-        SearchStore("Dulce Hogar", "Panadería y facturas", "4.9", "755", "0.9 km", "20-30 min", "$850"),
-        SearchStore("La Espiga", "Panificados artesanales", "4.6", "389", "1.4 km", "25-35 min", "$950"),
-    ),
-    "panadería" to listOf(
-        SearchStore("Dulce Hogar", "Panadería y facturas", "4.9", "755", "0.9 km", "20-30 min", "$850"),
-        SearchStore("La Espiga", "Panificados artesanales", "4.6", "389", "1.4 km", "25-35 min", "$950"),
-    ),
-    "cafeteria" to listOf(
-        SearchStore("Café Central", "Café y pastelería", "4.8", "903", "0.7 km", "20-30 min", "$900"),
-        SearchStore("Barista Club", "Café de especialidad", "4.7", "612", "1.3 km", "25-35 min", "$1.000"),
-    ),
-    "cafetería" to listOf(
-        SearchStore("Café Central", "Café y pastelería", "4.8", "903", "0.7 km", "20-30 min", "$900"),
-        SearchStore("Barista Club", "Café de especialidad", "4.7", "612", "1.3 km", "25-35 min", "$1.000"),
-    ),
-    "ofertas" to listOf(
-        SearchStore("Burger House", "Hamburguesas clásicas", "4.7", "1.208", "0.9 km", "20-30 min", "$1.100", "20% OFF"),
-        SearchStore("Pizzería Roma", "Pizzas seleccionadas", "4.6", "2.451", "0.8 km", "20-30 min", "$1200", "15% OFF"),
-        SearchStore("Fruta Viva", "Jugos naturales", "4.5", "408", "1.2 km", "20-30 min", "$900", "25% OFF"),
-    ),
-    "nuevos locales" to listOf(
-        SearchStore("Café Central", "Cafetería", "4.8", "903", "0.7 km", "20-30 min", "$900", "Nuevo"),
-        SearchStore("Sushi Zen", "Sushi", "4.7", "812", "1.5 km", "30-40 min", "$1.500", "Nuevo"),
-        SearchStore("Verde Vivo", "Comida saludable", "4.6", "377", "1.1 km", "20-30 min", "$1.100", "Nuevo"),
-    ),
-)
-
-private fun storesForQuery(query: String): List<SearchStore> {
-    val normalized = query.trim().lowercase()
-    if (normalized.isBlank()) return emptyList()
-    if (listOf("p", "pi", "piz", "pizz", "pizza", "pizzas").any { normalized == it || "pizzas".startsWith(normalized) }) return pizzaSearchStores
-    coherentStores.forEach { (key, stores) ->
-        if (key.startsWith(normalized) || normalized.contains(key) || key.contains(normalized)) return stores
-    }
-    return emptyList()
-}
-
 private fun realStoresForQuery(query: String, catalogState: PublicCatalogState): List<SearchStore> {
     if (!catalogState.hasRealCatalog) return emptyList()
     val normalized = query.trim().lowercase()
-    if (normalized.isBlank()) return emptyList()
+    if (normalized.isBlank()) return catalogState.stores.map { it.toSearchStore() }
     return catalogState.stores
         .filter { store ->
             store.name.contains(normalized, ignoreCase = true) ||
                 store.category.contains(normalized, ignoreCase = true) ||
-                store.description.contains(normalized, ignoreCase = true)
+                store.description.contains(normalized, ignoreCase = true) ||
+                catalogState.productsByStore[store.id].orEmpty().any { it.matches(normalized) }
         }
         .map { it.toSearchStore() }
 }
+
+private fun PublicProductSummary.matches(query: String): Boolean =
+    name.contains(query, ignoreCase = true) || description.contains(query, ignoreCase = true)
 
 private fun PublicStoreSummary.toSearchStore(): SearchStore =
     SearchStore(
@@ -177,7 +110,7 @@ fun PublicShopSearchScreen(
     var selectedFilter by remember { mutableStateOf(SearchFilter.Nearby) }
     var activeQuery by remember(query) { mutableStateOf(query) }
     val hasQuery = activeQuery.isNotBlank()
-    val relatedStores = realStoresForQuery(activeQuery, catalogState).ifEmpty { storesForQuery(activeQuery) }
+    val relatedStores = realStoresForQuery(activeQuery, catalogState)
     val hasRelatedStores = relatedStores.isNotEmpty()
     val listingMode = titleOverride != null
 
@@ -211,16 +144,23 @@ fun PublicShopSearchScreen(
                 }
             }
             if (listingMode || hasQuery) {
-                if (hasRelatedStores) {
-                    items(relatedStores) { store ->
-                        SearchResultCard(
-                            store = store,
-                            onView = onViewLocal,
-                        )
+                when {
+                    catalogState.isLoading -> item {
+                        SearchStatusMessage("Cargando locales...")
                     }
-                } else {
-                    item {
-                        SearchNoResults()
+                    catalogState.loadFailed -> item {
+                        SearchStatusMessage("No pudimos cargar los locales.")
+                    }
+                    hasRelatedStores -> {
+                        items(relatedStores) { store ->
+                            SearchResultCard(
+                                store = store,
+                                onView = onViewLocal,
+                            )
+                        }
+                    }
+                    else -> item {
+                        SearchStatusMessage("Todavía no hay locales disponibles.")
                     }
                 }
             }
@@ -309,7 +249,7 @@ private fun ActiveSearchBox(
 }
 
 @Composable
-private fun SearchNoResults() {
+private fun SearchStatusMessage(message: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -318,7 +258,7 @@ private fun SearchNoResults() {
             .padding(16.dp),
     ) {
         Text(
-            text = "No encontramos resultados.",
+            text = message,
             color = PediloText,
             fontSize = 19.sp,
             lineHeight = 22.sp,

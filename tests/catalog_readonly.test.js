@@ -11,6 +11,9 @@ const publicAppPath = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicApp.
 const publicCatalogStatePath = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicCatalogState.kt";
 const publicShopSearchPath = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicShopSearch.kt";
 const publicLocalPath = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicLocal.kt";
+const publicHomePath = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicHome.kt";
+const publicShopPath = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicShop.kt";
+const publicSubcategoryPath = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicShopSubcategory.kt";
 
 function read(path) {
   return fs.readFileSync(path, "utf8");
@@ -87,22 +90,81 @@ test("public UI loads real catalog once and keeps failure as a non-crashing stat
   assert.match(stateSource, /FirebasePublicCatalogAdapter/);
   assert.match(stateSource, /adapter\.getVisibleStores\(\)/);
   assert.match(stateSource, /adapter\.getProductsForStore\(store\.id\)/);
-  assert.match(stateSource, /return PublicCatalogState\(isLoading = false\)/);
+  assert.match(stateSource, /return PublicCatalogState\(isLoading = false, loadFailed = true\)/);
   assert.match(stateSource, /hasRealCatalog = stores\.isNotEmpty\(\)/);
   assert.doesNotMatch(stateSource, /\.(set|update|delete|add)\(/);
 
   assert.match(appSource, /LaunchedEffect\(Unit\)/);
   assert.match(appSource, /loadPublicCatalogState\(\)/);
   assert.match(appSource, /catalogState = catalogState/);
+  assert.ok(
+    appSource.indexOf("loadPublicCatalogState()") < appSource.indexOf("if (showSplash)"),
+    "catalog loading should start before the splash returns",
+  );
 });
 
-test("shop search and local screens prefer real catalog before fallback", () => {
+test("shop search and local screens use real catalog states without catalog fallback", () => {
   const searchSource = read(publicShopSearchPath);
   const localSource = read(publicLocalPath);
 
-  assert.match(searchSource, /realStoresForQuery\(activeQuery, catalogState\)\.ifEmpty \{ storesForQuery\(activeQuery\) \}/);
+  assert.match(searchSource, /val relatedStores = realStoresForQuery\(activeQuery, catalogState\)/);
   assert.match(searchSource, /if \(!catalogState\.hasRealCatalog\) return emptyList\(\)/);
+  assert.match(searchSource, /No pudimos cargar los locales/);
+  assert.doesNotMatch(searchSource, /storesForQuery|pizzaSearchStores|coherentStores/);
   assert.match(localSource, /catalogState\.productsByStore\["pizzeria-roma"\]/);
-  assert.match(localSource, /if \(realProducts\.isEmpty\(\)\) return productsFor\(category\)/);
-  assert.match(localSource, /LocalHero\(catalogState\.romaStore\(\)\)/);
+  assert.doesNotMatch(localSource, /localProducts|Pizza muzzarella|Resumen de Pizzería Roma/);
+  assert.match(localSource, /No pudimos cargar el local/);
+});
+
+test("home, shop, and subcategory screens render real stores or loading/error/empty states", () => {
+  const homeSource = read(publicHomePath);
+  const shopSource = read(publicShopPath);
+  const subcategorySource = read(publicSubcategoryPath);
+
+  for (const source of [homeSource, subcategorySource]) {
+    assert.match(source, /PublicCatalogState/);
+    assert.match(source, /catalogState\.isLoading/);
+    assert.match(source, /catalogState\.loadFailed/);
+    assert.match(source, /catalogState\.stores/);
+    assert.doesNotMatch(source, /Burger House|Sushi Zen|Verde Vivo|Dulce Hogar|La Esquina|Pizza & Co/);
+  }
+
+  assert.match(shopSource, /PublicCatalogState/);
+  assert.match(shopSource, /ShopSearchCard/);
+  assert.match(shopSource, /TrackingLookupCard/);
+  assert.match(shopSource, /CategoryGroupCard/);
+  assert.doesNotMatch(shopSource, /RealStoresSection|RealStoreTile|catalogState\.stores/);
+  assert.doesNotMatch(shopSource, /Burger House|Sushi Zen|Verde Vivo|Dulce Hogar|La Esquina|Pizza & Co/);
+});
+
+test("home offers only render real promo products when present", () => {
+  const homeSource = read(publicHomePath);
+
+  assert.match(homeSource, /realPromoProduct/);
+  assert.match(homeSource, /product\.id\.contains\("promo"/);
+  assert.match(homeSource, /OfferCard\(product = promo/);
+  assert.match(homeSource, /Todavía no hay ofertas disponibles/);
+  assert.doesNotMatch(homeSource, /Promo imperdible|Oferta destacada|2x1/);
+});
+
+test("shop subcategory maps visible catalog into category-specific listings", () => {
+  const subcategorySource = read(publicSubcategoryPath);
+
+  assert.match(subcategorySource, /searchTermsForSubcategory/);
+  assert.match(subcategorySource, /"pizzas" -> listOf\("pizza", "pizzería", "pizzeria"\)/);
+  assert.match(subcategorySource, /catalogState\.productsByStore\[store\.id\]/);
+  assert.match(subcategorySource, /RelatedStoreCard/);
+});
+
+test("public UI has no hardcoded catalog names from the initial seed", () => {
+  const result = spawnSync(
+    "rg",
+    [
+      "-n",
+      "Pizzería Roma|Pizza muzzarella|napolitana|empanadas|gaseosa",
+      "app/src/main/java/com/pedilo/app/ui/publicuser",
+    ],
+    {encoding: "utf8"},
+  );
+  assert.notEqual(result.status, 0, result.stdout);
 });

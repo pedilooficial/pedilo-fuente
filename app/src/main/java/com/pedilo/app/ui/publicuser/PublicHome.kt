@@ -56,6 +56,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pedilo.app.core.model.PublicProductSummary
+import com.pedilo.app.core.model.PublicStoreSummary
 
 enum class PublicBottomDestination {
     Home,
@@ -85,23 +87,6 @@ private data class QuickAccess(
     val query: String,
 )
 
-private data class OfferItem(
-    val title: String,
-    val store: String,
-    val price: String,
-    val oldPrice: String,
-    val discount: String,
-    val icon: PediloIconKind,
-)
-
-private data class LocalItem(
-    val name: String,
-    val category: String,
-    val rating: String,
-    val eta: String,
-    val icon: PediloIconKind,
-)
-
 private val quickAccessItems = listOf(
     QuickAccess("Supermercado", PediloIconKind.Cart, "Supermercado"),
     QuickAccess("Bebidas", PediloIconKind.Bottle, "Bebidas"),
@@ -109,22 +94,9 @@ private val quickAccessItems = listOf(
     QuickAccess("Mascotas", PediloIconKind.Paw, "Mascotas"),
 )
 
-private val offerItems = listOf(
-    OfferItem("Hamburguesas Clásicas", "Burger House", "$4.990", "$6.290", "-20%", PediloIconKind.Cart),
-    OfferItem("Pizzas Seleccionadas", "Pizzería Roma", "$5.990", "$7.990", "-15%", PediloIconKind.Tag),
-    OfferItem("Empanadas x 6", "La Criolla", "$3.590", "$3.990", "-10%", PediloIconKind.Tag),
-    OfferItem("Jugos Naturales", "Fruta Viva", "$2.240", "$2.990", "-25%", PediloIconKind.Bottle),
-)
-
-private val localItems = listOf(
-    LocalItem("Café Central", "Cafetería", "4,8", "20-30 min", PediloIconKind.Shop),
-    LocalItem("Sushi Zen", "Sushi", "4,7", "30-40 min", PediloIconKind.Tag),
-    LocalItem("Verde Vivo", "Saludable", "4,6", "20-30 min", PediloIconKind.Paw),
-    LocalItem("Dulce Hogar", "Panadería", "4,9", "20-30 min", PediloIconKind.Shop),
-)
-
 @Composable
 fun PublicHomeScreen(
+    catalogState: PublicCatalogState = PublicCatalogState(isLoading = false),
     onHome: () -> Unit,
     onPlus: () -> Unit,
     onShop: () -> Unit,
@@ -153,8 +125,8 @@ fun PublicHomeScreen(
             item { PublicHeader() }
             item { SearchBlock(onSearch = onSearch) }
             item { QuickAccessSection(onCategory = onCategory) }
-            item { OffersSection(onOffer = onOffer, onAllOffers = onAllOffers) }
-            item { LocalsSection(onLocal = onLocal, onAllLocals = onAllLocals) }
+            item { OffersSection(catalogState = catalogState, onOffer = onOffer, onAllOffers = onAllOffers) }
+            item { LocalsSection(catalogState = catalogState, onLocal = onLocal, onAllLocals = onAllLocals) }
             item { HomeBanner(onConventions = onConventions) }
         }
     }
@@ -311,21 +283,97 @@ private fun QuickAccessCard(item: QuickAccess, onClick: () -> Unit, modifier: Mo
 }
 
 @Composable
-private fun OffersSection(onOffer: (String) -> Unit, onAllOffers: () -> Unit) {
+private fun OffersSection(catalogState: PublicCatalogState, onOffer: (String) -> Unit, onAllOffers: () -> Unit) {
+    val promo = remember(catalogState) { catalogState.realPromoProduct() }
     SectionHeader(icon = PediloIconKind.Tag, title = "Ofertas", action = "Ver todas", onAction = onAllOffers)
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(offerItems) { offer ->
-            OfferCard(offer, onClick = { onOffer(offer.store) })
+    when {
+        catalogState.isLoading -> EmptyCatalogCard("Cargando ofertas...")
+        catalogState.loadFailed -> EmptyCatalogCard("No pudimos cargar las ofertas.")
+        promo == null -> EmptyCatalogCard("Todavía no hay ofertas disponibles.")
+        else -> OfferCard(product = promo, onClick = { onOffer(promo.storeId) })
+    }
+}
+
+private fun PublicCatalogState.realPromoProduct(): PublicProductSummary? =
+    productsByStore.values
+        .flatten()
+        .firstOrNull { product ->
+            product.visible &&
+                product.available &&
+                (product.id.contains("promo", ignoreCase = true) ||
+                    product.name.contains("promo", ignoreCase = true) ||
+                    product.description.contains("promo", ignoreCase = true))
+        }
+
+@Composable
+private fun OfferCard(product: PublicProductSummary, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(104.dp)
+            .background(PediloPanel, RoundedCornerShape(10.dp))
+            .border(1.dp, PediloLine, RoundedCornerShape(10.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(RoundedCornerShape(9.dp))
+                .background(Brush.radialGradient(listOf(PediloWarning, PediloOrangeDark, PediloPanelSoft))),
+            contentAlignment = Alignment.Center,
+        ) {
+            PediloLineIcon(PediloIconKind.Tag, tint = Color.White, modifier = Modifier.size(34.dp))
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(product.name, color = PediloText, fontSize = 15.sp, lineHeight = 17.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(product.description, color = PediloMuted, fontSize = 11.sp, lineHeight = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            product.priceCents?.let {
+                Spacer(Modifier.height(4.dp))
+                Text(formatLocalMoney((it / 100L).toInt()), color = PediloOrange, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
 
 @Composable
-private fun OfferCard(offer: OfferItem, onClick: () -> Unit) {
+private fun EmptyCatalogCard(message: String) {
+    Text(
+        text = message,
+        color = PediloMuted,
+        fontSize = 13.sp,
+        lineHeight = 17.sp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(PediloPanel, RoundedCornerShape(10.dp))
+            .border(1.dp, PediloLine, RoundedCornerShape(10.dp))
+            .padding(12.dp),
+    )
+}
+
+@Composable
+private fun LocalsSection(catalogState: PublicCatalogState, onLocal: (String) -> Unit, onAllLocals: () -> Unit) {
+    SectionHeader(icon = PediloIconKind.Shop, title = "Locales disponibles", action = "Ver todos", onAction = onAllLocals)
+    when {
+        catalogState.isLoading -> EmptyCatalogCard("Cargando locales...")
+        catalogState.loadFailed -> EmptyCatalogCard("No pudimos cargar los locales.")
+        catalogState.stores.isEmpty() -> EmptyCatalogCard("Todavía no hay locales disponibles.")
+        else -> LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(catalogState.stores) { local ->
+                LocalCard(local, onClick = { onLocal(local.name) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocalCard(local: PublicStoreSummary, onClick: () -> Unit) {
     Column(
         modifier = Modifier
-            .width(118.dp)
-            .height(160.dp)
+            .width(132.dp)
+            .height(142.dp)
             .background(PediloPanel, RoundedCornerShape(10.dp))
             .border(1.dp, PediloLine, RoundedCornerShape(10.dp))
             .clickable(role = Role.Button, onClick = onClick)
@@ -339,14 +387,14 @@ private fun OfferCard(offer: OfferItem, onClick: () -> Unit) {
                 .background(Brush.radialGradient(listOf(PediloOrangeDark, PediloPanelSoft))),
         ) {
             PediloLineIcon(
-                offer.icon,
+                PediloIconKind.Shop,
                 tint = PediloWarning,
                 modifier = Modifier
                     .align(Alignment.Center)
                     .size(34.dp),
             )
             Text(
-                text = offer.discount,
+                text = if (local.isOpen) "Abierto" else "Cerrado",
                 color = Color.White,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
@@ -357,65 +405,11 @@ private fun OfferCard(offer: OfferItem, onClick: () -> Unit) {
             )
         }
         Spacer(Modifier.height(6.dp))
-        Text(offer.title, color = PediloText, fontSize = 11.sp, lineHeight = 12.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Text(offer.store, color = PediloMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(local.name, color = PediloText, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(local.description.ifBlank { local.category }, color = PediloMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(3.dp))
         Row(verticalAlignment = Alignment.Bottom) {
-            Text(offer.price, color = PediloOrange, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.width(4.dp))
-            Text(offer.oldPrice, color = PediloMuted, fontSize = 9.sp)
-        }
-    }
-}
-
-@Composable
-private fun LocalsSection(onLocal: (String) -> Unit, onAllLocals: () -> Unit) {
-    SectionHeader(icon = PediloIconKind.Shop, title = "Nuevos locales", action = "Ver todos", onAction = onAllLocals)
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(localItems) { local ->
-            LocalCard(local, onClick = { onLocal(local.name) })
-        }
-    }
-}
-
-@Composable
-private fun LocalCard(local: LocalItem, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .width(132.dp)
-            .height(142.dp)
-            .background(PediloPanel, RoundedCornerShape(10.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(10.dp))
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(7.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(Brush.linearGradient(listOf(PediloPanelSoft, PediloOrangeDark))),
-        ) {
-            PediloLineIcon(local.icon, tint = PediloWarning, modifier = Modifier.align(Alignment.Center).size(34.dp))
-            Text(
-                text = "Nuevo",
-                color = Color.White,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .background(PediloOrange, RoundedCornerShape(5.dp))
-                    .padding(horizontal = 5.dp, vertical = 2.dp),
-            )
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(local.name, color = PediloText, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(local.category, color = PediloMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.height(3.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            PediloLineIcon(PediloIconKind.Star, tint = PediloOrange, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(3.dp))
-            Text("${local.rating} · ${local.eta}", color = PediloMuted, fontSize = 9.sp, maxLines = 1)
+            Text(local.openingHours ?: "Horario no informado", color = PediloOrange, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

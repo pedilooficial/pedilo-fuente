@@ -10,3 +10,4 @@ functions/node_modules/
 functions/.runtimeconfig.json
 tools/node_modules/
 reports/
+firebase-debug.log

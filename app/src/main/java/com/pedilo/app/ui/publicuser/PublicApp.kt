@@ -70,6 +70,12 @@ private sealed interface PublicRoute {
 fun PublicApp() {
     PublicTheme {
         var showSplash by remember { mutableStateOf(true) }
+        var catalogState by remember { mutableStateOf(PublicCatalogState()) }
+
+        LaunchedEffect(Unit) {
+            catalogState = withContext(Dispatchers.IO) { loadPublicCatalogState() }
+        }
+
         if (showSplash) {
             PublicBrandSplash(onFinished = { showSplash = false })
             return@PublicTheme
@@ -81,11 +87,6 @@ fun PublicApp() {
         var localCategory by remember { mutableStateOf(LocalCategory.Featured) }
         var localOrderPlaced by remember { mutableStateOf(false) }
         var pendingLocalExit by remember { mutableStateOf<PublicRoute?>(null) }
-        var catalogState by remember { mutableStateOf(PublicCatalogState()) }
-
-        LaunchedEffect(Unit) {
-            catalogState = withContext(Dispatchers.IO) { loadPublicCatalogState() }
-        }
 
         fun isLocalRoute(target: PublicRoute): Boolean = when (target) {
             PublicRoute.Local,
@@ -196,6 +197,7 @@ fun PublicApp() {
 
         when (route) {
             PublicRoute.Home -> PublicHomeScreen(
+                catalogState = catalogState,
                 onHome = { goHome() },
                 onPlus = { goPlus() },
                 onShop = { goShop() },
@@ -247,12 +249,17 @@ fun PublicApp() {
                 onTracking = { navigateTo(PublicRoute.PublicTracking(it, PublicBottomDestination.Plus)) },
             )
             PublicRoute.Shop -> PublicShopScreen(
+                catalogState = catalogState,
                 onHome = { goHome() },
                 onPlus = { goPlus() },
                 onShop = { goShop() },
                 onSearch = { navigateTo(PublicRoute.ShopSearch(it, PublicBottomDestination.Shop)) },
                 onTracking = { navigateTo(PublicRoute.ShopTracking(it)) },
                 onSubcategory = { navigateTo(PublicRoute.ShopSubcategory(it)) },
+                onViewLocal = {
+                    localOrderPlaced = false
+                    navigateTo(PublicRoute.Local)
+                },
             )
             is PublicRoute.ShopSearch -> PublicShopSearchScreen(
                 query = (route as PublicRoute.ShopSearch).query,
@@ -268,6 +275,7 @@ fun PublicApp() {
             )
             is PublicRoute.ShopSubcategory -> PublicShopSubcategoryScreen(
                 title = (route as PublicRoute.ShopSubcategory).name,
+                catalogState = catalogState,
                 onHome = { goHome() },
                 onPlus = { goPlus() },
                 onShop = { goShop() },
@@ -397,7 +405,7 @@ fun PublicApp() {
                     Text("Salir del local")
                 },
                 text = {
-                    Text("Tenés productos de Pizzería Roma en el carrito. Si salís, se vacía este pedido del local.")
+                    Text("Tenés productos del local en el carrito. Si salís, se vacía este pedido.")
                 },
                 confirmButton = {
                     TextButton(onClick = { confirmLocalExit() }) {

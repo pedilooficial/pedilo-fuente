@@ -99,27 +99,10 @@ private enum class LocalIconKind {
     Location,
 }
 
-private val localProducts = listOf(
-    LocalProduct("Pizza muzzarella", "Salsa de tomate, muzzarella y aceitunas", 6200, LocalCategory.Pizzas, "Más pedida"),
-    LocalProduct("Pizza napolitana", "Tomate fresco, ajo y muzzarella", 6900, LocalCategory.Pizzas),
-    LocalProduct("Fugazzeta rellena", "Cebolla, queso y masa al molde", 7600, LocalCategory.Pizzas, "Especial"),
-    LocalProduct("Empanadas x 6", "Carne suave, jamón y queso o verdura", 4300, LocalCategory.Starters),
-    LocalProduct("Papas rústicas", "Con salsa de la casa", 3100, LocalCategory.Starters),
-    LocalProduct("Gaseosa 1.5L", "Línea Coca-Cola o similar", 2400, LocalCategory.Drinks),
-    LocalProduct("Agua saborizada", "Pomelo o manzana", 1700, LocalCategory.Drinks),
-)
-
-private fun productsFor(category: LocalCategory): List<LocalProduct> =
-    when (category) {
-        LocalCategory.Featured -> localProducts.take(4)
-        else -> localProducts.filter { it.category == category }
-    }
-
 private fun productsFor(category: LocalCategory, catalogState: PublicCatalogState): List<LocalProduct> {
     val realProducts = catalogState.productsByStore["pizzeria-roma"].orEmpty()
         .filter { it.visible && it.available && it.priceCents != null }
         .map { it.toLocalProduct() }
-    if (realProducts.isEmpty()) return productsFor(category)
     return when (category) {
         LocalCategory.Featured -> realProducts.take(4)
         else -> realProducts.filter { it.category == category }
@@ -132,7 +115,7 @@ private fun PublicProductSummary.toLocalProduct(): LocalProduct =
         description = description,
         price = ((priceCents ?: 0L) / 100L).toInt(),
         category = when {
-            name.contains("gaseosa", ignoreCase = true) || name.contains("bebida", ignoreCase = true) -> LocalCategory.Drinks
+            name.contains("bebida", ignoreCase = true) || description.contains("bebida", ignoreCase = true) -> LocalCategory.Drinks
             name.contains("empanada", ignoreCase = true) -> LocalCategory.Starters
             else -> LocalCategory.Pizzas
         },
@@ -166,6 +149,9 @@ fun PublicLocalScreen(
     onPlus: () -> Unit,
     onShop: () -> Unit,
 ) {
+    val store = catalogState.romaStore()
+    val products = productsFor(selectedCategory, catalogState)
+    val promo = products.firstOrNull { it.name.contains("promo", ignoreCase = true) }
     PublicShell(current = PublicBottomDestination.Shop, onHome = onHome, onPlus = onPlus, onShop = onShop) {
         LazyColumn(
             modifier = Modifier
@@ -175,12 +161,23 @@ fun PublicLocalScreen(
             contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 132.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { LocalHero(catalogState.romaStore()) }
-            item { LocalStatsRow(catalogState.romaStore()) }
-            item { CategoryTabs(selected = selectedCategory, onSelected = onCategory) }
-            item { LocalPromo() }
-            items(productsFor(selectedCategory, catalogState)) { product ->
-                LocalProductCard(product = product, onClick = { onProduct(product) })
+            when {
+                catalogState.isLoading -> item { LocalStatusCard("Cargando local...") }
+                catalogState.loadFailed -> item { LocalStatusCard("No pudimos cargar el local.") }
+                store == null -> item { LocalStatusCard("Todavía no hay locales disponibles.") }
+                else -> {
+                    item { LocalHero(store) }
+                    item { LocalStatsRow(store) }
+                    item { CategoryTabs(selected = selectedCategory, onSelected = onCategory) }
+                    promo?.let { item { LocalPromo(it) } }
+                    if (products.isEmpty()) {
+                        item { LocalStatusCard("Todavía no hay productos disponibles.") }
+                    } else {
+                        items(products) { product ->
+                            LocalProductCard(product = product, onClick = { onProduct(product) })
+                        }
+                    }
+                }
             }
         }
     }
@@ -256,7 +253,7 @@ fun PublicLocalCartScreen(
             contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 132.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { LocalSectionTitle("Carrito del local", "Este pedido pertenece a Pizzería Roma") }
+            item { LocalSectionTitle("Carrito del local", "Este pedido pertenece al local seleccionado") }
             items(cartItems) { item -> CartItemCard(item) }
             item { TotalsCard(cartItems) }
             item { LocalSecondaryButton("Agregar más productos", LocalIconKind.Plus, onMoreProducts) }
@@ -381,7 +378,7 @@ fun PublicLocalTicketScreen(
                     Text("Estado inicial: Recibido", color = PediloMuted, fontSize = 14.sp)
                 }
             }
-            item { LocalInfoCard("Pedido de local", listOf("Pizzería Roma", "${cartItems.sumOf { it.quantity }} productos", "Total ${formatLocalMoney(localGrandTotal(cartItems))}"), LocalIconKind.Ticket) }
+            item { LocalInfoCard("Pedido de local", listOf("${cartItems.sumOf { it.quantity }} productos", "Total ${formatLocalMoney(localGrandTotal(cartItems))}"), LocalIconKind.Ticket) }
             item { LocalInfoCard("Entrega", listOf(orderData.address, orderData.payment), LocalIconKind.Location) }
             item { LocalPrimaryButton("Ver seguimiento", LocalIconKind.Tracking) { onTracking(orderNumber) } }
             item { LocalSecondaryButton("Volver al inicio", LocalIconKind.Check, onHome) }
@@ -390,7 +387,7 @@ fun PublicLocalTicketScreen(
 }
 
 @Composable
-private fun LocalHero(store: PublicStoreSummary?) {
+private fun LocalHero(store: PublicStoreSummary) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -409,21 +406,38 @@ private fun LocalHero(store: PublicStoreSummary?) {
         }
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(store?.name ?: "Pizzería Roma", color = PediloText, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
-                Text(if (store?.isOpen != false) "Abierto" else "Cerrado", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.background(if (store?.isOpen != false) PediloGreen else PediloMuted, RoundedCornerShape(16.dp)).padding(horizontal = 10.dp, vertical = 5.dp))
+                Text(store.name, color = PediloText, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
+                Text(if (store.isOpen) "Abierto" else "Cerrado", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.background(if (store.isOpen) PediloGreen else PediloMuted, RoundedCornerShape(16.dp)).padding(horizontal = 10.dp, vertical = 5.dp))
             }
-            Text(store?.description?.ifBlank { store.category } ?: "Pizza a la piedra · Cocina italiana", color = PediloMuted, fontSize = 13.sp)
+            Text(store.description.ifBlank { store.category }, color = PediloMuted, fontSize = 13.sp)
         }
     }
 }
 
 @Composable
-private fun LocalStatsRow(store: PublicStoreSummary?) {
+private fun LocalStatsRow(store: PublicStoreSummary) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        StatPill("Horario", store?.openingHours ?: "hasta 00:30", LocalIconKind.Clock, Modifier.weight(1f))
+        StatPill("Horario", store.openingHours ?: "No informado", LocalIconKind.Clock, Modifier.weight(1f))
         StatPill("20-30", "min", LocalIconKind.Clock, Modifier.weight(1f))
         StatPill("$1.200", "envío", LocalIconKind.Delivery, Modifier.weight(1f))
     }
+}
+
+@Composable
+private fun LocalStatusCard(message: String) {
+    Text(
+        text = message,
+        color = PediloText,
+        fontSize = 16.sp,
+        lineHeight = 20.sp,
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(PediloPanel, RoundedCornerShape(14.dp))
+            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .padding(16.dp),
+    )
 }
 
 @Composable
@@ -464,7 +478,7 @@ private fun CategoryTabs(selected: LocalCategory, onSelected: (LocalCategory) ->
 }
 
 @Composable
-private fun LocalPromo() {
+private fun LocalPromo(product: LocalProduct) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -472,9 +486,9 @@ private fun LocalPromo() {
             .border(1.dp, PediloLine, RoundedCornerShape(12.dp))
             .padding(12.dp),
     ) {
-        Text("Promo del día", color = PediloText, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        Text(product.name, color = PediloText, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(4.dp))
-        Text("Pizza grande con bebida con precio especial.", color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp)
+        Text(product.description.ifBlank { "Producto destacado del catálogo real." }, color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp)
     }
 }
 
@@ -682,7 +696,7 @@ private fun CompactOrderCard(cartItems: List<LocalCartItem>) {
             .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
             .padding(14.dp),
     ) {
-        Text("Resumen de Pizzería Roma", color = PediloText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Text("Resumen del local", color = PediloText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
         cartItems.forEach {
             Text("${it.quantity} x ${it.product.name}", color = PediloText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)

@@ -9,6 +9,7 @@ data class PublicCatalogState(
     val stores: List<PublicStoreSummary> = emptyList(),
     val productsByStore: Map<String, List<PublicProductSummary>> = emptyMap(),
     val isLoading: Boolean = true,
+    val loadFailed: Boolean = false,
     val hasRealCatalog: Boolean = false,
 )
 
@@ -17,7 +18,7 @@ suspend fun loadPublicCatalogState(
 ): PublicCatalogState {
     val storesResult = adapter.getVisibleStores()
     if (storesResult !is CoreResult.Success) {
-        return PublicCatalogState(isLoading = false)
+        return PublicCatalogState(isLoading = false, loadFailed = true)
     }
 
     val stores = storesResult.value
