@@ -38,15 +38,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pedilo.app.R
-import com.pedilo.app.core.firebase.FirebasePublicPlusOrderAdapter
-import com.pedilo.app.core.firebase.FirebasePublicOrderAdapter
-import com.pedilo.app.core.firebase.FirebasePublicTrackingAdapter
 import com.pedilo.app.core.model.PublicOrderTicket
 import com.pedilo.app.core.result.CoreError
 import com.pedilo.app.core.result.CoreResult
-import com.pedilo.app.core.usecase.CreatePublicPlusOrderUseCase
-import com.pedilo.app.core.usecase.CreatePublicOrderUseCase
-import com.pedilo.app.core.usecase.GetPublicTrackingUseCase
+import com.pedilo.app.core.runtime.publicLocalOrderUseCase
+import com.pedilo.app.core.runtime.publicPlusOrderUseCase
+import com.pedilo.app.core.runtime.publicTrackingUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -82,9 +79,9 @@ fun PublicApp() {
         var showSplash by remember { mutableStateOf(true) }
         var catalogState by remember { mutableStateOf(PublicCatalogState()) }
         val scope = rememberCoroutineScope()
-        val createLocalOrder = remember { CreatePublicOrderUseCase(FirebasePublicOrderAdapter()) }
-        val createPlusOrder = remember { CreatePublicPlusOrderUseCase(FirebasePublicPlusOrderAdapter()) }
-        val getPublicTracking = remember { GetPublicTrackingUseCase(FirebasePublicTrackingAdapter()) }
+        val createLocalOrder = remember { publicLocalOrderUseCase() }
+        val createPlusOrder = remember { publicPlusOrderUseCase() }
+        val getPublicTracking = remember { publicTrackingUseCase() }
 
         LaunchedEffect(Unit) {
             catalogState = withContext(Dispatchers.IO) { loadPublicCatalogState() }

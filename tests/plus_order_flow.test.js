@@ -20,7 +20,7 @@ test("plus flow submits through the use case only on Confirmar pedido", () => {
   const app = read(publicApp);
   const plus = read(publicPlus);
 
-  assert.match(app, /CreatePublicPlusOrderUseCase\(FirebasePublicPlusOrderAdapter\(\)\)/);
+  assert.match(app, /publicPlusOrderUseCase\(\)/);
   assert.match(app, /isSubmittingPlusOrder/);
   assert.match(app, /buildPlusOrderDraft\(currentRoute\.request\)/);
   assert.match(app, /createPlusOrder\(draft\)/);
@@ -59,9 +59,10 @@ test("plus use case validates before calling the adapter", () => {
   assert.match(source, /orderPort\.createPlusOrder\(draft\)/);
   assert.match(validation, /public_plus_buy/);
   assert.match(validation, /public_plus_pickup_shipping/);
-  assert.match(validation, /draft\.contact\.phone\.count\(Char::isDigit\) < 6/);
+  assert.match(validation, /draft\.contact\.phone\.count\(Char::isDigit\) !in 8\.\.15/);
   assert.match(validation, /draft\.items\.isEmpty\(\)/);
-  assert.match(validation, /draft\.sourceReference\.isBlank\(\)/);
+  assert.match(validation, /draft\.sourceReference\.isBlankOrPlaceholder\(\)/);
+  assert.match(validation, /placeholderValues/);
 });
 
 test("callable adapter calls createPlusOrder and never writes Firestore directly", () => {

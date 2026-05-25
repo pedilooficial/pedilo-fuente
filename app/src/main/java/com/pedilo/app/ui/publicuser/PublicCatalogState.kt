@@ -1,9 +1,10 @@
 package com.pedilo.app.ui.publicuser
 
-import com.pedilo.app.core.firebase.FirebasePublicCatalogAdapter
 import com.pedilo.app.core.model.PublicProductSummary
 import com.pedilo.app.core.model.PublicStoreSummary
+import com.pedilo.app.core.port.PublicCatalogPort
 import com.pedilo.app.core.result.CoreResult
+import com.pedilo.app.core.runtime.publicCatalogPort
 
 data class PublicCatalogState(
     val stores: List<PublicStoreSummary> = emptyList(),
@@ -14,7 +15,7 @@ data class PublicCatalogState(
 )
 
 suspend fun loadPublicCatalogState(
-    adapter: FirebasePublicCatalogAdapter = FirebasePublicCatalogAdapter(),
+    adapter: PublicCatalogPort = publicCatalogPort(),
 ): PublicCatalogState {
     val storesResult = adapter.getVisibleStores()
     if (storesResult !is CoreResult.Success) {

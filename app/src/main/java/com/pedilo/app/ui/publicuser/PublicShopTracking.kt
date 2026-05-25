@@ -38,6 +38,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
@@ -89,12 +90,13 @@ fun PublicShopTrackingScreen(
     var error by remember { mutableStateOf<String?>(null) }
 
     fun submitTracking() {
-        val clean = query.trim()
-        if (clean.isBlank()) {
-            error = "Ingresá el número de pedido."
+        val clean = normalizePublicTrackingInput(query)
+        if (!isValidPublicTrackingNumber(clean)) {
+            error = "Ingresá un número de pedido válido."
             tracking = null
             return
         }
+        query = clean
         scope.launch {
             isLoading = true
             error = null
@@ -193,13 +195,14 @@ private fun TrackingLookupForm(
                 contentAlignment = Alignment.CenterStart,
             ) {
                 if (value.isBlank()) {
-                    Text("PDL-XXXXXX", color = PediloMuted, fontSize = 14.sp)
+                    Text("PDL-XXXXXX", color = PediloMuted.copy(alpha = 0.68f), fontSize = 14.sp)
                 }
                 BasicTextField(
                     value = value,
-                    onValueChange = onQueryChange,
+                    onValueChange = { onQueryChange(normalizePublicTrackingInput(it)) },
                     textStyle = TextStyle(color = PediloText, fontSize = 15.sp, fontWeight = FontWeight.Bold),
                     singleLine = true,
+                    cursorBrush = SolidColor(PediloText),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -209,7 +212,7 @@ private fun TrackingLookupForm(
                     .height(46.dp)
                     .width(104.dp)
                     .background(Brush.verticalGradient(listOf(PediloOrangeSoft, PediloOrange)), RoundedCornerShape(10.dp))
-                    .clickable(enabled = value.isNotBlank() && !isLoading, role = Role.Button, onClick = onSubmit),
+                    .clickable(enabled = isValidPublicTrackingNumber(value) && !isLoading, role = Role.Button, onClick = onSubmit),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(if (isLoading) "..." else "Consultar", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)

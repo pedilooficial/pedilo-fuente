@@ -12,15 +12,15 @@ class ValidatePublicPlusOrderDraftUseCase {
             if (draft.source !in setOf("public_plus_buy", "public_plus_pickup_shipping")) {
                 add(ValidationError(ValidationError.Field.SOURCE, ValidationError.Reason.INVALID))
             }
-            if (draft.contact.name.isBlank()) {
+            if (draft.contact.name.isBlankOrPlaceholder()) {
                 add(ValidationError(ValidationError.Field.NAME, ValidationError.Reason.REQUIRED))
             }
-            if (draft.contact.phone.isBlank()) {
+            if (draft.contact.phone.isBlankOrPlaceholder()) {
                 add(ValidationError(ValidationError.Field.PHONE, ValidationError.Reason.REQUIRED))
-            } else if (draft.contact.phone.count(Char::isDigit) < 6) {
+            } else if (draft.contact.phone.count(Char::isDigit) !in 8..15) {
                 add(ValidationError(ValidationError.Field.PHONE, ValidationError.Reason.INVALID))
             }
-            if (draft.paymentMethod.isBlank()) {
+            if (draft.paymentMethod.isBlankOrPlaceholder()) {
                 add(ValidationError(ValidationError.Field.PAYMENT, ValidationError.Reason.REQUIRED))
             }
             when (draft.requestType) {
@@ -40,13 +40,13 @@ class ValidatePublicPlusOrderDraftUseCase {
         if (draft.source != "public_plus_buy") {
             add(ValidationError(ValidationError.Field.SOURCE, ValidationError.Reason.INVALID))
         }
-        if (draft.items.isEmpty() || draft.items.any { it.name.isBlank() || it.detail.isBlank() }) {
+        if (draft.items.isEmpty() || draft.items.any { it.name.isBlankOrPlaceholder() || it.detail.isBlankOrPlaceholder() }) {
             add(ValidationError(ValidationError.Field.ITEMS, ValidationError.Reason.REQUIRED))
         }
-        if (draft.sourceReference.isBlank()) {
+        if (draft.sourceReference.isBlankOrPlaceholder()) {
             add(ValidationError(ValidationError.Field.STORE, ValidationError.Reason.REQUIRED))
         }
-        if (draft.destination.isBlank()) {
+        if (draft.destination.isBlankOrPlaceholder()) {
             add(ValidationError(ValidationError.Field.ADDRESS, ValidationError.Reason.REQUIRED))
         }
     }
@@ -55,14 +55,29 @@ class ValidatePublicPlusOrderDraftUseCase {
         if (draft.source != "public_plus_pickup_shipping") {
             add(ValidationError(ValidationError.Field.SOURCE, ValidationError.Reason.INVALID))
         }
-        if (draft.sourceReference.isBlank()) {
+        if (draft.sourceReference.isBlankOrPlaceholder()) {
             add(ValidationError(ValidationError.Field.PICKUP_ADDRESS, ValidationError.Reason.REQUIRED))
         }
-        if (draft.destination.isBlank()) {
+        if (draft.destination.isBlankOrPlaceholder()) {
             add(ValidationError(ValidationError.Field.ADDRESS, ValidationError.Reason.REQUIRED))
         }
-        if (draft.items.isEmpty() || draft.items.first().name.isBlank()) {
+        if (draft.items.isEmpty() || draft.items.first().name.isBlankOrPlaceholder()) {
             add(ValidationError(ValidationError.Field.ITEMS, ValidationError.Reason.REQUIRED))
         }
     }
 }
+
+private val placeholderValues = setOf(
+    "nombre",
+    "tu nombre",
+    "telefono",
+    "teléfono",
+    "direccion",
+    "dirección",
+    "pedido",
+    "producto",
+    "paquete",
+)
+
+private fun String.isBlankOrPlaceholder(): Boolean =
+    isBlank() || trim().lowercase() in placeholderValues

@@ -19,7 +19,7 @@ class ValidatePublicOrderDraftUseCase {
             }
             if (draft.contact.phone.isBlankOrPlaceholder()) {
                 add(ValidationError(ValidationError.Field.PHONE, ValidationError.Reason.REQUIRED))
-            } else if (draft.contact.phone.count { it.isDigit() } < 6) {
+            } else if (draft.contact.phone.count { it.isDigit() } !in 8..15) {
                 add(ValidationError(ValidationError.Field.PHONE, ValidationError.Reason.INVALID))
             }
             if (draft.deliveryLocation?.addressLine.isNullOrBlankOrPlaceholder()) {

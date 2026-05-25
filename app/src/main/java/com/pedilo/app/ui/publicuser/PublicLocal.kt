@@ -314,7 +314,7 @@ fun PublicLocalDataScreen(
     var address by remember { mutableStateOf("") }
     var payment by remember { mutableStateOf("Efectivo al recibir") }
     var notes by remember { mutableStateOf("") }
-    val canContinue = cartItems.isNotEmpty() && name.isNotBlank() && phone.isNotBlank() && address.isNotBlank() && payment.isNotBlank()
+    val canContinue = cartItems.isNotEmpty() && name.isNotBlank() && isValidPublicPhone(phone) && address.isNotBlank() && payment.isNotBlank()
 
     PublicShell(current = PublicBottomDestination.Shop, onHome = onHome, onPlus = onPlus, onShop = onShop) {
         LazyColumn(
@@ -327,7 +327,7 @@ fun PublicLocalDataScreen(
         ) {
             item { LocalSectionTitle("Completá tus datos.", "") }
             item { LocalInput("Nombre completo", name, "Tu nombre", onValueChange = { name = it }) }
-            item { LocalInput("WhatsApp", phone, "11 5555 5555", onValueChange = { phone = it }) }
+            item { PublicPhoneInput("WhatsApp", phone, "11 5555 5555", onValueChange = { phone = it }) }
             item { LocalInput("Dirección de entrega", address, "Calle, altura y piso", onValueChange = { address = it }) }
             item { OptionSelector("Forma de pago", listOf("Efectivo al recibir", "Transferencia"), payment, onSelected = { payment = it }) }
             item { LocalInput("Observaciones finales", notes, "Referencia de entrega", minHeight = 90.dp, singleLine = false, onValueChange = { notes = it }) }
@@ -780,29 +780,14 @@ private fun LocalInfoCard(title: String, lines: List<String>, icon: LocalIconKin
 
 @Composable
 private fun LocalInput(label: String, value: String, placeholder: String, onValueChange: (String) -> Unit, minHeight: androidx.compose.ui.unit.Dp = 56.dp, singleLine: Boolean = true) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(PediloPanel, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
-            .padding(13.dp),
-    ) {
-        Text(label, color = PediloMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(7.dp))
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            textStyle = TextStyle(color = PediloText, fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold),
-            singleLine = singleLine,
-            modifier = Modifier.fillMaxWidth().height(minHeight),
-            decorationBox = { inner ->
-                Box(Modifier.fillMaxSize().background(PediloPanelSoft, RoundedCornerShape(11.dp)).padding(horizontal = 12.dp, vertical = 12.dp)) {
-                    if (value.isBlank()) Text(placeholder, color = PediloMuted, fontSize = 15.sp, maxLines = if (singleLine) 1 else 3, overflow = TextOverflow.Ellipsis)
-                    inner()
-                }
-            },
-        )
-    }
+    PublicTextInput(
+        label = label,
+        value = value,
+        placeholder = placeholder,
+        onValueChange = onValueChange,
+        minHeight = minHeight,
+        singleLine = singleLine,
+    )
 }
 
 @Composable

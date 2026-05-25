@@ -127,7 +127,7 @@ fun PublicConventionsInfoScreen(
                 InformationCard(
                     icon = ConventionIconKind.Alert,
                     title = "Aviso importante",
-                    body = "Durante horarios de alta demanda algunos locales pueden demorar unos minutos más de lo habitual.",
+                    body = "Cuando hay mucha actividad algunos locales pueden tardar unos minutos más de lo habitual.",
                     accent = PediloOrange,
                 )
             }
@@ -184,9 +184,9 @@ fun PublicConventionsClaimScreen(
                 ConventionInput(
                     label = "Número de pedido opcional",
                     value = orderNumber,
-                    placeholder = "PDL-123456",
+                    placeholder = "PDL-XXXXXX",
                     onValueChange = {
-                        orderNumber = it
+                        orderNumber = normalizePublicTrackingInput(it)
                         sent = false
                     },
                 )
@@ -203,7 +203,7 @@ fun PublicConventionsClaimScreen(
                 )
             }
             item {
-                ConventionInput(
+                PublicPhoneInput(
                     label = "Teléfono / WhatsApp",
                     value = phone,
                     placeholder = "11 5555 5555",
@@ -230,7 +230,7 @@ fun PublicConventionsClaimScreen(
                 ConventionPrimaryAction(
                     label = if (sent) "Reclamo registrado" else "Enviar reclamo",
                     icon = if (sent) ConventionIconKind.Check else ConventionIconKind.Claim,
-                    enabled = !sent && description.isNotBlank() && phone.isNotBlank(),
+                    enabled = !sent && description.isNotBlank() && isValidPublicPhone(phone),
                     onClick = { sent = true },
                 )
             }
@@ -270,10 +270,10 @@ fun PublicConventionsTrackingEntryScreen(
                 TrackingEntryCard()
             }
             item {
-                ConventionInput(
+                PublicTrackingInput(
                     label = "Número de pedido",
                     value = orderNumber,
-                    placeholder = "PDL-123456",
+                    placeholder = "PDL-XXXXXX",
                     onValueChange = { orderNumber = it },
                 )
             }
@@ -281,7 +281,7 @@ fun PublicConventionsTrackingEntryScreen(
                 ConventionPrimaryAction(
                     label = "Consultar pedido",
                     icon = ConventionIconKind.Tracking,
-                    enabled = orderNumber.isNotBlank(),
+                    enabled = isValidPublicTrackingNumber(orderNumber),
                     onClick = { onSubmit(orderNumber) },
                 )
             }
@@ -459,44 +459,14 @@ private fun ConventionInput(
     minHeight: androidx.compose.ui.unit.Dp = 58.dp,
     singleLine: Boolean = true,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(PediloPanel, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
-            .padding(13.dp),
-    ) {
-        Text(label, color = PediloMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(7.dp))
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            textStyle = TextStyle(color = PediloText, fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold),
-            singleLine = singleLine,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(minHeight),
-            decorationBox = { innerTextField ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(PediloPanelSoft, RoundedCornerShape(11.dp))
-                        .padding(horizontal = 12.dp, vertical = 12.dp),
-                ) {
-                    if (value.isBlank()) {
-                        Text(
-                            text = placeholder,
-                            color = PediloMuted,
-                            fontSize = 16.sp,
-                            maxLines = if (singleLine) 1 else 3,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    innerTextField()
-                }
-            },
-        )
-    }
+    PublicTextInput(
+        label = label,
+        value = value,
+        placeholder = placeholder,
+        onValueChange = onValueChange,
+        minHeight = minHeight,
+        singleLine = singleLine,
+    )
 }
 
 @Composable

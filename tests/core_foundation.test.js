@@ -75,7 +75,7 @@ test("use cases validate drafts and tracking before delegating to ports", () => 
   const validation = read(`${coreRoot}/usecase/ValidatePublicOrderDraftUseCase.kt`);
   assert.match(validation, /contact\.name\.isBlankOrPlaceholder\(\)/);
   assert.match(validation, /contact\.phone\.isBlankOrPlaceholder\(\)/);
-  assert.match(validation, /phone\.count \{ it\.isDigit\(\) \} < 6/);
+  assert.match(validation, /phone\.count \{ it\.isDigit\(\) \} !in 8\.\.15/);
   assert.match(validation, /deliveryLocation\?\.addressLine\.isNullOrBlankOrPlaceholder\(\)/);
   assert.match(validation, /storeId\.isBlankOrPlaceholder\(\)/);
   assert.match(validation, /storeName\.isBlankOrPlaceholder\(\)/);

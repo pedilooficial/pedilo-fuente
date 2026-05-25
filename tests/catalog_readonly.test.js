@@ -87,7 +87,7 @@ test("public UI loads real catalog once and keeps failure as a non-crashing stat
   const stateSource = read(publicCatalogStatePath);
   const appSource = read(publicAppPath);
 
-  assert.match(stateSource, /FirebasePublicCatalogAdapter/);
+  assert.match(stateSource, /publicCatalogPort/);
   assert.match(stateSource, /adapter\.getVisibleStores\(\)/);
   assert.match(stateSource, /adapter\.getProductsForStore\(store\.id\)/);
   assert.match(stateSource, /return PublicCatalogState\(isLoading = false, loadFailed = true\)/);

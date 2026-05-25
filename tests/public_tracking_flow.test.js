@@ -44,7 +44,7 @@ test("tracking adapter uses callable and never reads orders directly", () => {
 test("Home, Tienda and tickets converge on the same tracking screen and use case", () => {
   const app = read(publicApp);
 
-  assert.match(app, /GetPublicTrackingUseCase\(FirebasePublicTrackingAdapter\(\)\)/);
+  assert.match(app, /publicTrackingUseCase\(\)/);
   assert.match(app, /PublicRoute\.PublicTracking\(it, PublicBottomDestination\.Home\)/);
   assert.match(app, /PublicRoute\.PublicTracking\(it, PublicBottomDestination\.Shop\)/);
   assert.match(app, /PublicRoute\.PublicTracking\(it, PublicBottomDestination\.Plus\)/);

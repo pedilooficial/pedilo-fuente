@@ -18,7 +18,7 @@ test("local flow only submits through the use case on Confirmar pedido", () => {
   const app = read(publicApp);
   const local = read(publicLocal);
 
-  assert.match(app, /CreatePublicOrderUseCase\(FirebasePublicOrderAdapter\(\)\)/);
+  assert.match(app, /publicLocalOrderUseCase\(\)/);
   assert.match(app, /onConfirm = \{/);
   assert.match(app, /buildLocalOrderDraft/);
   assert.match(app, /createLocalOrder\(draft\)/);

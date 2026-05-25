@@ -186,7 +186,7 @@ fun PublicPlusBuyScreen(
     var phone by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
     val canAddProduct = productName.isNotBlank() && productDetail.isNotBlank()
-    val canContinue = products.isNotEmpty() && source.isNotBlank() && contactName.isNotBlank() && phone.isNotBlank() && address.isNotBlank()
+    val canContinue = products.isNotEmpty() && source.isNotBlank() && contactName.isNotBlank() && isValidPublicPhone(phone) && address.isNotBlank()
 
     PublicShell(current = PublicBottomDestination.Plus, onHome = onHome, onPlus = onPlus, onShop = onShop) {
         LazyColumn(
@@ -221,7 +221,7 @@ fun PublicPlusBuyScreen(
             }
             item { PlusInput("Dónde comprar", source, "Kiosco, farmacia, supermercado", onValueChange = { source = it }) }
             item { PlusInput("Nombre", contactName, "Tu nombre", onValueChange = { contactName = it }) }
-            item { PlusInput("WhatsApp", phone, "11 5555 5555", onValueChange = { phone = it }) }
+            item { PublicPhoneInput("WhatsApp", phone, "11 5555 5555", onValueChange = { phone = it }) }
             item { PlusInput("Dirección de entrega", address, "Calle y altura", onValueChange = { address = it }) }
             item { PlusInput("Observaciones", notes, "Detalle opcional", minHeight = 92.dp, singleLine = false, onValueChange = { notes = it }) }
             item {
@@ -270,7 +270,7 @@ fun PublicPlusPickupShippingScreen(
     val canContinue = pickupAddress.isNotBlank() &&
         destination.isNotBlank() &&
         contactName.isNotBlank() &&
-        phone.isNotBlank() &&
+        isValidPublicPhone(phone) &&
         description.isNotBlank() &&
         (alreadyPaid || amount.isNotBlank())
 
@@ -288,7 +288,7 @@ fun PublicPlusPickupShippingScreen(
             item { PlusInput("Dirección de entrega", destination, "Dónde entregamos", onValueChange = { destination = it }) }
             item { ScheduleSelector(selected = schedule, onSelected = { schedule = it }) }
             item { PlusInput("A nombre de quién está", contactName, "Nombre de referencia", onValueChange = { contactName = it }) }
-            item { PlusInput("WhatsApp", phone, "11 5555 5555", onValueChange = { phone = it }) }
+            item { PublicPhoneInput("WhatsApp", phone, "11 5555 5555", onValueChange = { phone = it }) }
             item {
                 PaymentStateCard(
                     alreadyPaid = alreadyPaid,
@@ -684,44 +684,14 @@ private fun PlusInput(
     minHeight: Dp = 58.dp,
     singleLine: Boolean = true,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(PediloPanel, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
-            .padding(13.dp),
-    ) {
-        Text(label, color = PediloMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(7.dp))
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            textStyle = TextStyle(color = PediloText, fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold),
-            singleLine = singleLine,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(minHeight),
-            decorationBox = { innerTextField ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(PediloPanelSoft, RoundedCornerShape(11.dp))
-                        .padding(horizontal = 12.dp, vertical = 12.dp),
-                ) {
-                    if (value.isBlank()) {
-                        Text(
-                            text = placeholder,
-                            color = PediloMuted,
-                            fontSize = 16.sp,
-                            maxLines = if (singleLine) 1 else 3,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    innerTextField()
-                }
-            },
-        )
-    }
+    PublicTextInput(
+        label = label,
+        value = value,
+        placeholder = placeholder,
+        onValueChange = onValueChange,
+        minHeight = minHeight,
+        singleLine = singleLine,
+    )
 }
 
 @Composable
