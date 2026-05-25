@@ -28,9 +28,30 @@ service cloud.firestore {
           || order.driverId == request.auth.uid);
     }
 
+    function storeVisible(storeId) {
+      return exists(/databases/$(database)/documents/stores/$(storeId))
+        && get(/databases/$(database)/documents/stores/$(storeId)).data.visible == true;
+    }
+
+    function productPubliclyVisible(product) {
+      return product.visible == true
+        && (!("available" in product) || product.available == true);
+    }
+
     match /users/{userId} {
       allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
       allow create, update, delete: if isAdmin();
+    }
+
+    match /stores/{storeId} {
+      allow read: if resource.data.visible == true;
+      allow create, update, delete: if false;
+
+      match /products/{productId} {
+        allow read: if storeVisible(storeId)
+          && productPubliclyVisible(resource.data);
+        allow create, update, delete: if false;
+      }
     }
 
     match /orders/{orderId} {
