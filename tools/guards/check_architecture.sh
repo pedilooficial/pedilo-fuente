@@ -68,13 +68,20 @@ if rg -n "collection[(][\"']orders[\"'][)].*[.](set|update|delete|add)|document[
   fail "Android must not write directly to orders"
 fi
 
+pure_core_paths=(
+  app/src/main/java/com/pedilo/app/core/model
+  app/src/main/java/com/pedilo/app/core/port
+  app/src/main/java/com/pedilo/app/core/result
+  app/src/main/java/com/pedilo/app/core/usecase
+)
+
 if [ -d app/src/main/java/com/pedilo/app/core ]; then
-  if rg -n "firebase|Firebase|Firestore|Functions|com[.]google[.]firebase" app/src/main/java/com/pedilo/app/core >/tmp/pedilo_guard_match.txt; then
+  if rg -n "firebase|Firebase|Firestore|Functions|com[.]google[.]firebase" "${pure_core_paths[@]}" >/tmp/pedilo_guard_match.txt; then
     cat /tmp/pedilo_guard_match.txt >&2
-    fail "core must not import Firebase"
+    fail "pure core must not import Firebase"
   fi
 
-  if rg -n "androidx[.]compose|android[.]app|android[.]content" app/src/main/java/com/pedilo/app/core >/tmp/pedilo_guard_match.txt; then
+  if rg -n "androidx[.]compose|android[.]app|android[.]content" "${pure_core_paths[@]}" app/src/main/java/com/pedilo/app/core/firebase >/tmp/pedilo_guard_match.txt; then
     cat /tmp/pedilo_guard_match.txt >&2
     fail "core must not import Android or Compose"
   fi

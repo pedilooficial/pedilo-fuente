@@ -57,3 +57,13 @@ test("architecture guard fails if clean core imports platform code", () => {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /core must not import Android or Compose/);
 });
+
+test("architecture guard fails if pure core imports Firebase", () => {
+  const root = copyProjectForGuard();
+  const coreDir = path.join(root, "app/src/main/java/com/pedilo/app/core/model");
+  fs.mkdirSync(coreDir, {recursive: true});
+  fs.writeFileSync(path.join(coreDir, "BrokenFirebase.kt"), "package com.pedilo.app.core.model\nimport com.google.firebase.firestore.FirebaseFirestore\n");
+  const result = runGuard(root);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /pure core must not import Firebase/);
+});

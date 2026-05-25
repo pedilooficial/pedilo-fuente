@@ -90,11 +90,14 @@ test("use cases validate drafts and tracking before delegating to ports", () => 
   assert.match(tracking, /trackingPort\.getPublicTracking\(cleanTrackingNumber\)/);
 });
 
-test("core source stays free of Firebase, Compose and Android imports", () => {
+test("pure core source stays free of Firebase, Compose and Android imports", () => {
   const forbidden = spawnSync("rg", [
     "-n",
     "firebase|Firebase|Firestore|Functions|com\\.google\\.firebase|androidx\\.compose|android\\.app|android\\.content",
-    coreRoot,
+    `${coreRoot}/model`,
+    `${coreRoot}/port`,
+    `${coreRoot}/result`,
+    `${coreRoot}/usecase`,
   ], {encoding: "utf8"});
 
   assert.notEqual(forbidden.status, 0, forbidden.stdout);
