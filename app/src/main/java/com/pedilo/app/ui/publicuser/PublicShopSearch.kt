@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pedilo.app.core.model.PublicStoreSummary
 
 private enum class SearchFilter(val label: String) {
     Nearby("Más cercanos"),
@@ -137,10 +138,36 @@ private fun storesForQuery(query: String): List<SearchStore> {
     return emptyList()
 }
 
+private fun realStoresForQuery(query: String, catalogState: PublicCatalogState): List<SearchStore> {
+    if (!catalogState.hasRealCatalog) return emptyList()
+    val normalized = query.trim().lowercase()
+    if (normalized.isBlank()) return emptyList()
+    return catalogState.stores
+        .filter { store ->
+            store.name.contains(normalized, ignoreCase = true) ||
+                store.category.contains(normalized, ignoreCase = true) ||
+                store.description.contains(normalized, ignoreCase = true)
+        }
+        .map { it.toSearchStore() }
+}
+
+private fun PublicStoreSummary.toSearchStore(): SearchStore =
+    SearchStore(
+        name = name,
+        description = description.ifBlank { category },
+        rating = "Nuevo",
+        reviews = "",
+        distance = "",
+        eta = openingHours ?: if (isOpen) "Abierto" else "Cerrado",
+        delivery = "",
+        icon = if (category.contains("pizza", ignoreCase = true)) SearchIconKind.Pizza else SearchIconKind.Shop,
+    )
+
 @Composable
 fun PublicShopSearchScreen(
     query: String,
     current: PublicBottomDestination = PublicBottomDestination.Shop,
+    catalogState: PublicCatalogState = PublicCatalogState(isLoading = false),
     onHome: () -> Unit,
     onPlus: () -> Unit,
     onShop: () -> Unit,
@@ -150,7 +177,7 @@ fun PublicShopSearchScreen(
     var selectedFilter by remember { mutableStateOf(SearchFilter.Nearby) }
     var activeQuery by remember(query) { mutableStateOf(query) }
     val hasQuery = activeQuery.isNotBlank()
-    val relatedStores = storesForQuery(activeQuery)
+    val relatedStores = realStoresForQuery(activeQuery, catalogState).ifEmpty { storesForQuery(activeQuery) }
     val hasRelatedStores = relatedStores.isNotEmpty()
     val listingMode = titleOverride != null
 
@@ -376,15 +403,25 @@ private fun SearchResultCard(
                 SearchIcon(SearchIconKind.Star, tint = PediloOrange, modifier = Modifier.size(15.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(store.rating, color = PediloOrange, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.width(5.dp))
-                Text("(${store.reviews})", color = PediloMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(" · ${store.eta}", color = PediloMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (store.reviews.isNotBlank()) {
+                    Spacer(Modifier.width(5.dp))
+                    Text("(${store.reviews})", color = PediloMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                if (store.eta.isNotBlank()) {
+                    Text(" · ${store.eta}", color = PediloMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
             Spacer(Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                SearchIcon(SearchIconKind.Delivery, tint = PediloOrange, modifier = Modifier.size(15.dp))
-                Spacer(Modifier.width(5.dp))
-                Text("${store.distance} · Envío ${store.delivery}", color = PediloMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (store.distance.isNotBlank() || store.delivery.isNotBlank()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SearchIcon(SearchIconKind.Delivery, tint = PediloOrange, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(5.dp))
+                    val deliveryText = listOf(
+                        store.distance.takeIf { it.isNotBlank() },
+                        store.delivery.takeIf { it.isNotBlank() }?.let { "Envío $it" },
+                    ).filterNotNull().joinToString(" · ")
+                    Text(deliveryText, color = PediloMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
         Spacer(Modifier.width(6.dp))

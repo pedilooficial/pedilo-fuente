@@ -6,6 +6,11 @@ const {spawnSync} = require("node:child_process");
 const adapterPath = "app/src/main/java/com/pedilo/app/core/firebase/FirebasePublicCatalogAdapter.kt";
 const mapperPath = "app/src/main/java/com/pedilo/app/core/firebase/FirestoreCatalogMappers.kt";
 const seedPath = "tools/seed_public_catalog.js";
+const verifyPath = "tools/verify_public_catalog.js";
+const publicAppPath = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicApp.kt";
+const publicCatalogStatePath = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicCatalogState.kt";
+const publicShopSearchPath = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicShopSearch.kt";
+const publicLocalPath = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicLocal.kt";
 
 function read(path) {
   return fs.readFileSync(path, "utf8");
@@ -63,4 +68,41 @@ test("public UI does not expose removed sample labels", () => {
     });
     assert.notEqual(result.status, 0, result.stdout);
   }
+});
+
+test("read-only catalog verifier only reads the initial catalog scope", () => {
+  const source = read(verifyPath);
+  assert.match(source, /STORE_ID = "pizzeria-roma"/);
+  assert.match(source, /PRODUCT_IDS = \["muzzarella", "napolitana", "empanadas", "gaseosa", "promo-dia"\]/);
+  assert.match(source, /collection\("stores"\)\.doc\(STORE_ID\)/);
+  assert.match(source, /storeRef\.collection\("products"\)\.get\(\)/);
+  assert.doesNotMatch(source, /\.(set|update|delete|add)\(/);
+  assert.doesNotMatch(source, /collection\("orders"\)|order_tracking|users|roles/);
+});
+
+test("public UI loads real catalog once and keeps failure as a non-crashing state", () => {
+  const stateSource = read(publicCatalogStatePath);
+  const appSource = read(publicAppPath);
+
+  assert.match(stateSource, /FirebasePublicCatalogAdapter/);
+  assert.match(stateSource, /adapter\.getVisibleStores\(\)/);
+  assert.match(stateSource, /adapter\.getProductsForStore\(store\.id\)/);
+  assert.match(stateSource, /return PublicCatalogState\(isLoading = false\)/);
+  assert.match(stateSource, /hasRealCatalog = stores\.isNotEmpty\(\)/);
+  assert.doesNotMatch(stateSource, /\.(set|update|delete|add)\(/);
+
+  assert.match(appSource, /LaunchedEffect\(Unit\)/);
+  assert.match(appSource, /loadPublicCatalogState\(\)/);
+  assert.match(appSource, /catalogState = catalogState/);
+});
+
+test("shop search and local screens prefer real catalog before fallback", () => {
+  const searchSource = read(publicShopSearchPath);
+  const localSource = read(publicLocalPath);
+
+  assert.match(searchSource, /realStoresForQuery\(activeQuery, catalogState\)\.ifEmpty \{ storesForQuery\(activeQuery\) \}/);
+  assert.match(searchSource, /if \(!catalogState\.hasRealCatalog\) return emptyList\(\)/);
+  assert.match(localSource, /catalogState\.productsByStore\["pizzeria-roma"\]/);
+  assert.match(localSource, /if \(realProducts\.isEmpty\(\)\) return productsFor\(category\)/);
+  assert.match(localSource, /LocalHero\(catalogState\.romaStore\(\)\)/);
 });

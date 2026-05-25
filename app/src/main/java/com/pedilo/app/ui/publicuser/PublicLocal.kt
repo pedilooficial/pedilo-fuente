@@ -50,6 +50,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pedilo.app.core.model.PublicProductSummary
+import com.pedilo.app.core.model.PublicStoreSummary
 
 enum class LocalCategory(val label: String) {
     Featured("Destacados"),
@@ -113,6 +115,33 @@ private fun productsFor(category: LocalCategory): List<LocalProduct> =
         else -> localProducts.filter { it.category == category }
     }
 
+private fun productsFor(category: LocalCategory, catalogState: PublicCatalogState): List<LocalProduct> {
+    val realProducts = catalogState.productsByStore["pizzeria-roma"].orEmpty()
+        .filter { it.visible && it.available && it.priceCents != null }
+        .map { it.toLocalProduct() }
+    if (realProducts.isEmpty()) return productsFor(category)
+    return when (category) {
+        LocalCategory.Featured -> realProducts.take(4)
+        else -> realProducts.filter { it.category == category }
+    }.ifEmpty { realProducts }
+}
+
+private fun PublicProductSummary.toLocalProduct(): LocalProduct =
+    LocalProduct(
+        name = name,
+        description = description,
+        price = ((priceCents ?: 0L) / 100L).toInt(),
+        category = when {
+            name.contains("gaseosa", ignoreCase = true) || name.contains("bebida", ignoreCase = true) -> LocalCategory.Drinks
+            name.contains("empanada", ignoreCase = true) -> LocalCategory.Starters
+            else -> LocalCategory.Pizzas
+        },
+        badge = if (name.contains("promo", ignoreCase = true)) "Especial" else "",
+    )
+
+private fun PublicCatalogState.romaStore(): PublicStoreSummary? =
+    stores.firstOrNull { it.id == "pizzeria-roma" } ?: stores.firstOrNull()
+
 fun localCartTotal(items: List<LocalCartItem>): Int = items.sumOf { item ->
     val extras = item.extras.size * 450
     val size = if (item.size == "Grande") 1200 else 0
@@ -129,6 +158,7 @@ fun formatLocalMoney(value: Int): String = "$" + "%,d".format(value).replace(","
 fun PublicLocalScreen(
     selectedCategory: LocalCategory,
     cartItems: List<LocalCartItem>,
+    catalogState: PublicCatalogState = PublicCatalogState(isLoading = false),
     onCategory: (LocalCategory) -> Unit,
     onProduct: (LocalProduct) -> Unit,
     onCart: () -> Unit,
@@ -145,11 +175,11 @@ fun PublicLocalScreen(
             contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 132.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { LocalHero() }
-            item { LocalStatsRow() }
+            item { LocalHero(catalogState.romaStore()) }
+            item { LocalStatsRow(catalogState.romaStore()) }
             item { CategoryTabs(selected = selectedCategory, onSelected = onCategory) }
             item { LocalPromo() }
-            items(productsFor(selectedCategory)) { product ->
+            items(productsFor(selectedCategory, catalogState)) { product ->
                 LocalProductCard(product = product, onClick = { onProduct(product) })
             }
         }
@@ -360,7 +390,7 @@ fun PublicLocalTicketScreen(
 }
 
 @Composable
-private fun LocalHero() {
+private fun LocalHero(store: PublicStoreSummary?) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -379,18 +409,18 @@ private fun LocalHero() {
         }
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Pizzería Roma", color = PediloText, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
-                Text("Abierto", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.background(PediloGreen, RoundedCornerShape(16.dp)).padding(horizontal = 10.dp, vertical = 5.dp))
+                Text(store?.name ?: "Pizzería Roma", color = PediloText, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
+                Text(if (store?.isOpen != false) "Abierto" else "Cerrado", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.background(if (store?.isOpen != false) PediloGreen else PediloMuted, RoundedCornerShape(16.dp)).padding(horizontal = 10.dp, vertical = 5.dp))
             }
-            Text("Pizza a la piedra · Cocina italiana", color = PediloMuted, fontSize = 13.sp)
+            Text(store?.description?.ifBlank { store.category } ?: "Pizza a la piedra · Cocina italiana", color = PediloMuted, fontSize = 13.sp)
         }
     }
 }
 
 @Composable
-private fun LocalStatsRow() {
+private fun LocalStatsRow(store: PublicStoreSummary?) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        StatPill("Horario", "hasta 00:30", LocalIconKind.Clock, Modifier.weight(1f))
+        StatPill("Horario", store?.openingHours ?: "hasta 00:30", LocalIconKind.Clock, Modifier.weight(1f))
         StatPill("20-30", "min", LocalIconKind.Clock, Modifier.weight(1f))
         StatPill("$1.200", "envío", LocalIconKind.Delivery, Modifier.weight(1f))
     }

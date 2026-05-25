@@ -37,7 +37,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pedilo.app.R
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 private sealed interface PublicRoute {
     data object Home : PublicRoute
@@ -79,6 +81,11 @@ fun PublicApp() {
         var localCategory by remember { mutableStateOf(LocalCategory.Featured) }
         var localOrderPlaced by remember { mutableStateOf(false) }
         var pendingLocalExit by remember { mutableStateOf<PublicRoute?>(null) }
+        var catalogState by remember { mutableStateOf(PublicCatalogState()) }
+
+        LaunchedEffect(Unit) {
+            catalogState = withContext(Dispatchers.IO) { loadPublicCatalogState() }
+        }
 
         fun isLocalRoute(target: PublicRoute): Boolean = when (target) {
             PublicRoute.Local,
@@ -250,6 +257,7 @@ fun PublicApp() {
             is PublicRoute.ShopSearch -> PublicShopSearchScreen(
                 query = (route as PublicRoute.ShopSearch).query,
                 current = (route as PublicRoute.ShopSearch).origin,
+                catalogState = catalogState,
                 onHome = { goHome() },
                 onPlus = { goPlus() },
                 onShop = { goShop() },
@@ -279,6 +287,7 @@ fun PublicApp() {
                 query = (route as PublicRoute.HomeListing).query,
                 current = PublicBottomDestination.Home,
                 titleOverride = (route as PublicRoute.HomeListing).title,
+                catalogState = catalogState,
                 onHome = { goHome() },
                 onPlus = { goPlus() },
                 onShop = { goShop() },
@@ -321,6 +330,7 @@ fun PublicApp() {
             PublicRoute.Local -> PublicLocalScreen(
                 selectedCategory = localCategory,
                 cartItems = localCart,
+                catalogState = catalogState,
                 onCategory = { localCategory = it },
                 onProduct = { navigateTo(PublicRoute.LocalProductDetail(it)) },
                 onCart = { navigateTo(PublicRoute.LocalCart) },
