@@ -294,10 +294,10 @@ private fun ConventionHeader(title: String, subtitle: String) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = title,
-            color = PediloOrange,
             fontSize = 30.sp,
             lineHeight = 33.sp,
             fontWeight = FontWeight.ExtraBold,
+            style = TextStyle(brush = Brush.verticalGradient(listOf(PediloWarning, PediloOrangeSoft, PediloOrangeDark))),
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
@@ -317,8 +317,9 @@ private fun TodayHighlightCard() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Brush.horizontalGradient(listOf(PediloOrangeDark, PediloPanel)), RoundedCornerShape(16.dp))
-            .border(1.dp, PediloOrange, RoundedCornerShape(16.dp))
+            .pediloCardDepth(RoundedCornerShape(16.dp))
+            .background(PediloWarmPanelBrush, RoundedCornerShape(16.dp))
+            .border(1.dp, PediloGoldLine.copy(alpha = 0.62f), RoundedCornerShape(16.dp))
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -347,8 +348,9 @@ private fun ConventionOptionCard(option: ConventionOption) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PediloOverlay, RoundedCornerShape(15.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(15.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
             .clickable(role = Role.Button, onClick = option.onClick)
             .semantics { contentDescription = option.title }
             .padding(14.dp),
@@ -393,8 +395,9 @@ private fun InformationCard(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PediloOverlay, RoundedCornerShape(15.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(15.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
             .padding(15.dp),
         verticalAlignment = Alignment.Top,
     ) {
@@ -420,7 +423,8 @@ private fun ClaimIntroCard(sent: Boolean) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (sent) PediloGreen.copy(alpha = 0.18f) else PediloOverlay, RoundedCornerShape(15.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(if (sent) Brush.verticalGradient(listOf(PediloGreen.copy(alpha = 0.18f), PediloPanel)) else PediloCardBrush, RoundedCornerShape(15.dp))
             .border(1.dp, if (sent) PediloGreen else PediloLine, RoundedCornerShape(15.dp))
             .padding(15.dp),
     ) {
@@ -442,8 +446,9 @@ private fun TrackingEntryCard() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Brush.horizontalGradient(listOf(PediloPanel, PediloOrangeDark.copy(alpha = 0.28f))), RoundedCornerShape(16.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(16.dp))
+            .pediloCardDepth(RoundedCornerShape(16.dp))
+            .background(PediloWarmPanelBrush, RoundedCornerShape(16.dp))
+            .border(1.dp, PediloGoldLine.copy(alpha = 0.56f), RoundedCornerShape(16.dp))
             .padding(16.dp),
     ) {
         Text("Carga de número", color = PediloText, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
@@ -480,9 +485,10 @@ private fun ConventionPrimaryAction(
         modifier = Modifier
             .fillMaxWidth()
             .height(58.dp)
+            .pediloButtonDepth(RoundedCornerShape(14.dp))
             .background(
                 Brush.verticalGradient(
-                    if (enabled) listOf(PediloOrangeSoft, PediloOrange) else listOf(PediloPanelSoft, PediloPanelSoft),
+                    if (enabled) listOf(PediloWarning, PediloOrangeSoft, PediloOrangeDark) else listOf(PediloPanelSoft, PediloPanelSoft),
                 ),
                 RoundedCornerShape(14.dp),
             )

@@ -25,7 +25,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -115,10 +117,10 @@ fun PublicShopSubcategoryScreen(
 private fun SubcategoryHeader(title: String) {
     Text(
         text = title,
-        color = PediloText,
         fontSize = 30.sp,
         lineHeight = 32.sp,
         fontWeight = FontWeight.ExtraBold,
+        style = TextStyle(brush = Brush.verticalGradient(listOf(PediloWarning, PediloOrangeSoft, PediloOrangeDark))),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
@@ -134,8 +136,9 @@ private fun SubcategoryStatus(message: String) {
         fontWeight = FontWeight.Bold,
         modifier = Modifier
             .fillMaxWidth()
-            .background(PediloPanel, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
             .padding(16.dp),
     )
 }
@@ -146,8 +149,9 @@ private fun RelatedStoreCard(store: PublicStoreSummary, onView: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .height(148.dp)
-            .background(PediloOverlay, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
             .clickable(role = Role.Button, onClick = onView)
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -169,11 +173,12 @@ private fun RelatedStoreCard(store: PublicStoreSummary, onView: () -> Unit) {
                 modifier = Modifier
                     .height(34.dp)
                     .width(100.dp)
-                    .background(Brush.verticalGradient(listOf(PediloOrangeSoft, PediloOrange)), RoundedCornerShape(10.dp))
+                    .pediloButtonDepth(RoundedCornerShape(10.dp))
+                    .background(PediloPrimaryBrush, RoundedCornerShape(10.dp))
                     .clickable(role = Role.Button, onClick = onView),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("Ver local", color = androidx.compose.ui.graphics.Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text("Ver local", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             }
         }
     }

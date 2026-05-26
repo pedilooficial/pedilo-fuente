@@ -15,6 +15,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -72,8 +73,9 @@ fun PublicTextInput(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(PediloPanel, RoundedCornerShape(14.dp))
-            .border(1.dp, if (errorText == null) PediloLine else PediloWarning, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, if (errorText == null) PediloLine.copy(alpha = 0.92f) else PediloWarning, RoundedCornerShape(15.dp))
             .padding(13.dp),
     ) {
         Text(label, color = PediloMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
@@ -92,7 +94,8 @@ fun PublicTextInput(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(PediloPanelSoft, RoundedCornerShape(11.dp))
+                        .background(Brush.horizontalGradient(listOf(PediloPanelSoft, PediloPanel, PediloPanelSoft)), RoundedCornerShape(11.dp))
+                        .border(1.dp, PediloGoldLine.copy(alpha = 0.35f), RoundedCornerShape(11.dp))
                         .padding(horizontal = 12.dp, vertical = 12.dp),
                 ) {
                     if (value.isBlank()) {

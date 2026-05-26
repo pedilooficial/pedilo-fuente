@@ -38,12 +38,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
@@ -78,6 +80,7 @@ private enum class PediloIconKind {
     Star,
     Clock,
     Megaphone,
+    Delivery,
     Info,
 }
 
@@ -168,10 +171,13 @@ private fun PublicHeader() {
         ) {
             Text(
                 text = "Pédilo!",
-                color = PediloOrange,
                 fontSize = 48.sp,
                 lineHeight = 48.sp,
                 fontWeight = FontWeight.ExtraBold,
+                style = TextStyle(
+                    brush = Brush.verticalGradient(listOf(PediloWarning, PediloOrangeSoft, PediloOrange, PediloOrangeDark)),
+                    shadow = Shadow(PediloOrangeDark.copy(alpha = 0.62f), Offset(0f, 5f), 14f),
+                ),
             )
             Text(
                 text = "todos tus pedidos en un solo lugar",
@@ -187,7 +193,9 @@ private fun PublicHeader() {
         Box(
             modifier = Modifier
                 .padding(top = 10.dp)
-                .background(PediloOrange, RoundedCornerShape(18.dp))
+                .shadow(12.dp, RoundedCornerShape(18.dp), ambientColor = PediloOrangeDark.copy(alpha = 0.28f), spotColor = PediloOrange.copy(alpha = 0.30f))
+                .background(Brush.verticalGradient(listOf(PediloOrangeSoft, PediloOrange, PediloOrangeDark)), RoundedCornerShape(18.dp))
+                .border(1.dp, PediloWarning.copy(alpha = 0.42f), RoundedCornerShape(18.dp))
                 .clickable(role = Role.Button, onClick = {})
                 .semantics { contentDescription = "Equipo" }
                 .padding(horizontal = 13.dp, vertical = 7.dp),
@@ -221,8 +229,9 @@ private fun SearchInput(onSearch: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .height(48.dp)
-            .background(PediloPanelSoft, RoundedCornerShape(12.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(12.dp))
+            .shadow(10.dp, RoundedCornerShape(15.dp), ambientColor = Color.Black.copy(alpha = 0.28f), spotColor = PediloOrange.copy(alpha = 0.10f))
+            .background(Brush.horizontalGradient(listOf(PediloPanelSoft, PediloPanel, PediloPanelSoft)), RoundedCornerShape(15.dp))
+            .border(1.dp, PediloGoldLine.copy(alpha = 0.55f), RoundedCornerShape(15.dp))
             .clickable(role = Role.Button, onClick = onSearch)
             .semantics { contentDescription = "Buscar desde Home" }
             .padding(horizontal = 14.dp),
@@ -259,8 +268,9 @@ private fun QuickAccessCard(item: QuickAccess, onClick: () -> Unit, modifier: Mo
     Column(
         modifier = modifier
             .height(78.dp)
-            .background(PediloPanel, RoundedCornerShape(10.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(10.dp))
+            .shadow(9.dp, RoundedCornerShape(12.dp), ambientColor = Color.Black.copy(alpha = 0.30f), spotColor = PediloOrange.copy(alpha = 0.10f))
+            .background(Brush.verticalGradient(listOf(PediloPanelSoft, PediloPanel)), RoundedCornerShape(12.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.86f), RoundedCornerShape(12.dp))
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { contentDescription = item.title }
             .padding(horizontal = 4.dp, vertical = 6.dp),
@@ -272,12 +282,12 @@ private fun QuickAccessCard(item: QuickAccess, onClick: () -> Unit, modifier: Mo
         Text(
             text = item.title,
             color = PediloText,
-            fontSize = 10.sp,
-            lineHeight = 11.sp,
+            fontSize = 9.sp,
+            lineHeight = 10.sp,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Clip,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -311,8 +321,9 @@ private fun OfferCard(product: PublicProductSummary, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .height(104.dp)
-            .background(PediloPanel, RoundedCornerShape(10.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(10.dp))
+            .shadow(12.dp, RoundedCornerShape(12.dp), ambientColor = Color.Black.copy(alpha = 0.32f), spotColor = PediloOrange.copy(alpha = 0.10f))
+            .background(Brush.verticalGradient(listOf(PediloPanelSoft, PediloPanel)), RoundedCornerShape(12.dp))
+            .border(1.dp, PediloGoldLine.copy(alpha = 0.48f), RoundedCornerShape(12.dp))
             .clickable(role = Role.Button, onClick = onClick)
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -374,8 +385,9 @@ private fun LocalCard(local: PublicStoreSummary, onClick: () -> Unit) {
         modifier = Modifier
             .width(132.dp)
             .height(142.dp)
-            .background(PediloPanel, RoundedCornerShape(10.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(10.dp))
+            .shadow(12.dp, RoundedCornerShape(12.dp), ambientColor = Color.Black.copy(alpha = 0.34f), spotColor = PediloOrange.copy(alpha = 0.10f))
+            .background(Brush.verticalGradient(listOf(PediloPanelSoft, PediloPanel)), RoundedCornerShape(12.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(12.dp))
             .clickable(role = Role.Button, onClick = onClick)
             .padding(7.dp),
     ) {
@@ -420,8 +432,9 @@ private fun HomeBanner(onConventions: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .height(112.dp)
-            .background(Brush.horizontalGradient(listOf(PediloOrangeDark, PediloPanel)), RoundedCornerShape(12.dp))
-            .border(1.dp, PediloOrange, RoundedCornerShape(12.dp))
+            .shadow(16.dp, RoundedCornerShape(16.dp), ambientColor = Color.Black.copy(alpha = 0.36f), spotColor = PediloOrange.copy(alpha = 0.22f))
+            .background(Brush.horizontalGradient(listOf(PediloOrangeDark, PediloWarmDepth, PediloPanel)), RoundedCornerShape(16.dp))
+            .border(1.dp, PediloOrange.copy(alpha = 0.82f), RoundedCornerShape(16.dp))
             .semantics { contentDescription = "Aviso de envíos más rápidos" }
             .padding(16.dp),
     ) {
@@ -454,7 +467,7 @@ private fun HomeBanner(onConventions: () -> Unit) {
                     )
             }
         }
-        PediloLineIcon(PediloIconKind.Megaphone, tint = PediloWarning, modifier = Modifier.align(Alignment.CenterEnd).size(54.dp))
+        PediloLineIcon(PediloIconKind.Delivery, tint = PediloWarning, modifier = Modifier.align(Alignment.CenterEnd).size(58.dp))
     }
 }
 
@@ -482,8 +495,9 @@ private fun SurfacePanel(content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PediloOverlay, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .shadow(12.dp, RoundedCornerShape(18.dp), ambientColor = Color.Black.copy(alpha = 0.30f), spotColor = PediloOrange.copy(alpha = 0.08f))
+            .background(Brush.verticalGradient(listOf(PediloPanelSoft.copy(alpha = 0.82f), PediloOverlay)), RoundedCornerShape(18.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.92f), RoundedCornerShape(18.dp))
             .padding(14.dp),
         content = content,
     )
@@ -505,8 +519,9 @@ private fun PublicBottomBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(84.dp)
-                .background(PediloPanel, RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
-                .border(1.dp, PediloLine, RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
+                .shadow(18.dp, RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp), ambientColor = Color.Black.copy(alpha = 0.40f), spotColor = PediloOrange.copy(alpha = 0.12f))
+                .background(Brush.verticalGradient(listOf(PediloPanelSoft, PediloPanel, PediloBg)), RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
+                .border(1.dp, PediloLine.copy(alpha = 0.95f), RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
                 .padding(horizontal = 42.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
@@ -520,8 +535,10 @@ private fun PublicBottomBar(
             Box(
                 modifier = Modifier
                     .size(58.dp)
+                    .shadow(14.dp, CircleShape, ambientColor = PediloOrangeDark.copy(alpha = 0.35f), spotColor = PediloOrange.copy(alpha = 0.45f))
                     .clip(CircleShape)
-                    .background(Brush.verticalGradient(listOf(PediloOrangeSoft, PediloOrange)))
+                    .background(Brush.verticalGradient(listOf(PediloWarning, PediloOrangeSoft, PediloOrangeDark)))
+                    .border(1.dp, PediloWarning.copy(alpha = 0.45f), CircleShape)
                     .clickable(role = Role.Button, onClick = onPlus)
                     .semantics { contentDescription = "Abrir boton mas" },
                 contentAlignment = Alignment.Center,
@@ -671,6 +688,13 @@ private fun PediloLineIcon(
                 drawLine(tint, Offset(size.width * 0.78f, size.height * 0.36f), Offset(size.width * 0.9f, size.height * 0.28f), strokeWidth = stroke.width, cap = StrokeCap.Round)
                 drawLine(tint, Offset(size.width * 0.8f, size.height * 0.5f), Offset(size.width * 0.94f, size.height * 0.5f), strokeWidth = stroke.width, cap = StrokeCap.Round)
                 drawLine(tint, Offset(size.width * 0.78f, size.height * 0.64f), Offset(size.width * 0.9f, size.height * 0.72f), strokeWidth = stroke.width, cap = StrokeCap.Round)
+            }
+            PediloIconKind.Delivery -> {
+                drawRoundRect(tint, Offset(size.width * 0.14f, size.height * 0.42f), Size(size.width * 0.48f, size.height * 0.25f), CornerRadius(size.width * 0.05f), style = stroke)
+                drawLine(tint, Offset(size.width * 0.62f, size.height * 0.5f), Offset(size.width * 0.8f, size.height * 0.5f), strokeWidth = stroke.width, cap = StrokeCap.Round)
+                drawLine(tint, Offset(size.width * 0.7f, size.height * 0.35f), Offset(size.width * 0.86f, size.height * 0.35f), strokeWidth = stroke.width, cap = StrokeCap.Round)
+                drawCircle(tint, size.minDimension * 0.08f, Offset(size.width * 0.3f, size.height * 0.78f), style = stroke)
+                drawCircle(tint, size.minDimension * 0.08f, Offset(size.width * 0.7f, size.height * 0.78f), style = stroke)
             }
             PediloIconKind.Info -> {
                 drawCircle(tint, size.minDimension * 0.38f, Offset(size.width * 0.5f, size.height * 0.5f), style = stroke)

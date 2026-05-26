@@ -178,8 +178,9 @@ private fun TrackingLookupForm(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PediloPanel, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
             .padding(14.dp),
     ) {
         Text("Número de pedido", color = PediloMuted, fontSize = 13.sp)
@@ -211,7 +212,8 @@ private fun TrackingLookupForm(
                 modifier = Modifier
                     .height(46.dp)
                     .width(104.dp)
-                    .background(Brush.verticalGradient(listOf(PediloOrangeSoft, PediloOrange)), RoundedCornerShape(10.dp))
+                    .pediloButtonDepth(RoundedCornerShape(10.dp))
+                    .background(PediloPrimaryBrush, RoundedCornerShape(10.dp))
                     .clickable(enabled = isValidPublicTrackingNumber(value) && !isLoading, role = Role.Button, onClick = onSubmit),
                 contentAlignment = Alignment.Center,
             ) {
@@ -226,10 +228,10 @@ private fun TrackingHeader() {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = "Seguimiento del pedido",
-            color = PediloOrange,
             fontSize = 28.sp,
             lineHeight = 31.sp,
             fontWeight = FontWeight.ExtraBold,
+            style = TextStyle(brush = Brush.verticalGradient(listOf(PediloWarning, PediloOrangeSoft, PediloOrangeDark))),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -273,8 +275,9 @@ private fun TrackingMessageCard(title: String, message: String, icon: TrackingIc
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PediloOverlay, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -299,8 +302,9 @@ private fun OrderNumberCard(orderNumber: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PediloPanel, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -317,8 +321,9 @@ private fun TrackingProgressCard(tracking: PublicTrackingData) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Brush.linearGradient(listOf(PediloOrangeDark.copy(alpha = 0.32f), PediloPanel)), RoundedCornerShape(15.dp))
-            .border(1.dp, PediloOrangeDark, RoundedCornerShape(15.dp))
+            .pediloCardDepth(RoundedCornerShape(16.dp))
+            .background(PediloWarmPanelBrush, RoundedCornerShape(16.dp))
+            .border(1.dp, PediloGoldLine.copy(alpha = 0.62f), RoundedCornerShape(16.dp))
             .padding(16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -411,8 +416,9 @@ private fun TrackingInfoCard(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PediloOverlay, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -446,8 +452,9 @@ private fun TrackingActionButton(
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
+            .pediloButtonDepth(RoundedCornerShape(13.dp))
             .background(
-                if (filled) Brush.verticalGradient(listOf(PediloOrangeSoft, PediloOrange)) else Brush.verticalGradient(listOf(PediloBg, PediloBg)),
+                if (filled) PediloPrimaryBrush else Brush.verticalGradient(listOf(PediloBg, PediloBg)),
                 RoundedCornerShape(13.dp),
             )
             .border(1.dp, PediloOrange, RoundedCornerShape(13.dp))

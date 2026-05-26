@@ -179,10 +179,10 @@ private fun SearchHeader(query: String, titleOverride: String?) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = titleOverride ?: if (hasQuery) "Resultado: ${query.trim()}" else "Pédilo!",
-                color = PediloText,
                 fontSize = 24.sp,
                 lineHeight = 27.sp,
                 fontWeight = FontWeight.ExtraBold,
+                style = TextStyle(brush = if (titleOverride == null && !hasQuery) Brush.verticalGradient(listOf(PediloWarning, PediloOrangeSoft, PediloOrangeDark)) else Brush.verticalGradient(listOf(PediloText, PediloText))),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -209,8 +209,9 @@ private fun ActiveSearchBox(
         modifier = Modifier
             .fillMaxWidth()
             .height(58.dp)
-            .background(PediloPanel, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(Brush.horizontalGradient(listOf(PediloPanelSoft, PediloPanel, PediloPanelSoft)), RoundedCornerShape(15.dp))
+            .border(1.dp, PediloGoldLine.copy(alpha = 0.52f), RoundedCornerShape(15.dp))
             .semantics { contentDescription = "Búsqueda activa" }
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -255,8 +256,9 @@ private fun SearchStatusMessage(message: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PediloOverlay, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
             .padding(16.dp),
     ) {
         Text(
@@ -316,8 +318,9 @@ private fun SearchResultCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(136.dp)
-            .background(PediloOverlay, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -371,7 +374,8 @@ private fun SearchResultCard(
             modifier = Modifier
                 .width(68.dp)
                 .height(34.dp)
-                .background(Brush.verticalGradient(listOf(PediloOrangeSoft, PediloOrange)), RoundedCornerShape(10.dp))
+                .pediloButtonDepth(RoundedCornerShape(10.dp))
+                .background(PediloPrimaryBrush, RoundedCornerShape(10.dp))
                 .clickable(role = Role.Button, onClick = onView),
             contentAlignment = Alignment.Center,
         ) {

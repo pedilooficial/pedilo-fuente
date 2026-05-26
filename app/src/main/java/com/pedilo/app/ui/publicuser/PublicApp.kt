@@ -32,7 +32,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -548,11 +552,14 @@ private fun PublicBrandSplash(onFinished: () -> Unit) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "Pédilo!",
-                    color = PediloOrange,
                     fontSize = 46.sp,
                     lineHeight = 48.sp,
                     fontWeight = FontWeight.ExtraBold,
                     textAlign = TextAlign.Center,
+                    style = TextStyle(
+                        brush = Brush.verticalGradient(listOf(PediloWarning, PediloOrangeSoft, PediloOrange, PediloOrangeDark)),
+                        shadow = Shadow(PediloOrangeDark.copy(alpha = 0.55f), Offset(0f, 4f), 13f),
+                    ),
                 )
                 Spacer(Modifier.height(10.dp))
                 Text(
@@ -592,9 +599,9 @@ private fun PublicPhasePlaceholder(
         ) {
             Text(
                 text = "Pédilo!",
-                color = PediloOrange,
                 fontSize = 44.sp,
                 fontWeight = FontWeight.ExtraBold,
+                style = TextStyle(brush = Brush.verticalGradient(listOf(PediloWarning, PediloOrangeSoft, PediloOrangeDark))),
             )
             Spacer(Modifier.height(14.dp))
             Text(

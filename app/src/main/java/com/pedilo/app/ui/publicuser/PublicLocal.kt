@@ -441,8 +441,9 @@ private fun LocalHero(store: PublicStoreSummary) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PediloPanel, RoundedCornerShape(18.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(18.dp)),
+            .pediloCardDepth(RoundedCornerShape(18.dp))
+            .background(PediloCardBrush, RoundedCornerShape(18.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.92f), RoundedCornerShape(18.dp)),
     ) {
         Box(
             modifier = Modifier
@@ -484,8 +485,9 @@ private fun LocalStatusCard(message: String) {
         textAlign = TextAlign.Center,
         modifier = Modifier
             .fillMaxWidth()
-            .background(PediloPanel, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
             .padding(16.dp),
     )
 }
@@ -495,8 +497,9 @@ private fun StatPill(value: String, label: String, icon: LocalIconKind, modifier
     Column(
         modifier = modifier
             .height(88.dp)
-            .background(PediloOverlay, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
             .padding(horizontal = 8.dp, vertical = 9.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -515,7 +518,7 @@ private fun CategoryTabs(selected: LocalCategory, onSelected: (LocalCategory) ->
             Box(
                 modifier = Modifier
                     .height(42.dp)
-                    .background(if (active) PediloOrange else PediloPanel, RoundedCornerShape(21.dp))
+                    .background(if (active) PediloPrimaryBrush else PediloCardBrush, RoundedCornerShape(21.dp))
                     .border(1.dp, if (active) PediloOrange else PediloLine, RoundedCornerShape(21.dp))
                     .clickable(role = Role.Button) { onSelected(category) }
                     .padding(horizontal = 14.dp),
@@ -532,8 +535,9 @@ private fun LocalPromo(product: LocalProduct) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PediloOverlay, RoundedCornerShape(12.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(12.dp))
+            .pediloCardDepth(RoundedCornerShape(14.dp))
+            .background(PediloWarmPanelBrush, RoundedCornerShape(14.dp))
+            .border(1.dp, PediloGoldLine.copy(alpha = 0.56f), RoundedCornerShape(14.dp))
             .padding(12.dp),
     ) {
         Text(product.name, color = PediloText, fontSize = 15.sp, fontWeight = FontWeight.Bold)
@@ -548,8 +552,9 @@ private fun LocalProductCard(product: LocalProduct, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .height(124.dp)
-            .background(PediloOverlay, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
             .clickable(role = Role.Button, onClick = onClick)
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -602,7 +607,7 @@ private fun ProductThumb(product: LocalProduct) {
 @Composable
 private fun LocalSectionTitle(title: String, subtitle: String) {
     Column(Modifier.fillMaxWidth()) {
-        Text(title, color = PediloOrange, fontSize = 30.sp, lineHeight = 33.sp, fontWeight = FontWeight.ExtraBold)
+        Text(title, fontSize = 30.sp, lineHeight = 33.sp, fontWeight = FontWeight.ExtraBold, style = TextStyle(brush = Brush.verticalGradient(listOf(PediloWarning, PediloOrangeSoft, PediloOrangeDark))))
         if (subtitle.isNotBlank()) {
             Text(subtitle, color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp)
         }
@@ -614,8 +619,9 @@ private fun OptionSelector(title: String, options: List<String>, selected: Strin
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PediloPanel, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
             .padding(13.dp),
     ) {
         Text(title, color = PediloMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
@@ -627,7 +633,7 @@ private fun OptionSelector(title: String, options: List<String>, selected: Strin
                     modifier = Modifier
                         .weight(1f)
                         .height(42.dp)
-                        .background(if (active) PediloOrange else PediloPanelSoft, RoundedCornerShape(21.dp))
+                        .background(if (active) PediloPrimaryBrush else PediloCardBrush, RoundedCornerShape(21.dp))
                         .border(1.dp, if (active) PediloOrange else PediloLine, RoundedCornerShape(21.dp))
                         .clickable(role = Role.Button) { onSelected(option) },
                     contentAlignment = Alignment.Center,
@@ -644,7 +650,8 @@ private fun ToggleOption(title: String, subtitle: String, checked: Boolean, onCl
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PediloOverlay, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
             .border(1.dp, if (checked) PediloOrange else PediloLine, RoundedCornerShape(14.dp))
             .clickable(role = Role.Button, onClick = onClick)
             .padding(14.dp),
@@ -667,8 +674,9 @@ private fun QuantitySelector(quantity: Int, onMinus: () -> Unit, onPlus: () -> U
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PediloPanel, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -697,8 +705,9 @@ private fun CartItemCard(item: LocalCartItem) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PediloOverlay, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
             .padding(12.dp),
         verticalAlignment = Alignment.Top,
     ) {
@@ -719,8 +728,9 @@ private fun TotalsCard(cartItems: List<LocalCartItem>) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PediloPanel, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
             .padding(14.dp),
     ) {
         TotalLine("Subtotal", formatLocalMoney(localCartTotal(cartItems)))
@@ -742,8 +752,9 @@ private fun CompactOrderCard(cartItems: List<LocalCartItem>) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PediloOverlay, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
             .padding(14.dp),
     ) {
         Text("Resumen del local", color = PediloText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
@@ -762,8 +773,9 @@ private fun LocalInfoCard(title: String, lines: List<String>, icon: LocalIconKin
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PediloPanel, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(15.dp))
             .padding(14.dp),
         verticalAlignment = Alignment.Top,
     ) {
@@ -796,8 +808,9 @@ private fun LocalPrimaryButton(label: String, icon: LocalIconKind, enabled: Bool
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
+            .pediloButtonDepth(RoundedCornerShape(14.dp))
             .background(
-                if (enabled) Brush.verticalGradient(listOf(PediloOrangeSoft, PediloOrange)) else Brush.verticalGradient(listOf(PediloLine, PediloLine)),
+                if (enabled) PediloPrimaryBrush else Brush.verticalGradient(listOf(PediloLine, PediloLine)),
                 RoundedCornerShape(14.dp),
             )
             .border(1.dp, if (enabled) PediloOrange else PediloLine, RoundedCornerShape(14.dp))
@@ -818,6 +831,7 @@ private fun LocalSecondaryButton(label: String, icon: LocalIconKind, onClick: ()
         modifier = Modifier
             .fillMaxWidth()
             .height(52.dp)
+            .pediloButtonDepth(RoundedCornerShape(14.dp))
             .background(PediloBg, RoundedCornerShape(14.dp))
             .border(1.dp, PediloOrange, RoundedCornerShape(14.dp))
             .clickable(role = Role.Button, onClick = onClick),

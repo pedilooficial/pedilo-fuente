@@ -180,16 +180,18 @@ private fun ShopHeader() {
         ) {
             Text(
                 text = "Tienda",
-                color = PediloOrange,
                 fontSize = 42.sp,
                 lineHeight = 42.sp,
                 fontWeight = FontWeight.ExtraBold,
+                style = TextStyle(brush = Brush.verticalGradient(listOf(PediloWarning, PediloOrangeSoft, PediloOrangeDark))),
             )
         }
         Box(
             modifier = Modifier
                 .padding(top = 10.dp)
-                .background(PediloOrange, RoundedCornerShape(18.dp))
+                .pediloButtonDepth(RoundedCornerShape(18.dp))
+                .background(PediloPrimaryBrush, RoundedCornerShape(18.dp))
+                .border(1.dp, PediloWarning.copy(alpha = 0.42f), RoundedCornerShape(18.dp))
                 .padding(horizontal = 13.dp, vertical = 7.dp),
             contentAlignment = Alignment.Center,
         ) {
@@ -205,8 +207,9 @@ private fun ShopSearchCard(onPending: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .height(48.dp)
-            .background(PediloPanel, RoundedCornerShape(12.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(12.dp))
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(Brush.horizontalGradient(listOf(PediloPanelSoft, PediloPanel, PediloPanelSoft)), RoundedCornerShape(15.dp))
+            .border(1.dp, PediloGoldLine.copy(alpha = 0.55f), RoundedCornerShape(15.dp))
             .clickable(role = Role.Button, onClick = onPending)
             .semantics { contentDescription = "Buscar en Tienda" }
             .padding(horizontal = 14.dp),
@@ -242,8 +245,9 @@ private fun TrackingLookupCard(onPending: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Brush.horizontalGradient(listOf(PediloPanel, PediloOrangeDark.copy(alpha = 0.24f))), RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .pediloCardDepth(RoundedCornerShape(16.dp))
+            .background(PediloWarmPanelBrush, RoundedCornerShape(16.dp))
+            .border(1.dp, PediloGoldLine.copy(alpha = 0.62f), RoundedCornerShape(16.dp))
             .padding(13.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -288,7 +292,8 @@ private fun TrackingLookupCard(onPending: (String) -> Unit) {
                 modifier = Modifier
                     .height(40.dp)
                     .width(90.dp)
-                    .background(Brush.verticalGradient(listOf(PediloOrangeSoft, PediloOrange)), RoundedCornerShape(10.dp))
+                    .pediloButtonDepth(RoundedCornerShape(10.dp))
+                    .background(PediloPrimaryBrush, RoundedCornerShape(10.dp))
                     .clickable(enabled = isValidPublicTrackingNumber(code), role = Role.Button, onClick = { onPending(code) }),
                 contentAlignment = Alignment.Center,
             ) {
@@ -306,8 +311,9 @@ private fun CategoryGroupCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(groupBrush(group.accent), RoundedCornerShape(12.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(12.dp))
+            .pediloCardDepth(RoundedCornerShape(14.dp))
+            .background(groupBrush(group.accent), RoundedCornerShape(14.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.90f), RoundedCornerShape(14.dp))
             .padding(8.dp),
     ) {
         Row(
@@ -337,8 +343,9 @@ private fun CategoryTile(
         modifier = Modifier
             .width(86.dp)
             .height(86.dp)
-            .background(PediloPanel, RoundedCornerShape(9.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(9.dp))
+            .pediloCardDepth(RoundedCornerShape(10.dp))
+            .background(PediloCardBrush, RoundedCornerShape(10.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.86f), RoundedCornerShape(10.dp))
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { contentDescription = item.title }
             .padding(6.dp),
@@ -397,7 +404,7 @@ private fun ShopStatusNote(message: String) {
 }
 
 private fun groupBrush(accent: Color): Brush = Brush.horizontalGradient(
-    listOf(accent.copy(alpha = 0.45f), PediloPanel),
+    listOf(accent.copy(alpha = 0.34f), PediloPanelSoft.copy(alpha = 0.82f), PediloPanel),
 )
 
 @Composable
