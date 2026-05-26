@@ -1,7 +1,5 @@
 package com.pedilo.app.ui.publicuser
 
-import android.graphics.Paint
-import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -49,7 +46,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -81,7 +77,6 @@ private enum class PediloIconKind {
     Star,
     Clock,
     Megaphone,
-    Delivery,
     Info,
 }
 
@@ -194,19 +189,19 @@ private fun PublicHeader() {
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = 11.dp)
-                .pediloButtonDepth(RoundedCornerShape(16.dp))
-                .background(Brush.verticalGradient(listOf(PediloOrangeSoft, PediloOrange, PediloOrangeDark)), RoundedCornerShape(16.dp))
-                .border(1.dp, PediloWarning.copy(alpha = 0.42f), RoundedCornerShape(16.dp))
+                .padding(top = 8.dp)
+                .shadow(5.dp, RoundedCornerShape(13.dp), ambientColor = Color.Black.copy(alpha = 0.24f), spotColor = PediloOrange.copy(alpha = 0.10f))
+                .background(Brush.verticalGradient(listOf(PediloPanelSoft.copy(alpha = 0.86f), PediloPanel.copy(alpha = 0.94f))), RoundedCornerShape(13.dp))
+                .border(1.dp, PediloOrange.copy(alpha = 0.44f), RoundedCornerShape(13.dp))
                 .clickable(role = Role.Button, onClick = {})
                 .semantics { contentDescription = "Equipo" }
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                .padding(horizontal = 7.dp, vertical = 4.dp),
             contentAlignment = Alignment.Center,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                TeamMiniIcon(tint = Color.Black, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(5.dp))
-                Text("Equipo", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                TeamMiniIcon(tint = PediloOrange, modifier = Modifier.size(13.dp))
+                Spacer(Modifier.width(3.dp))
+                Text("Equipo", color = PediloText, fontSize = 9.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -442,22 +437,36 @@ private fun HomeBanner(onConventions: () -> Unit) {
             .background(Brush.horizontalGradient(listOf(PediloOrangeDark, PediloWarmDepth, PediloPanel, PediloPanelSoft)), RoundedCornerShape(18.dp))
             .border(1.dp, PediloWarning.copy(alpha = 0.62f), RoundedCornerShape(18.dp))
             .semantics { contentDescription = "Aviso de envíos más rápidos" }
-            .padding(16.dp),
     ) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(Brush.horizontalGradient(listOf(PediloOrangeDark, PediloWarmDepth, PediloPanel, PediloPanelSoft)), RoundedCornerShape(18.dp)),
+        )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(Brush.horizontalGradient(listOf(Color.Black.copy(alpha = 0.10f), Color.Black.copy(alpha = 0.30f), Color.Black.copy(alpha = 0.52f))), RoundedCornerShape(18.dp)),
+        )
         Canvas(modifier = Modifier.matchParentSize()) {
-            drawCircle(PediloWarning.copy(alpha = 0.18f), radius = size.minDimension * 0.56f, center = Offset(size.width * 0.88f, size.height * 0.48f))
-            repeat(4) { index ->
-                val y = size.height * (0.24f + index * 0.16f)
+            drawCircle(PediloWarning.copy(alpha = 0.10f), radius = size.minDimension * 0.62f, center = Offset(size.width * 0.88f, size.height * 0.46f))
+            repeat(3) { index ->
+                val y = size.height * (0.32f + index * 0.17f)
                 drawLine(
-                    color = PediloOrangeSoft.copy(alpha = 0.28f - index * 0.04f),
-                    start = Offset(size.width * (0.58f + index * 0.04f), y),
-                    end = Offset(size.width * 0.98f, y - size.height * 0.12f),
-                    strokeWidth = 3.2f,
+                    color = PediloWarning.copy(alpha = 0.16f - index * 0.03f),
+                    start = Offset(size.width * (0.58f + index * 0.05f), y),
+                    end = Offset(size.width * 0.95f, y - size.height * 0.10f),
+                    strokeWidth = 2.6f,
                     cap = StrokeCap.Round,
                 )
             }
         }
-        Column(modifier = Modifier.align(Alignment.CenterStart).fillMaxWidth().padding(end = 94.dp)) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+        ) {
             Text(
                 "¡Envíos más rápidos!",
                 color = Color.White,
@@ -482,12 +491,6 @@ private fun HomeBanner(onConventions: () -> Unit) {
                 Text("Ver más", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
             }
         }
-        DeliveryRiderIllustration(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .offset(x = 5.dp)
-                .size(width = 154.dp, height = 104.dp),
-        )
     }
 }
 
@@ -499,82 +502,6 @@ private fun TeamMiniIcon(tint: Color, modifier: Modifier = Modifier) {
         drawCircle(tint, radius = size.minDimension * 0.13f, center = Offset(size.width * 0.64f, size.height * 0.34f), style = stroke)
         drawRoundRect(tint, Offset(size.width * 0.16f, size.height * 0.58f), Size(size.width * 0.34f, size.height * 0.22f), CornerRadius(size.width * 0.12f), style = stroke)
         drawRoundRect(tint, Offset(size.width * 0.50f, size.height * 0.58f), Size(size.width * 0.34f, size.height * 0.22f), CornerRadius(size.width * 0.12f), style = stroke)
-    }
-}
-
-@Composable
-private fun DeliveryRiderIllustration(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val orange = PediloOrange
-        val light = PediloWarning
-        val deep = PediloOrangeDark
-        val ink = PediloBg.copy(alpha = 0.92f)
-        val stroke = Stroke(width = size.minDimension * 0.035f, cap = StrokeCap.Round)
-
-        drawCircle(light.copy(alpha = 0.18f), radius = size.height * 0.48f, center = Offset(size.width * 0.57f, size.height * 0.50f))
-        repeat(4) { index ->
-            val y = size.height * (0.34f + index * 0.13f)
-            drawLine(
-                color = light.copy(alpha = 0.42f - index * 0.06f),
-                start = Offset(size.width * (0.02f + index * 0.03f), y),
-                end = Offset(size.width * 0.88f, y - size.height * 0.12f),
-                strokeWidth = size.height * 0.025f,
-                cap = StrokeCap.Round,
-            )
-        }
-
-        val rearWheel = Offset(size.width * 0.40f, size.height * 0.78f)
-        val frontWheel = Offset(size.width * 0.78f, size.height * 0.78f)
-        drawCircle(ink, size.height * 0.15f, rearWheel)
-        drawCircle(ink, size.height * 0.15f, frontWheel)
-        drawCircle(light, size.height * 0.11f, rearWheel, style = stroke)
-        drawCircle(light, size.height * 0.11f, frontWheel, style = stroke)
-        drawCircle(PediloPanelSoft, size.height * 0.045f, rearWheel)
-        drawCircle(PediloPanelSoft, size.height * 0.045f, frontWheel)
-
-        val scooter = Path().apply {
-            moveTo(size.width * 0.26f, size.height * 0.68f)
-            cubicTo(size.width * 0.42f, size.height * 0.56f, size.width * 0.58f, size.height * 0.61f, size.width * 0.69f, size.height * 0.68f)
-            lineTo(size.width * 0.86f, size.height * 0.68f)
-            cubicTo(size.width * 0.90f, size.height * 0.68f, size.width * 0.92f, size.height * 0.72f, size.width * 0.89f, size.height * 0.75f)
-            lineTo(size.width * 0.33f, size.height * 0.75f)
-            cubicTo(size.width * 0.25f, size.height * 0.75f, size.width * 0.20f, size.height * 0.72f, size.width * 0.26f, size.height * 0.68f)
-            close()
-        }
-        drawPath(scooter, Brush.verticalGradient(listOf(light, orange, deep)))
-        drawLine(ink, Offset(size.width * 0.66f, size.height * 0.63f), Offset(size.width * 0.82f, size.height * 0.45f), strokeWidth = size.height * 0.035f, cap = StrokeCap.Round)
-        drawLine(ink, Offset(size.width * 0.80f, size.height * 0.46f), Offset(size.width * 0.92f, size.height * 0.46f), strokeWidth = size.height * 0.028f, cap = StrokeCap.Round)
-
-        val boxTop = Offset(size.width * 0.16f, size.height * 0.34f)
-        drawRoundRect(
-            color = deep,
-            topLeft = boxTop,
-            size = Size(size.width * 0.32f, size.height * 0.28f),
-            cornerRadius = CornerRadius(size.width * 0.035f, size.width * 0.035f),
-        )
-        drawRoundRect(
-            color = orange,
-            topLeft = Offset(boxTop.x + size.width * 0.018f, boxTop.y + size.height * 0.018f),
-            size = Size(size.width * 0.284f, size.height * 0.236f),
-            cornerRadius = CornerRadius(size.width * 0.025f, size.width * 0.025f),
-        )
-        drawContext.canvas.nativeCanvas.drawText(
-            "Pédilo!",
-            boxTop.x + size.width * 0.16f,
-            boxTop.y + size.height * 0.17f,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = android.graphics.Color.WHITE
-                textAlign = Paint.Align.CENTER
-                textSize = size.height * 0.085f
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            },
-        )
-
-        drawLine(ink, Offset(size.width * 0.48f, size.height * 0.47f), Offset(size.width * 0.58f, size.height * 0.62f), strokeWidth = size.height * 0.045f, cap = StrokeCap.Round)
-        drawLine(ink, Offset(size.width * 0.58f, size.height * 0.62f), Offset(size.width * 0.70f, size.height * 0.63f), strokeWidth = size.height * 0.04f, cap = StrokeCap.Round)
-        drawCircle(light, size.height * 0.105f, Offset(size.width * 0.55f, size.height * 0.30f))
-        drawArc(deep, 188f, 185f, false, Offset(size.width * 0.45f, size.height * 0.20f), Size(size.width * 0.20f, size.height * 0.18f), style = Stroke(width = size.height * 0.055f, cap = StrokeCap.Round))
-        drawLine(light, Offset(size.width * 0.58f, size.height * 0.42f), Offset(size.width * 0.78f, size.height * 0.46f), strokeWidth = size.height * 0.035f, cap = StrokeCap.Round)
     }
 }
 
@@ -795,13 +722,6 @@ private fun PediloLineIcon(
                 drawLine(tint, Offset(size.width * 0.78f, size.height * 0.36f), Offset(size.width * 0.9f, size.height * 0.28f), strokeWidth = stroke.width, cap = StrokeCap.Round)
                 drawLine(tint, Offset(size.width * 0.8f, size.height * 0.5f), Offset(size.width * 0.94f, size.height * 0.5f), strokeWidth = stroke.width, cap = StrokeCap.Round)
                 drawLine(tint, Offset(size.width * 0.78f, size.height * 0.64f), Offset(size.width * 0.9f, size.height * 0.72f), strokeWidth = stroke.width, cap = StrokeCap.Round)
-            }
-            PediloIconKind.Delivery -> {
-                drawRoundRect(tint, Offset(size.width * 0.14f, size.height * 0.42f), Size(size.width * 0.48f, size.height * 0.25f), CornerRadius(size.width * 0.05f), style = stroke)
-                drawLine(tint, Offset(size.width * 0.62f, size.height * 0.5f), Offset(size.width * 0.8f, size.height * 0.5f), strokeWidth = stroke.width, cap = StrokeCap.Round)
-                drawLine(tint, Offset(size.width * 0.7f, size.height * 0.35f), Offset(size.width * 0.86f, size.height * 0.35f), strokeWidth = stroke.width, cap = StrokeCap.Round)
-                drawCircle(tint, size.minDimension * 0.08f, Offset(size.width * 0.3f, size.height * 0.78f), style = stroke)
-                drawCircle(tint, size.minDimension * 0.08f, Offset(size.width * 0.7f, size.height * 0.78f), style = stroke)
             }
             PediloIconKind.Info -> {
                 drawCircle(tint, size.minDimension * 0.38f, Offset(size.width * 0.5f, size.height * 0.5f), style = stroke)
