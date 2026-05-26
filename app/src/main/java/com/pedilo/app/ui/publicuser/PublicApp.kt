@@ -267,11 +267,11 @@ fun PublicApp() {
                 onShop = { goShop() },
                 onConfirm = {
                     if (!isSubmittingPlusOrder) {
+                        isSubmittingPlusOrder = true
+                        plusOrderError = null
                         val currentRoute = route as PublicRoute.PlusConfirmation
                         val draft = buildPlusOrderDraft(currentRoute.request)
                         scope.launch {
-                            isSubmittingPlusOrder = true
-                            plusOrderError = null
                             val result = withContext(Dispatchers.IO) { createPlusOrder(draft) }
                             isSubmittingPlusOrder = false
                             when (result) {
@@ -420,6 +420,8 @@ fun PublicApp() {
                 onEditData = { navigateTo(PublicRoute.LocalData) },
                 onConfirm = {
                     if (!isSubmittingLocalOrder) {
+                        isSubmittingLocalOrder = true
+                        localOrderError = null
                         val currentRoute = route as PublicRoute.LocalConfirmation
                         val draft = buildLocalOrderDraft(
                             store = catalogState.romaStoreForOrder(),
@@ -427,8 +429,6 @@ fun PublicApp() {
                             orderData = currentRoute.orderData,
                         )
                         scope.launch {
-                            isSubmittingLocalOrder = true
-                            localOrderError = null
                             val result = withContext(Dispatchers.IO) { createLocalOrder(draft) }
                             isSubmittingLocalOrder = false
                             when (result) {
