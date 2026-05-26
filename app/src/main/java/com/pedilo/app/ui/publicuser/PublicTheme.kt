@@ -30,6 +30,7 @@ val PediloOlive = Color(0xFF5E7D2B)
 val PediloGoldLine = Color(0xFF6E4A2C)
 val PediloPressed = Color(0xFFFF8D20)
 val PediloWarmDepth = Color(0xFF3A1C0B)
+val PediloCream = Color(0xFFEFE8DE)
 
 val PediloPrimaryBrush: Brush = Brush.verticalGradient(
     listOf(PediloWarning, PediloOrangeSoft, PediloOrangeDark),

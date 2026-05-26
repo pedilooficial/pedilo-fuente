@@ -1,7 +1,5 @@
 package com.pedilo.app.ui.publicuser
 
-import android.graphics.Paint
-import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -48,7 +47,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -161,44 +159,45 @@ fun PublicShell(
 
 @Composable
 private fun PublicHeader() {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Top,
-    ) {
+    Box(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
                 text = "Pédilo!",
-                fontSize = 48.sp,
-                lineHeight = 48.sp,
+                fontSize = 50.sp,
+                lineHeight = 50.sp,
                 fontWeight = FontWeight.ExtraBold,
                 style = TextStyle(
                     brush = Brush.verticalGradient(listOf(PediloWarning, PediloOrangeSoft, PediloOrange, PediloOrangeDark)),
-                    shadow = Shadow(PediloOrangeDark.copy(alpha = 0.62f), Offset(0f, 5f), 14f),
+                    shadow = Shadow(PediloOrangeDark.copy(alpha = 0.68f), Offset(0f, 5f), 16f),
                 ),
             )
             Text(
                 text = "todos tus pedidos en un solo lugar",
                 color = PediloText,
-                fontSize = 13.sp,
+                fontSize = 12.sp,
                 lineHeight = 16.sp,
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 14.dp),
             )
         }
         Box(
             modifier = Modifier
+                .align(Alignment.TopEnd)
                 .padding(top = 10.dp)
-                .shadow(12.dp, RoundedCornerShape(18.dp), ambientColor = PediloOrangeDark.copy(alpha = 0.28f), spotColor = PediloOrange.copy(alpha = 0.30f))
-                .background(Brush.verticalGradient(listOf(PediloOrangeSoft, PediloOrange, PediloOrangeDark)), RoundedCornerShape(18.dp))
-                .border(1.dp, PediloWarning.copy(alpha = 0.42f), RoundedCornerShape(18.dp))
+                .pediloButtonDepth(RoundedCornerShape(19.dp))
+                .background(PediloPrimaryBrush, RoundedCornerShape(19.dp))
+                .border(1.dp, PediloWarning.copy(alpha = 0.50f), RoundedCornerShape(19.dp))
                 .clickable(role = Role.Button, onClick = {})
                 .semantics { contentDescription = "Equipo" }
-                .padding(horizontal = 13.dp, vertical = 7.dp),
+                .padding(horizontal = 14.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text("Equipo", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
@@ -431,43 +430,59 @@ private fun HomeBanner(onConventions: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(112.dp)
-            .shadow(16.dp, RoundedCornerShape(16.dp), ambientColor = Color.Black.copy(alpha = 0.36f), spotColor = PediloOrange.copy(alpha = 0.22f))
-            .background(Brush.horizontalGradient(listOf(PediloOrangeDark, PediloWarmDepth, PediloPanel)), RoundedCornerShape(16.dp))
-            .border(1.dp, PediloOrange.copy(alpha = 0.82f), RoundedCornerShape(16.dp))
+            .height(126.dp)
+            .shadow(18.dp, RoundedCornerShape(18.dp), ambientColor = Color.Black.copy(alpha = 0.40f), spotColor = PediloOrange.copy(alpha = 0.26f))
+            .background(Brush.horizontalGradient(listOf(PediloOrangeDark, PediloWarmDepth, PediloPanel, PediloPanelSoft)), RoundedCornerShape(18.dp))
+            .border(1.dp, PediloWarning.copy(alpha = 0.62f), RoundedCornerShape(18.dp))
             .semantics { contentDescription = "Aviso de envíos más rápidos" }
             .padding(16.dp),
     ) {
-        Column(modifier = Modifier.align(Alignment.CenterStart).fillMaxWidth().padding(end = 82.dp)) {
-            Text("¡Envíos más rápidos!", color = Color.White, fontSize = 18.sp, lineHeight = 20.sp, fontWeight = FontWeight.ExtraBold)
-            Text("Tus locales favoritos, ahora más cerca que nunca.", color = Color.White, fontSize = 11.sp, lineHeight = 14.sp)
-            Spacer(Modifier.height(10.dp))
-            Canvas(
-                modifier = Modifier
-                    .width(112.dp)
-                    .height(38.dp)
-                    .clickable(role = Role.Button, onClick = onConventions)
-                    .semantics { contentDescription = "Ver más" },
-            ) {
-                drawRoundRect(
-                    color = Color.White,
-                    cornerRadius = CornerRadius(size.height / 2f, size.height / 2f),
+        Canvas(modifier = Modifier.matchParentSize()) {
+            drawCircle(PediloWarning.copy(alpha = 0.18f), radius = size.minDimension * 0.56f, center = Offset(size.width * 0.88f, size.height * 0.48f))
+            repeat(4) { index ->
+                val y = size.height * (0.24f + index * 0.16f)
+                drawLine(
+                    color = PediloOrangeSoft.copy(alpha = 0.28f - index * 0.04f),
+                    start = Offset(size.width * (0.58f + index * 0.04f), y),
+                    end = Offset(size.width * 0.98f, y - size.height * 0.12f),
+                    strokeWidth = 3.2f,
+                    cap = StrokeCap.Round,
                 )
-                    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = android.graphics.Color.BLACK
-                        textAlign = Paint.Align.CENTER
-                    textSize = size.height * 0.62f
-                        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-                    }
-                    drawContext.canvas.nativeCanvas.drawText(
-                        "Ver más",
-                        size.width / 2f,
-                    size.height * 0.7f,
-                        paint,
-                    )
             }
         }
-        PediloLineIcon(PediloIconKind.Delivery, tint = PediloWarning, modifier = Modifier.align(Alignment.CenterEnd).size(58.dp))
+        Column(modifier = Modifier.align(Alignment.CenterStart).fillMaxWidth().padding(end = 94.dp)) {
+            Text(
+                "¡Envíos más rápidos!",
+                color = Color.White,
+                fontSize = 18.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text("Tus locales favoritos, ahora más cerca.", color = Color.White.copy(alpha = 0.92f), fontSize = 12.sp, lineHeight = 15.sp)
+            Spacer(Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .width(118.dp)
+                    .height(34.dp)
+                    .background(Brush.verticalGradient(listOf(Color.White, PediloCream)), RoundedCornerShape(17.dp))
+                    .border(1.dp, PediloWarning.copy(alpha = 0.46f), RoundedCornerShape(17.dp))
+                    .clickable(role = Role.Button, onClick = onConventions)
+                    .semantics { contentDescription = "Ver más" },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("Ver más", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+            }
+        }
+        PediloLineIcon(
+            PediloIconKind.Delivery,
+            tint = PediloWarning,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .offset(x = 2.dp)
+                .size(68.dp),
+        )
     }
 }
 
@@ -518,11 +533,11 @@ private fun PublicBottomBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(84.dp)
-                .shadow(18.dp, RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp), ambientColor = Color.Black.copy(alpha = 0.40f), spotColor = PediloOrange.copy(alpha = 0.12f))
-                .background(Brush.verticalGradient(listOf(PediloPanelSoft, PediloPanel, PediloBg)), RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
-                .border(1.dp, PediloLine.copy(alpha = 0.95f), RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
-                .padding(horizontal = 42.dp, vertical = 8.dp),
+                .height(74.dp)
+                .shadow(14.dp, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), ambientColor = Color.Black.copy(alpha = 0.36f), spotColor = PediloOrange.copy(alpha = 0.10f))
+                .background(Brush.verticalGradient(listOf(PediloPanelSoft.copy(alpha = 0.95f), PediloPanel, PediloBg)), RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                .border(1.dp, PediloLine.copy(alpha = 0.82f), RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                .padding(horizontal = 52.dp, vertical = 7.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -534,8 +549,8 @@ private fun PublicBottomBar(
             )
             Box(
                 modifier = Modifier
-                    .size(58.dp)
-                    .shadow(14.dp, CircleShape, ambientColor = PediloOrangeDark.copy(alpha = 0.35f), spotColor = PediloOrange.copy(alpha = 0.45f))
+                    .size(54.dp)
+                    .shadow(12.dp, CircleShape, ambientColor = PediloOrangeDark.copy(alpha = 0.32f), spotColor = PediloOrange.copy(alpha = 0.42f))
                     .clip(CircleShape)
                     .background(Brush.verticalGradient(listOf(PediloWarning, PediloOrangeSoft, PediloOrangeDark)))
                     .border(1.dp, PediloWarning.copy(alpha = 0.45f), CircleShape)
@@ -543,7 +558,7 @@ private fun PublicBottomBar(
                     .semantics { contentDescription = "Abrir boton mas" },
                 contentAlignment = Alignment.Center,
             ) {
-                PediloLineIcon(PediloIconKind.Plus, tint = Color.White, modifier = Modifier.size(31.dp))
+                PediloLineIcon(PediloIconKind.Plus, tint = Color.White, modifier = Modifier.size(29.dp))
             }
             BottomItem(
                 icon = PediloIconKind.Shop,
@@ -575,12 +590,12 @@ private fun BottomItem(
             .semantics { contentDescription = label },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        PediloLineIcon(icon, tint = if (selected) PediloOrange else PediloMuted, modifier = Modifier.size(28.dp))
-        Spacer(Modifier.height(3.dp))
+        PediloLineIcon(icon, tint = if (selected) PediloOrange else PediloMuted, modifier = Modifier.size(25.dp))
+        Spacer(Modifier.height(2.dp))
         Text(
             text = label,
             color = if (selected) PediloOrange else PediloMuted,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
             maxLines = 1,
         )

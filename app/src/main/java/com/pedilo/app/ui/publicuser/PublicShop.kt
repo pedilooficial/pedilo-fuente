@@ -170,32 +170,23 @@ fun PublicShopScreen(
 
 @Composable
 private fun ShopHeader() {
-    Row(
+    Box(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Top,
     ) {
         Column(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.align(Alignment.Center),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
                 text = "Tienda",
-                fontSize = 42.sp,
-                lineHeight = 42.sp,
+                fontSize = 44.sp,
+                lineHeight = 44.sp,
                 fontWeight = FontWeight.ExtraBold,
-                style = TextStyle(brush = Brush.verticalGradient(listOf(PediloWarning, PediloOrangeSoft, PediloOrangeDark))),
+                style = TextStyle(
+                    brush = Brush.verticalGradient(listOf(PediloWarning, PediloOrangeSoft, PediloOrange, PediloOrangeDark)),
+                    shadow = androidx.compose.ui.graphics.Shadow(PediloOrangeDark.copy(alpha = 0.56f), Offset(0f, 4f), 13f),
+                ),
             )
-        }
-        Box(
-            modifier = Modifier
-                .padding(top = 10.dp)
-                .pediloButtonDepth(RoundedCornerShape(18.dp))
-                .background(PediloPrimaryBrush, RoundedCornerShape(18.dp))
-                .border(1.dp, PediloWarning.copy(alpha = 0.42f), RoundedCornerShape(18.dp))
-                .padding(horizontal = 13.dp, vertical = 7.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("Equipo", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
         }
     }
 }

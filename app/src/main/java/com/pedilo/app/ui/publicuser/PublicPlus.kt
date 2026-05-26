@@ -144,7 +144,6 @@ fun PublicPlusChoiceScreen(
             contentPadding = PaddingValues(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 132.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { PlusHeader(title = "¿Qué necesitás?", subtitle = "") }
             item {
                 ChoiceHeroCard()
             }
