@@ -1,5 +1,7 @@
 package com.pedilo.app.ui.publicuser
 
+import android.graphics.Paint
+import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -47,6 +49,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -191,16 +194,20 @@ private fun PublicHeader() {
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = 10.dp)
-                .pediloButtonDepth(RoundedCornerShape(19.dp))
-                .background(PediloPrimaryBrush, RoundedCornerShape(19.dp))
-                .border(1.dp, PediloWarning.copy(alpha = 0.50f), RoundedCornerShape(19.dp))
+                .padding(top = 11.dp)
+                .pediloButtonDepth(RoundedCornerShape(16.dp))
+                .background(Brush.verticalGradient(listOf(PediloOrangeSoft, PediloOrange, PediloOrangeDark)), RoundedCornerShape(16.dp))
+                .border(1.dp, PediloWarning.copy(alpha = 0.42f), RoundedCornerShape(16.dp))
                 .clickable(role = Role.Button, onClick = {})
                 .semantics { contentDescription = "Equipo" }
-                .padding(horizontal = 14.dp, vertical = 8.dp),
+                .padding(horizontal = 10.dp, vertical = 6.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text("Equipo", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TeamMiniIcon(tint = Color.Black, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(5.dp))
+                Text("Equipo", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+            }
         }
     }
 }
@@ -475,14 +482,99 @@ private fun HomeBanner(onConventions: () -> Unit) {
                 Text("Ver más", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
             }
         }
-        PediloLineIcon(
-            PediloIconKind.Delivery,
-            tint = PediloWarning,
+        DeliveryRiderIllustration(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .offset(x = 2.dp)
-                .size(68.dp),
+                .offset(x = 5.dp)
+                .size(width = 154.dp, height = 104.dp),
         )
+    }
+}
+
+@Composable
+private fun TeamMiniIcon(tint: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val stroke = Stroke(width = size.minDimension * 0.10f, cap = StrokeCap.Round)
+        drawCircle(tint, radius = size.minDimension * 0.13f, center = Offset(size.width * 0.37f, size.height * 0.34f), style = stroke)
+        drawCircle(tint, radius = size.minDimension * 0.13f, center = Offset(size.width * 0.64f, size.height * 0.34f), style = stroke)
+        drawRoundRect(tint, Offset(size.width * 0.16f, size.height * 0.58f), Size(size.width * 0.34f, size.height * 0.22f), CornerRadius(size.width * 0.12f), style = stroke)
+        drawRoundRect(tint, Offset(size.width * 0.50f, size.height * 0.58f), Size(size.width * 0.34f, size.height * 0.22f), CornerRadius(size.width * 0.12f), style = stroke)
+    }
+}
+
+@Composable
+private fun DeliveryRiderIllustration(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val orange = PediloOrange
+        val light = PediloWarning
+        val deep = PediloOrangeDark
+        val ink = PediloBg.copy(alpha = 0.92f)
+        val stroke = Stroke(width = size.minDimension * 0.035f, cap = StrokeCap.Round)
+
+        drawCircle(light.copy(alpha = 0.18f), radius = size.height * 0.48f, center = Offset(size.width * 0.57f, size.height * 0.50f))
+        repeat(4) { index ->
+            val y = size.height * (0.34f + index * 0.13f)
+            drawLine(
+                color = light.copy(alpha = 0.42f - index * 0.06f),
+                start = Offset(size.width * (0.02f + index * 0.03f), y),
+                end = Offset(size.width * 0.88f, y - size.height * 0.12f),
+                strokeWidth = size.height * 0.025f,
+                cap = StrokeCap.Round,
+            )
+        }
+
+        val rearWheel = Offset(size.width * 0.40f, size.height * 0.78f)
+        val frontWheel = Offset(size.width * 0.78f, size.height * 0.78f)
+        drawCircle(ink, size.height * 0.15f, rearWheel)
+        drawCircle(ink, size.height * 0.15f, frontWheel)
+        drawCircle(light, size.height * 0.11f, rearWheel, style = stroke)
+        drawCircle(light, size.height * 0.11f, frontWheel, style = stroke)
+        drawCircle(PediloPanelSoft, size.height * 0.045f, rearWheel)
+        drawCircle(PediloPanelSoft, size.height * 0.045f, frontWheel)
+
+        val scooter = Path().apply {
+            moveTo(size.width * 0.26f, size.height * 0.68f)
+            cubicTo(size.width * 0.42f, size.height * 0.56f, size.width * 0.58f, size.height * 0.61f, size.width * 0.69f, size.height * 0.68f)
+            lineTo(size.width * 0.86f, size.height * 0.68f)
+            cubicTo(size.width * 0.90f, size.height * 0.68f, size.width * 0.92f, size.height * 0.72f, size.width * 0.89f, size.height * 0.75f)
+            lineTo(size.width * 0.33f, size.height * 0.75f)
+            cubicTo(size.width * 0.25f, size.height * 0.75f, size.width * 0.20f, size.height * 0.72f, size.width * 0.26f, size.height * 0.68f)
+            close()
+        }
+        drawPath(scooter, Brush.verticalGradient(listOf(light, orange, deep)))
+        drawLine(ink, Offset(size.width * 0.66f, size.height * 0.63f), Offset(size.width * 0.82f, size.height * 0.45f), strokeWidth = size.height * 0.035f, cap = StrokeCap.Round)
+        drawLine(ink, Offset(size.width * 0.80f, size.height * 0.46f), Offset(size.width * 0.92f, size.height * 0.46f), strokeWidth = size.height * 0.028f, cap = StrokeCap.Round)
+
+        val boxTop = Offset(size.width * 0.16f, size.height * 0.34f)
+        drawRoundRect(
+            color = deep,
+            topLeft = boxTop,
+            size = Size(size.width * 0.32f, size.height * 0.28f),
+            cornerRadius = CornerRadius(size.width * 0.035f, size.width * 0.035f),
+        )
+        drawRoundRect(
+            color = orange,
+            topLeft = Offset(boxTop.x + size.width * 0.018f, boxTop.y + size.height * 0.018f),
+            size = Size(size.width * 0.284f, size.height * 0.236f),
+            cornerRadius = CornerRadius(size.width * 0.025f, size.width * 0.025f),
+        )
+        drawContext.canvas.nativeCanvas.drawText(
+            "Pédilo!",
+            boxTop.x + size.width * 0.16f,
+            boxTop.y + size.height * 0.17f,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.WHITE
+                textAlign = Paint.Align.CENTER
+                textSize = size.height * 0.085f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            },
+        )
+
+        drawLine(ink, Offset(size.width * 0.48f, size.height * 0.47f), Offset(size.width * 0.58f, size.height * 0.62f), strokeWidth = size.height * 0.045f, cap = StrokeCap.Round)
+        drawLine(ink, Offset(size.width * 0.58f, size.height * 0.62f), Offset(size.width * 0.70f, size.height * 0.63f), strokeWidth = size.height * 0.04f, cap = StrokeCap.Round)
+        drawCircle(light, size.height * 0.105f, Offset(size.width * 0.55f, size.height * 0.30f))
+        drawArc(deep, 188f, 185f, false, Offset(size.width * 0.45f, size.height * 0.20f), Size(size.width * 0.20f, size.height * 0.18f), style = Stroke(width = size.height * 0.055f, cap = StrokeCap.Round))
+        drawLine(light, Offset(size.width * 0.58f, size.height * 0.42f), Offset(size.width * 0.78f, size.height * 0.46f), strokeWidth = size.height * 0.035f, cap = StrokeCap.Round)
     }
 }
 
