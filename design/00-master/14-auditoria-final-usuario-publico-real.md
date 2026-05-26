@@ -4,11 +4,11 @@ Fecha: 2026-05-25
 
 ## Dictamen
 
-B) Parcial, requiere una verificación manual puntual antes de pasar a roles.
+A) Usuario público real aprobado para pasar a etapa de roles.
 
-El usuario público real quedó operativo para catálogo, Local, Botón + Comprar y seguimiento público real. Durante la auditoría se detectó y corrigió un bug de navegación en subcategorías: la card visible de Pizzería Roma solo abría desde una zona pequeña inferior. Ahora toda la card abre el Local.
+El usuario público real quedó operativo para catálogo, Local, Botón + Comprar, Botón + Retiro / Envío y seguimiento público real. Durante la auditoría se detectó y corrigió un bug de navegación en subcategorías: la card visible de Pizzería Roma solo abría desde una zona pequeña inferior. Ahora toda la card abre el Local.
 
-Queda pendiente repetir manualmente el flujo Botón + Retiro / Envío completo con ingreso humano de datos, porque la automatización por ADB no permitió cargar con precisión todos los campos en esta corrida. No se detectó bug estructural del flujo en código/tests.
+El pendiente de Botón + Retiro / Envío fue repetido y certificado hasta ticket real y seguimiento real.
 
 ## Pruebas realizadas
 
@@ -27,6 +27,12 @@ Queda pendiente repetir manualmente el flujo Botón + Retiro / Envío completo c
 - Doble tap en Confirmar Compra creó un solo documento.
 - Ticket Compra mostró número real.
 - Seguimiento consultado no modificó el pedido.
+- Botón + Retiro / Envío permitió confirmar un pedido real.
+- Botón + Retiro / Envío no escribió antes de Confirmar.
+- Entrar a Confirmación de Retiro / Envío no escribió pedido.
+- Doble tap en Confirmar Retiro / Envío creó un solo documento.
+- Ticket Retiro / Envío mostró número real.
+- Seguimiento desde ticket Retiro / Envío abrió el seguimiento común y mostró estado real.
 - Subcategoría Pizzas fue reprobada tras corrección: tocar título/área superior de la card abre Local.
 - Rotación permanece bloqueada en portrait por manifest.
 
@@ -34,6 +40,7 @@ Queda pendiente repetir manualmente el flujo Botón + Retiro / Envío completo c
 
 - `ZzD21mqE...` / `PDL-ZZD21M`: `source=public_local`, `status=created`, `publicStatus=Pedido recibido`.
 - `I7X2v1gV...` / `PDL-I7X2V1`: `source=public_plus_buy`, `status=created`, `publicStatus=Pedido recibido`.
+- `wCNQF4TW...` / `PDL-WCNQF4`: `source=public_plus_pickup_shipping`, `requestType=pickup_shipping`, `status=created`, `publicStatus=Pedido recibido`.
 
 No se reportan datos personales completos en este documento.
 
@@ -45,6 +52,9 @@ No se reportan datos personales completos en este documento.
 - Antes de confirmar Compra, el último pedido seguía siendo `PDL-ZZD21M`.
 - Después de confirmar Compra, `PDL-I7X2V1` tuvo `tracking_count=1`.
 - Luego de consultar seguimiento, ambos pedidos auditados seguían en `status=created`.
+- Antes de continuar y antes de confirmar Retiro / Envío, el último pedido seguía siendo `PDL-I7X2V1`.
+- Después de confirmar Retiro / Envío, `PDL-WCNQF4` tuvo `tracking_count=1`.
+- Luego de consultar seguimiento de Retiro / Envío, el pedido seguía en `status=created`.
 
 ## Seguridad revisada
 
@@ -60,7 +70,7 @@ No se reportan datos personales completos en este documento.
 
 ## Logcat
 
-Se guardó logcat de auditoría en `reports/final-public-real-audit/logcat-final-public-real-audit.txt` y no se commitea.
+Se guardaron logcats de auditoría en `reports/final-public-real-audit/` y no se commitean.
 
 Búsquedas sin hallazgos atribuibles a Pédilo:
 
@@ -93,5 +103,5 @@ Búsquedas sin hallazgos atribuibles a Pédilo:
 
 ## Pendientes
 
-- Repetir con ingreso manual humano el flujo Botón + Retiro / Envío hasta ticket real para cerrar la certificación al 100%.
-- No avanzar a roles hasta completar esa repetición puntual.
+- Sin pendientes bloqueantes para usuario público.
+- Próxima etapa habilitada: roles, sin cambiar este dictamen.
