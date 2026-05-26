@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -69,6 +70,7 @@ fun PublicTextInput(
     singleLine: Boolean = true,
     keyboardType: KeyboardType = KeyboardType.Text,
     errorText: String? = null,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
     Column(
         modifier = modifier
@@ -86,6 +88,7 @@ fun PublicTextInput(
             textStyle = TextStyle(color = PediloText, fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold),
             singleLine = singleLine,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            visualTransformation = visualTransformation,
             cursorBrush = SolidColor(PediloText),
             modifier = Modifier
                 .fillMaxWidth()

@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -42,12 +43,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pedilo.app.R
+import com.pedilo.app.core.model.TeamLoginRequest
+import com.pedilo.app.core.model.TeamLoginResult
+import com.pedilo.app.core.model.TeamRole
 import com.pedilo.app.core.model.PublicOrderTicket
 import com.pedilo.app.core.result.CoreError
 import com.pedilo.app.core.result.CoreResult
 import com.pedilo.app.core.runtime.publicLocalOrderUseCase
 import com.pedilo.app.core.runtime.publicPlusOrderUseCase
 import com.pedilo.app.core.runtime.publicTrackingUseCase
+import com.pedilo.app.core.runtime.teamAccessPort
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -55,6 +60,8 @@ import kotlinx.coroutines.withContext
 
 private sealed interface PublicRoute {
     data object Home : PublicRoute
+    data object TeamLogin : PublicRoute
+    data class TeamRolePlaceholder(val role: TeamRole) : PublicRoute
     data object Plus : PublicRoute
     data object PlusBuy : PublicRoute
     data object PlusPickupShipping : PublicRoute
@@ -80,12 +87,16 @@ private sealed interface PublicRoute {
 @Composable
 fun PublicApp() {
     PublicTheme {
+        val context = LocalContext.current
         var showSplash by remember { mutableStateOf(true) }
         var catalogState by remember { mutableStateOf(PublicCatalogState()) }
         val scope = rememberCoroutineScope()
         val createLocalOrder = remember { publicLocalOrderUseCase() }
         val createPlusOrder = remember { publicPlusOrderUseCase() }
         val getPublicTracking = remember { publicTrackingUseCase() }
+        val teamAccess = remember { teamAccessPort() }
+        val teamSessionStore = remember { TeamSessionStore(context) }
+        var activeTeamSession by remember { mutableStateOf(teamSessionStore.readPersistedSession()) }
 
         LaunchedEffect(Unit) {
             catalogState = withContext(Dispatchers.IO) { loadPublicCatalogState() }
@@ -96,7 +107,11 @@ fun PublicApp() {
             return@PublicTheme
         }
 
-        var route by remember { mutableStateOf<PublicRoute>(PublicRoute.Home) }
+        var route by remember {
+            mutableStateOf<PublicRoute>(
+                activeTeamSession?.let { PublicRoute.TeamRolePlaceholder(it.role) } ?: PublicRoute.Home,
+            )
+        }
         val history = remember { mutableStateListOf<PublicRoute>() }
         val localCart = remember { mutableStateListOf<LocalCartItem>() }
         var localCategory by remember { mutableStateOf(LocalCategory.Featured) }
@@ -106,6 +121,8 @@ fun PublicApp() {
         var localOrderError by remember { mutableStateOf<String?>(null) }
         var isSubmittingPlusOrder by remember { mutableStateOf(false) }
         var plusOrderError by remember { mutableStateOf<String?>(null) }
+        var isTeamLoginLoading by remember { mutableStateOf(false) }
+        var teamLoginError by remember { mutableStateOf<String?>(null) }
 
         fun isLocalRoute(target: PublicRoute): Boolean = when (target) {
             PublicRoute.Local,
@@ -163,6 +180,8 @@ fun PublicApp() {
 
         fun logicalParent(current: PublicRoute): PublicRoute? = when (current) {
             PublicRoute.Home -> null
+            PublicRoute.TeamLogin -> PublicRoute.Home
+            is PublicRoute.TeamRolePlaceholder -> null
             PublicRoute.Shop -> PublicRoute.Home
             PublicRoute.Conventions -> PublicRoute.Home
             PublicRoute.ConventionsInfo,
@@ -219,6 +238,10 @@ fun PublicApp() {
                 onHome = { goHome() },
                 onPlus = { goPlus() },
                 onShop = { goShop() },
+                onTeam = {
+                    teamLoginError = null
+                    navigateTo(PublicRoute.TeamLogin)
+                },
                 onSearch = { navigateTo(PublicRoute.ShopSearch("", PublicBottomDestination.Home)) },
                 onConventions = { navigateTo(PublicRoute.Conventions) },
                 onCategory = { navigateTo(PublicRoute.HomeListing(it, it)) },
@@ -232,6 +255,51 @@ fun PublicApp() {
                     navigateTo(PublicRoute.Local)
                 },
                 onAllLocals = { navigateTo(PublicRoute.HomeListing("Nuevos locales", "Nuevos locales")) },
+            )
+            PublicRoute.TeamLogin -> TeamLoginScreen(
+                isLoading = isTeamLoginLoading,
+                errorMessage = teamLoginError,
+                onLogin = { user, secret, keepSignedIn ->
+                    if (!isTeamLoginLoading) {
+                        isTeamLoginLoading = true
+                        teamLoginError = null
+                        scope.launch {
+                            val result = withContext(Dispatchers.IO) {
+                                teamAccess.login(
+                                    TeamLoginRequest(
+                                        user = user,
+                                        secret = secret,
+                                        keepSignedIn = keepSignedIn,
+                                    ),
+                                )
+                            }
+                            isTeamLoginLoading = false
+                            when (result) {
+                                is TeamLoginResult.Success -> {
+                                    activeTeamSession = result.session
+                                    teamSessionStore.save(result.session)
+                                    history.clear()
+                                    route = PublicRoute.TeamRolePlaceholder(result.session.role)
+                                }
+                                TeamLoginResult.NoAccess -> {
+                                    teamLoginError = "No encontramos un acceso activo para este usuario."
+                                }
+                                TeamLoginResult.MissingSecureProvider -> {
+                                    teamLoginError = "El acceso de Equipo todavía no está habilitado para usuarios reales."
+                                }
+                            }
+                        }
+                    }
+                },
+            )
+            is PublicRoute.TeamRolePlaceholder -> TeamRolePlaceholderScreen(
+                role = (route as PublicRoute.TeamRolePlaceholder).role,
+                onSignOutConfirmed = {
+                    activeTeamSession = null
+                    teamSessionStore.clear()
+                    history.clear()
+                    route = PublicRoute.Home
+                },
             )
             PublicRoute.Plus -> PublicPlusChoiceScreen(
                 onHome = { goHome() },

@@ -99,6 +99,7 @@ fun PublicHomeScreen(
     onHome: () -> Unit,
     onPlus: () -> Unit,
     onShop: () -> Unit,
+    onTeam: () -> Unit,
     onSearch: () -> Unit,
     onConventions: () -> Unit,
     onCategory: (String) -> Unit,
@@ -121,7 +122,7 @@ fun PublicHomeScreen(
             contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 132.dp),
             verticalArrangement = Arrangement.spacedBy(11.dp),
         ) {
-            item { PublicHeader() }
+            item { PublicHeader(onTeam = onTeam) }
             item { SearchBlock(onSearch = onSearch) }
             item { QuickAccessSection(onCategory = onCategory) }
             item { OffersSection(catalogState = catalogState, onOffer = onOffer, onAllOffers = onAllOffers) }
@@ -156,7 +157,7 @@ fun PublicShell(
 }
 
 @Composable
-private fun PublicHeader() {
+private fun PublicHeader(onTeam: () -> Unit) {
     Box(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
@@ -193,7 +194,7 @@ private fun PublicHeader() {
                 .shadow(5.dp, RoundedCornerShape(13.dp), ambientColor = Color.Black.copy(alpha = 0.24f), spotColor = PediloOrange.copy(alpha = 0.10f))
                 .background(Brush.verticalGradient(listOf(PediloPanelSoft.copy(alpha = 0.86f), PediloPanel.copy(alpha = 0.94f))), RoundedCornerShape(13.dp))
                 .border(1.dp, PediloOrange.copy(alpha = 0.44f), RoundedCornerShape(13.dp))
-                .clickable(role = Role.Button, onClick = {})
+                .clickable(role = Role.Button, onClick = onTeam)
                 .semantics { contentDescription = "Equipo" }
                 .padding(horizontal = 7.dp, vertical = 4.dp),
             contentAlignment = Alignment.Center,
