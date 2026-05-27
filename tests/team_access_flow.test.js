@@ -8,6 +8,7 @@ const screen = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicTeamAccess.
 const store = "app/src/main/java/com/pedilo/app/ui/publicuser/TeamSessionStore.kt";
 const runtime = "app/src/main/java/com/pedilo/app/core/runtime/TeamAccessRuntime.kt";
 const model = "app/src/main/java/com/pedilo/app/core/model/TeamAccess.kt";
+const adapter = "app/src/main/java/com/pedilo/app/core/firebase/FirebaseTeamAccessAdapter.kt";
 
 test("team button opens login without changing public home navigation", () => {
   const appSource = fs.readFileSync(app, "utf8");
@@ -24,8 +25,10 @@ test("team access has role placeholders only and sign out confirmation", () => {
   const modelSource = fs.readFileSync(model, "utf8");
 
   assert.match(modelSource, /Admin\("admin", "Pantalla Admin"\)/);
-  assert.match(modelSource, /Local\("local", "Pantalla Local"\)/);
-  assert.match(modelSource, /Driver\("repartidor", "Pantalla Repartidor"\)/);
+  assert.match(modelSource, /Local\("store", "Pantalla Local"\)/);
+  assert.match(modelSource, /Driver\("driver", "Pantalla Repartidor"\)/);
+  assert.match(modelSource, /"store", "local" -> Local/);
+  assert.match(modelSource, /"driver", "repartidor" -> Driver/);
   assert.match(source, /role\.screenTitle/);
   assert.match(source, /"Cerrar sesión"/);
   assert.match(source, /"¿Querés cerrar sesión\?"/);
@@ -49,18 +52,27 @@ test("persisted session redirects to the saved role and back does not clear it",
 test("login failure stays closed and exposes pediloapp shop link", () => {
   const appSource = fs.readFileSync(app, "utf8");
   const screenSource = fs.readFileSync(screen, "utf8");
-  const runtimeSource = fs.readFileSync(runtime, "utf8");
 
-  assert.match(runtimeSource, /MissingSecureProvider/);
   assert.match(appSource, /No encontramos un acceso activo/);
-  assert.match(appSource, /todavía no está habilitado/);
   assert.match(screenSource, /"¿Querés formar parte de Pédilo\?"/);
   assert.match(screenSource, /"Ir a pediloapp\.shop"/);
   assert.match(screenSource, /https:\/\/pediloapp\.shop/);
 });
 
+test("team login uses Firebase Auth and users uid profile for role resolution", () => {
+  const runtimeSource = fs.readFileSync(runtime, "utf8");
+  const adapterSource = fs.readFileSync(adapter, "utf8");
+
+  assert.match(runtimeSource, /FirebaseTeamAccessAdapter/);
+  assert.match(adapterSource, /signInWithEmailAndPassword\(request\.user, request\.secret\)/);
+  assert.match(adapterSource, /collection\(USERS\)\.document\(user\.uid\)\.get\(\)\.await\(\)/);
+  assert.match(adapterSource, /profile\.getBoolean\(ACTIVE\) != true/);
+  assert.match(adapterSource, /TeamRole\.fromWire\(profile\.getString\(ROLE\)\.orEmpty\(\)\)/);
+  assert.match(adapterSource, /auth\.signOut\(\)/);
+});
+
 test("team access does not hardcode credentials or touch operational domains", () => {
-  const joined = [home, screen, store, runtime, model]
+  const joined = [home, screen, store, runtime, model, adapter]
     .map((file) => fs.readFileSync(file, "utf8"))
     .join("\n");
   const appSource = fs.readFileSync(app, "utf8");
@@ -72,9 +84,21 @@ test("team access does not hardcode credentials or touch operational domains", (
       ["local", "123"].join(""),
     ].join("|"),
   );
+  const realFirebaseIdentifiers = new RegExp(
+    [
+      ["local", "test.com"].join("@"),
+      ["repart", "test.com"].join("@"),
+      ["javib18", "gmail.com"].join("@"),
+      ["9JHn2fgicxO11X41aHe1xA9ub5", "J3"].join(""),
+      ["b5cEvThJKMS5EQFj8266DDOMQ1", "w2"].join(""),
+      ["a2vodl6GULNrVEwy19A5f8ltWO", "13"].join(""),
+    ].join("|"),
+  );
 
   assert.doesNotMatch(joined, forbiddenSamples);
   assert.doesNotMatch(joined, /collection\("orders"\)|collection\('orders'\)|payments|order_tracking|createLocalOrder|createPlusOrder|getPublicOrderTracking/);
+  assert.doesNotMatch(joined, realFirebaseIdentifiers);
   assert.match(appSource, /teamAccess\.login/);
   assert.doesNotMatch(appSource, forbiddenSamples);
+  assert.doesNotMatch(appSource, realFirebaseIdentifiers);
 });

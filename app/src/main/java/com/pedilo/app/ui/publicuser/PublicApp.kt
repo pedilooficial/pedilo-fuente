@@ -284,9 +284,6 @@ fun PublicApp() {
                                 TeamLoginResult.NoAccess -> {
                                     teamLoginError = "No encontramos un acceso activo para este usuario."
                                 }
-                                TeamLoginResult.MissingSecureProvider -> {
-                                    teamLoginError = "El acceso de Equipo todavía no está habilitado para usuarios reales."
-                                }
                             }
                         }
                     }
@@ -295,6 +292,7 @@ fun PublicApp() {
             is PublicRoute.TeamRolePlaceholder -> TeamRolePlaceholderScreen(
                 role = (route as PublicRoute.TeamRolePlaceholder).role,
                 onSignOutConfirmed = {
+                    teamAccess.signOut()
                     activeTeamSession = null
                     teamSessionStore.clear()
                     history.clear()
