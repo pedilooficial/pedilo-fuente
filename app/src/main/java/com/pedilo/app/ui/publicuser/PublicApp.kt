@@ -289,16 +289,24 @@ fun PublicApp() {
                     }
                 },
             )
-            is PublicRoute.TeamRolePlaceholder -> TeamRolePlaceholderScreen(
-                role = (route as PublicRoute.TeamRolePlaceholder).role,
-                onSignOutConfirmed = {
+            is PublicRoute.TeamRolePlaceholder -> {
+                val role = (route as PublicRoute.TeamRolePlaceholder).role
+                val onSignOutConfirmed = {
                     teamAccess.signOut()
                     activeTeamSession = null
                     teamSessionStore.clear()
                     history.clear()
                     route = PublicRoute.Home
-                },
-            )
+                }
+                if (role == TeamRole.Admin) {
+                    AdminApp(onSignOutConfirmed = onSignOutConfirmed)
+                } else {
+                    TeamRolePlaceholderScreen(
+                        role = role,
+                        onSignOutConfirmed = onSignOutConfirmed,
+                    )
+                }
+            }
             PublicRoute.Plus -> PublicPlusChoiceScreen(
                 onHome = { goHome() },
                 onPlus = { goPlus() },
