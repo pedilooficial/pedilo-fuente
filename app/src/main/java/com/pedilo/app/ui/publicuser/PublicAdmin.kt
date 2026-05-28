@@ -48,6 +48,8 @@ private sealed interface AdminRoute {
     data object Operation : AdminRoute
     data object Configuration : AdminRoute
     data object RoleAccess : AdminRoute
+    data class OperationSection(val section: AdminOperationSection) : AdminRoute
+    data class OperationSubsection(val section: AdminOperationSection, val title: String) : AdminRoute
     data class Section(val root: AdminRoot, val title: String) : AdminRoute
 }
 
@@ -56,12 +58,83 @@ private data class AdminEntry(
     val note: String,
 )
 
+private data class AdminOperationSection(
+    val title: String,
+    val summary: String,
+    val contextTitle: String,
+    val contextText: String,
+    val entries: List<AdminEntry>,
+)
+
 private val operationEntries = listOf(
-    AdminEntry("Pedidos del día", "Seguimiento operativo"),
-    AdminEntry("Pedidos activos", "Resumen operativo"),
-    AdminEntry("Pedidos con problemas", "Revisión pendiente"),
-    AdminEntry("Repartidores activos", "Organización del bloque"),
-    AdminEntry("Locales activos", "Sección disponible"),
+    AdminEntry("Pedidos del día", "Movimiento completo de hoy"),
+    AdminEntry("Pedidos activos", "Pedidos que siguen en curso"),
+    AdminEntry("Pedidos con problemas", "Casos que necesitan revisión"),
+    AdminEntry("Repartidores activos", "Estado operativo de repartidores"),
+    AdminEntry("Locales activos", "Estado operativo de locales"),
+)
+
+private val operationSections = listOf(
+    AdminOperationSection(
+        title = "Pedidos del día",
+        summary = "Movimiento completo de pedidos del día.",
+        contextTitle = "Vista del día",
+        contextText = "Agrupa los estados principales sin abrir pedidos ni resolver casos.",
+        entries = listOf(
+            AdminEntry("Activos", "Pedidos en movimiento"),
+            AdminEntry("Finalizados", "Cierres del día"),
+            AdminEntry("Cancelados", "Pedidos detenidos"),
+            AdminEntry("Demorados", "Revisión de tiempos"),
+            AdminEntry("Con problemas", "Casos para clasificar"),
+        ),
+    ),
+    AdminOperationSection(
+        title = "Pedidos activos",
+        summary = "Pedidos vivos dentro de la operación actual.",
+        contextTitle = "Operación en curso",
+        contextText = "Ordena los momentos del pedido sin abrir acciones finales.",
+        entries = listOf(
+            AdminEntry("Esperando local", "Pendientes de aceptación"),
+            AdminEntry("Preparando", "En preparación"),
+            AdminEntry("Esperando repartidor", "Aguardan asignación"),
+            AdminEntry("En entrega", "Camino al cliente"),
+        ),
+    ),
+    AdminOperationSection(
+        title = "Pedidos con problemas",
+        summary = "Clasificación inicial de casos que requieren atención.",
+        contextTitle = "Casos a revisar",
+        contextText = "Separa motivos sin resolver, contactar ni cerrar incidencias.",
+        entries = listOf(
+            AdminEntry("Local no responde", "Requiere seguimiento"),
+            AdminEntry("Reclamo del cliente", "Requiere revisión"),
+        ),
+    ),
+    AdminOperationSection(
+        title = "Repartidores activos",
+        summary = "Estado operativo de repartidores.",
+        contextTitle = "Equipo en movimiento",
+        contextText = "Agrupa disponibilidad sin editar perfiles, permisos ni asignaciones.",
+        entries = listOf(
+            AdminEntry("Libres", "Disponibles para operar"),
+            AdminEntry("Ocupados", "Con actividad en curso"),
+            AdminEntry("Pendientes de respuesta", "Aguardan confirmación"),
+            AdminEntry("Con incidencia", "Requieren revisión"),
+        ),
+    ),
+    AdminOperationSection(
+        title = "Locales activos",
+        summary = "Estado operativo de locales.",
+        contextTitle = "Locales en operación",
+        contextText = "Ordena señales operativas sin editar locales, productos ni visibilidad.",
+        entries = listOf(
+            AdminEntry("Vendiendo ahora", "Activos en la app"),
+            AdminEntry("Sin respuesta", "Requieren seguimiento"),
+            AdminEntry("Pausados", "Sin venta activa"),
+            AdminEntry("Con configuración pendiente", "Necesitan revisión"),
+            AdminEntry("Sin productos vendibles", "Catálogo incompleto"),
+        ),
+    ),
 )
 
 private val configurationEntries = listOf(
@@ -92,11 +165,18 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
     var route by remember { mutableStateOf<AdminRoute>(AdminRoute.Operation) }
     var showSignOut by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = route is AdminRoute.Section) {
-        route = when ((route as AdminRoute.Section).root) {
-            AdminRoot.Operation -> AdminRoute.Operation
-            AdminRoot.Configuration -> AdminRoute.Configuration
-            AdminRoot.RoleAccess -> AdminRoute.RoleAccess
+    BackHandler(enabled = route !is AdminRoute.Operation && route !is AdminRoute.Configuration && route !is AdminRoute.RoleAccess) {
+        route = when (val current = route) {
+            is AdminRoute.OperationSubsection -> AdminRoute.OperationSection(current.section)
+            is AdminRoute.OperationSection -> AdminRoute.Operation
+            is AdminRoute.Section -> when (current.root) {
+                AdminRoot.Operation -> AdminRoute.Operation
+                AdminRoot.Configuration -> AdminRoute.Configuration
+                AdminRoot.RoleAccess -> AdminRoute.RoleAccess
+            }
+            AdminRoute.Operation -> AdminRoute.Operation
+            AdminRoute.Configuration -> AdminRoute.Configuration
+            AdminRoute.RoleAccess -> AdminRoute.RoleAccess
         }
     }
 
@@ -111,8 +191,13 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 eyebrow = "Operación",
                 summary = "Vista inicial para seguir la operación.",
                 entries = operationEntries,
-                onEntry = { route = AdminRoute.Section(AdminRoot.Operation, it.title) },
+                onEntry = { entry ->
+                    operationSections.firstOrNull { it.title == entry.title }?.let {
+                        route = AdminRoute.OperationSection(it)
+                    }
+                },
                 onSignOut = { showSignOut = true },
+                showSignOut = true,
             )
             AdminRoute.Configuration -> AdminRootScreen(
                 title = "Configuración",
@@ -121,6 +206,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 entries = configurationEntries,
                 onEntry = { route = AdminRoute.Section(AdminRoot.Configuration, it.title) },
                 onSignOut = { showSignOut = true },
+                showSignOut = false,
             )
             AdminRoute.RoleAccess -> AdminRootScreen(
                 title = "Alta de roles",
@@ -129,18 +215,25 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 entries = roleEntries,
                 onEntry = { route = AdminRoute.Section(AdminRoot.RoleAccess, it.title) },
                 onSignOut = { showSignOut = true },
+                showSignOut = false,
+            )
+            is AdminRoute.OperationSection -> AdminOperationSectionScreen(
+                section = current.section,
+                onEntry = { route = AdminRoute.OperationSubsection(current.section, it.title) },
+            )
+            is AdminRoute.OperationSubsection -> AdminSectionScreen(
+                root = AdminRoot.Operation,
+                title = current.title,
+                summary = "Submundo operativo preparado para organizar la siguiente capa.",
+                panelTitle = current.section.title,
+                panelText = "Este espacio mantiene la separación operativa sin abrir pedidos, resolver casos ni ejecutar acciones.",
             )
             is AdminRoute.Section -> AdminSectionScreen(
                 root = current.root,
                 title = current.title,
-                onBack = {
-                    route = when (current.root) {
-                        AdminRoot.Operation -> AdminRoute.Operation
-                        AdminRoot.Configuration -> AdminRoute.Configuration
-                        AdminRoot.RoleAccess -> AdminRoute.RoleAccess
-                    }
-                },
-                onSignOut = { showSignOut = true },
+                summary = "Sección lista para organizar el próximo paso.",
+                panelTitle = "Sección preparada",
+                panelText = "Este espacio ordena el bloque sin leer información, guardar cambios ni operar pedidos.",
             )
         }
 
@@ -179,6 +272,7 @@ private fun AdminRootScreen(
     entries: List<AdminEntry>,
     onEntry: (AdminEntry) -> Unit,
     onSignOut: () -> Unit,
+    showSignOut: Boolean,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -189,9 +283,46 @@ private fun AdminRootScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            AdminHeader(title = title, eyebrow = eyebrow, summary = summary, onSignOut = onSignOut)
+            AdminHeader(
+                title = title,
+                eyebrow = eyebrow,
+                summary = summary,
+                onSignOut = onSignOut,
+                showSignOut = showSignOut,
+            )
         }
         items(entries) {
+            AdminEntryCard(entry = it, onClick = { onEntry(it) })
+        }
+    }
+}
+
+@Composable
+private fun AdminOperationSectionScreen(
+    section: AdminOperationSection,
+    onEntry: (AdminEntry) -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(top = 18.dp, bottom = 118.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            AdminHeader(
+                title = section.title,
+                eyebrow = "Operación",
+                summary = section.summary,
+                onSignOut = {},
+                showSignOut = false,
+            )
+        }
+        item {
+            AdminInfoPanel(title = section.contextTitle, text = section.contextText)
+        }
+        items(section.entries) {
             AdminEntryCard(entry = it, onClick = { onEntry(it) })
         }
     }
@@ -201,8 +332,9 @@ private fun AdminRootScreen(
 private fun AdminSectionScreen(
     root: AdminRoot,
     title: String,
-    onBack: () -> Unit,
-    onSignOut: () -> Unit,
+    summary: String,
+    panelTitle: String,
+    panelText: String,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -216,18 +348,16 @@ private fun AdminSectionScreen(
             AdminHeader(
                 title = title,
                 eyebrow = root.label,
-                summary = "Sección lista para organizar el próximo paso.",
-                onSignOut = onSignOut,
+                summary = summary,
+                onSignOut = {},
+                showSignOut = false,
             )
         }
         item {
             AdminInfoPanel(
-                title = "Sección preparada",
-                text = "Este espacio ordena el bloque sin leer información, guardar cambios ni operar pedidos.",
+                title = panelTitle,
+                text = panelText,
             )
-        }
-        item {
-            AdminActionButton(text = "Volver", onClick = onBack)
         }
     }
 }
@@ -238,6 +368,7 @@ private fun AdminHeader(
     eyebrow: String,
     summary: String,
     onSignOut: () -> Unit,
+    showSignOut: Boolean,
 ) {
     Column(
         modifier = Modifier
@@ -257,18 +388,20 @@ private fun AdminHeader(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
             )
-            Text(
-                "Cerrar sesión",
-                color = PediloText,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(PediloPanel.copy(alpha = 0.82f), RoundedCornerShape(14.dp))
-                    .border(1.dp, PediloOrange.copy(alpha = 0.42f), RoundedCornerShape(14.dp))
-                    .clickable(role = Role.Button, onClick = onSignOut)
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-            )
+            if (showSignOut) {
+                Text(
+                    "Cerrar sesión",
+                    color = PediloText,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(PediloPanel.copy(alpha = 0.82f), RoundedCornerShape(14.dp))
+                        .border(1.dp, PediloOrange.copy(alpha = 0.42f), RoundedCornerShape(14.dp))
+                        .clickable(role = Role.Button, onClick = onSignOut)
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                )
+            }
         }
         Text(
             title,
@@ -311,22 +444,6 @@ private fun AdminInfoPanel(title: String, text: String) {
     ) {
         Text(title, color = PediloText, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
         Text(text, color = PediloMuted, fontSize = 14.sp, lineHeight = 20.sp)
-    }
-}
-
-@Composable
-private fun AdminActionButton(text: String, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(52.dp)
-            .pediloButtonDepth(RoundedCornerShape(15.dp))
-            .background(PediloPrimaryBrush, RoundedCornerShape(15.dp))
-            .border(1.dp, PediloWarning.copy(alpha = 0.4f), RoundedCornerShape(15.dp))
-            .clickable(role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
     }
 }
 
@@ -389,5 +506,7 @@ private fun AdminRoute.root(): AdminRoot = when (this) {
     AdminRoute.Operation -> AdminRoot.Operation
     AdminRoute.Configuration -> AdminRoot.Configuration
     AdminRoute.RoleAccess -> AdminRoot.RoleAccess
+    is AdminRoute.OperationSection -> AdminRoot.Operation
+    is AdminRoute.OperationSubsection -> AdminRoot.Operation
     is AdminRoute.Section -> root
 }

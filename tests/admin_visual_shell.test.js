@@ -35,7 +35,47 @@ test("admin operation root exposes visual operation cards only", () => {
     "Repartidores activos",
     "Locales activos",
   ].forEach((label) => assert.match(source, new RegExp(label)));
-  assert.match(source, /Seguimiento operativo|Resumen operativo|Revisión pendiente/);
+  assert.match(source, /Movimiento completo de hoy/);
+  assert.match(source, /Pedidos que siguen en curso/);
+  assert.match(source, /Casos que necesitan revisión/);
+});
+
+test("admin operation internal screens expose planned operation subworlds", () => {
+  const source = fs.readFileSync(admin, "utf8");
+
+  [
+    "Activos",
+    "Finalizados",
+    "Cancelados",
+    "Demorados",
+    "Con problemas",
+    "Esperando local",
+    "Preparando",
+    "Esperando repartidor",
+    "En entrega",
+    "Local no responde",
+    "Reclamo del cliente",
+    "Libres",
+    "Ocupados",
+    "Pendientes de respuesta",
+    "Con incidencia",
+    "Vendiendo ahora",
+    "Sin respuesta",
+    "Pausados",
+    "Con configuración pendiente",
+    "Sin productos vendibles",
+  ].forEach((label) => assert.match(source, new RegExp(label)));
+});
+
+test("admin relies on native back and only shows sign out on operation root", () => {
+  const source = fs.readFileSync(admin, "utf8");
+  const forbiddenReturnLabels = [`Volv${"er"}`, `Atr${"ás"}`];
+
+  assert.match(source, /BackHandler\(enabled = route !is AdminRoute\.Operation/);
+  forbiddenReturnLabels.forEach((label) => assert.doesNotMatch(source, new RegExp(`"${label}"`)));
+  assert.match(source, /showSignOut = true/);
+  assert.match(source, /showSignOut = false/);
+  assert.match(source, /if \(showSignOut\)/);
 });
 
 test("admin configuration and role access roots expose their planned entries", () => {
@@ -64,9 +104,14 @@ test("admin configuration and role access roots expose their planned entries", (
 
 test("admin visual shell does not touch real data or operational systems", () => {
   const source = fs.readFileSync(admin, "utf8");
+  const oldCopy = [
+    `Sin datos conect${"ados"}`,
+    `Estructura visual fut${"ura"}`,
+    `Acceso visual fut${"uro"}`,
+  ];
 
   assert.doesNotMatch(source, /Firebase|Firestore|collection\(|orders|createLocalOrder|createPlusOrder|getPublicOrderTracking|payments|WhatsApp|whatsapp|driverId/);
-  assert.doesNotMatch(source, /Sin datos conectados|Estructura visual futura|Acceso visual futuro/);
+  oldCopy.forEach((text) => assert.doesNotMatch(source, new RegExp(text)));
   assert.match(source, /"¿Querés cerrar sesión\?"/);
   assert.match(source, /Text\("No"\)/);
   assert.match(source, /Text\("Sí"\)/);
