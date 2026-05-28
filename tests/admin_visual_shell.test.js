@@ -67,6 +67,28 @@ test("admin operation internal screens expose planned operation subworlds", () =
   ].forEach((label) => assert.match(source, new RegExp(label)));
 });
 
+test("admin remaining operation roots use safe visual copy", () => {
+  const source = fs.readFileSync(admin, "utf8");
+
+  [
+    "Pedidos esperando respuesta del local",
+    "Pedidos en preparación",
+    "Pedidos listos para asignación",
+    "Pedidos en camino",
+    "Pedidos detenidos por falta de respuesta",
+    "Casos iniciados por aviso del cliente",
+    "Repartidores disponibles",
+    "Repartidores con pedido asignado",
+    "Casos esperando confirmación",
+    "Situaciones que requieren revisión",
+    "Locales disponibles para recibir pedidos",
+    "Locales que no respondieron a tiempo",
+    "Locales temporalmente detenidos",
+    "Locales con datos por revisar",
+    "Locales sin oferta disponible",
+  ].forEach((label) => assert.match(source, new RegExp(label)));
+});
+
 test("admin today orders flow exposes category screens and subworlds", () => {
   const source = fs.readFileSync(admin, "utf8");
 
@@ -141,6 +163,7 @@ test("admin visual shell does not touch real data or operational systems", () =>
   ];
 
   assert.doesNotMatch(source, /Firebase|Firestore|collection\(|orders|createLocalOrder|createPlusOrder|getPublicOrderTracking|payments|WhatsApp|whatsapp|driverId/);
+  assert.doesNotMatch(source, /Pedido #|Solucionar|reasignar|desactivar usuario|editar perfil|editar local|cargar catálogo/);
   oldCopy.forEach((text) => assert.doesNotMatch(source, new RegExp(text)));
   assert.match(source, /"¿Querés cerrar sesión\?"/);
   assert.match(source, /Text\("No"\)/);

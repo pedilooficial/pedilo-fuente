@@ -112,7 +112,7 @@ private val todayOrdersCategories = listOf(
     AdminTodayOrdersCategory(
         title = "Cancelados",
         summary = "Pedidos del día cerrados sin completar",
-        contextText = "Separa motivos de cancelación sin cancelar, contactar ni modificar estados.",
+        contextText = "Separa motivos de cancelación sin abrir gestiones ni modificar estados.",
         entries = listOf(
             AdminEntry("Cancelados por cliente", "Cierre solicitado por cliente"),
             AdminEntry("Cancelados por local", "Cierre iniciado por local"),
@@ -132,7 +132,7 @@ private val todayOrdersCategories = listOf(
     AdminTodayOrdersCategory(
         title = "Con problemas",
         summary = "Pedidos del día marcados con incidencia",
-        contextText = "Clasifica incidencias del día sin abrir Solucionar ni acciones finales.",
+        contextText = "Clasifica incidencias del día sin abrir gestiones ni acciones finales.",
         entries = listOf(
             AdminEntry("Local no responde", "Requiere seguimiento"),
             AdminEntry("Reclamo del cliente", "Requiere revisión"),
@@ -160,45 +160,45 @@ private val operationSections = listOf(
         contextTitle = "Operación en curso",
         contextText = "Ordena los momentos del pedido sin abrir acciones finales.",
         entries = listOf(
-            AdminEntry("Esperando local", "Pendientes de aceptación"),
-            AdminEntry("Preparando", "En preparación"),
-            AdminEntry("Esperando repartidor", "Aguardan asignación"),
-            AdminEntry("En entrega", "Camino al cliente"),
+            AdminEntry("Esperando local", "Pedidos esperando respuesta del local"),
+            AdminEntry("Preparando", "Pedidos en preparación"),
+            AdminEntry("Esperando repartidor", "Pedidos listos para asignación"),
+            AdminEntry("En entrega", "Pedidos en camino"),
         ),
     ),
     AdminOperationSection(
         title = "Pedidos con problemas",
         summary = "Clasificación inicial de casos que requieren atención.",
         contextTitle = "Casos a revisar",
-        contextText = "Separa motivos sin resolver, contactar ni cerrar incidencias.",
+        contextText = "Separa motivos para lectura operativa sin cerrar incidencias.",
         entries = listOf(
-            AdminEntry("Local no responde", "Requiere seguimiento"),
-            AdminEntry("Reclamo del cliente", "Requiere revisión"),
+            AdminEntry("Local no responde", "Pedidos detenidos por falta de respuesta"),
+            AdminEntry("Reclamo del cliente", "Casos iniciados por aviso del cliente"),
         ),
     ),
     AdminOperationSection(
         title = "Repartidores activos",
         summary = "Estado operativo de repartidores.",
         contextTitle = "Equipo en movimiento",
-        contextText = "Agrupa disponibilidad sin editar perfiles, permisos ni asignaciones.",
+        contextText = "Agrupa disponibilidad sin tocar perfiles, permisos ni asignaciones.",
         entries = listOf(
-            AdminEntry("Libres", "Disponibles para operar"),
-            AdminEntry("Ocupados", "Con actividad en curso"),
-            AdminEntry("Pendientes de respuesta", "Aguardan confirmación"),
-            AdminEntry("Con incidencia", "Requieren revisión"),
+            AdminEntry("Libres", "Repartidores disponibles"),
+            AdminEntry("Ocupados", "Repartidores con pedido asignado"),
+            AdminEntry("Pendientes de respuesta", "Casos esperando confirmación"),
+            AdminEntry("Con incidencia", "Situaciones que requieren revisión"),
         ),
     ),
     AdminOperationSection(
         title = "Locales activos",
         summary = "Estado operativo de locales.",
         contextTitle = "Locales en operación",
-        contextText = "Ordena señales operativas sin editar locales, productos ni visibilidad.",
+        contextText = "Ordena señales operativas sin tocar locales, productos ni visibilidad.",
         entries = listOf(
-            AdminEntry("Vendiendo ahora", "Activos en la app"),
-            AdminEntry("Sin respuesta", "Requieren seguimiento"),
-            AdminEntry("Pausados", "Sin venta activa"),
-            AdminEntry("Con configuración pendiente", "Necesitan revisión"),
-            AdminEntry("Sin productos vendibles", "Catálogo incompleto"),
+            AdminEntry("Vendiendo ahora", "Locales disponibles para recibir pedidos"),
+            AdminEntry("Sin respuesta", "Locales que no respondieron a tiempo"),
+            AdminEntry("Pausados", "Locales temporalmente detenidos"),
+            AdminEntry("Con configuración pendiente", "Locales con datos por revisar"),
+            AdminEntry("Sin productos vendibles", "Locales sin oferta disponible"),
         ),
     ),
 )
@@ -304,7 +304,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 title = current.title,
                 summary = "Submundo operativo preparado para organizar la siguiente capa.",
                 panelTitle = current.section.title,
-                panelText = "Este espacio mantiene la separación operativa sin abrir pedidos, resolver casos ni ejecutar acciones.",
+                panelText = "Este espacio mantiene la separación operativa sin listados reales ni acciones disponibles.",
             )
             is AdminRoute.TodayOrdersCategory -> AdminTodayOrdersCategoryScreen(
                 category = current.category,
@@ -315,7 +315,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 title = current.title,
                 summary = "Submundo de pedidos del día preparado para organizar la siguiente capa.",
                 panelTitle = current.category.title,
-                panelText = "Este espacio clasifica el movimiento del día sin mostrar pedidos reales, abrir Pedido # ni ejecutar acciones.",
+                panelText = "Este espacio clasifica el movimiento del día sin mostrar listados reales ni acciones disponibles.",
             )
             is AdminRoute.Section -> AdminSectionScreen(
                 root = current.root,
