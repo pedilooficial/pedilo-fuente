@@ -67,6 +67,36 @@ test("admin operation internal screens expose planned operation subworlds", () =
   ].forEach((label) => assert.match(source, new RegExp(label)));
 });
 
+test("admin today orders flow exposes category screens and subworlds", () => {
+  const source = fs.readFileSync(admin, "utf8");
+
+  assert.match(source, /TodayOrdersCategory/);
+  assert.match(source, /TodayOrdersSubsection/);
+  [
+    "Pedidos del día que siguen en curso",
+    "Pedidos del día cerrados correctamente",
+    "Pedidos del día cerrados sin completar",
+    "Pedidos del día con tiempo excedido",
+    "Pedidos del día marcados con incidencia",
+    "Entregados",
+    "Retirados",
+    "Enviados",
+    "Cancelados por cliente",
+    "Cancelados por local",
+    "Cancelados por operación",
+  ].forEach((label) => assert.match(source, new RegExp(label)));
+});
+
+test("admin shell reserves safe area for system navigation", () => {
+  const source = fs.readFileSync(admin, "utf8");
+
+  assert.match(source, /navigationBarsPadding\(\)/);
+  assert.match(source, /adminBottomBarReservedPadding = 112\.dp/);
+  assert.match(source, /adminContentBottomPadding = 24\.dp/);
+  assert.match(source, /padding\(bottom = adminBottomBarReservedPadding\)/);
+  assert.match(source, /contentPadding = PaddingValues\(top = 18\.dp, bottom = adminContentBottomPadding\)/);
+});
+
 test("admin relies on native back and only shows sign out on operation root", () => {
   const source = fs.readFileSync(admin, "utf8");
   const forbiddenReturnLabels = [`Volv${"er"}`, `Atr${"ás"}`];

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -50,6 +51,8 @@ private sealed interface AdminRoute {
     data object RoleAccess : AdminRoute
     data class OperationSection(val section: AdminOperationSection) : AdminRoute
     data class OperationSubsection(val section: AdminOperationSection, val title: String) : AdminRoute
+    data class TodayOrdersCategory(val category: AdminTodayOrdersCategory) : AdminRoute
+    data class TodayOrdersSubsection(val category: AdminTodayOrdersCategory, val title: String) : AdminRoute
     data class Section(val root: AdminRoot, val title: String) : AdminRoute
 }
 
@@ -66,12 +69,75 @@ private data class AdminOperationSection(
     val entries: List<AdminEntry>,
 )
 
+private data class AdminTodayOrdersCategory(
+    val title: String,
+    val summary: String,
+    val contextText: String,
+    val entries: List<AdminEntry>,
+)
+
+private val adminBottomBarReservedPadding = 112.dp
+private val adminContentBottomPadding = 24.dp
+
 private val operationEntries = listOf(
     AdminEntry("Pedidos del día", "Movimiento completo de hoy"),
     AdminEntry("Pedidos activos", "Pedidos que siguen en curso"),
     AdminEntry("Pedidos con problemas", "Casos que necesitan revisión"),
     AdminEntry("Repartidores activos", "Estado operativo de repartidores"),
     AdminEntry("Locales activos", "Estado operativo de locales"),
+)
+
+private val todayOrdersCategories = listOf(
+    AdminTodayOrdersCategory(
+        title = "Activos",
+        summary = "Pedidos del día que siguen en curso",
+        contextText = "Clasifica los pedidos abiertos del día sin abrir pedidos concretos ni ejecutar acciones.",
+        entries = listOf(
+            AdminEntry("Esperando local", "Aguardan aceptación"),
+            AdminEntry("Preparando", "En preparación"),
+            AdminEntry("Esperando repartidor", "Aguardan asignación"),
+            AdminEntry("En entrega", "Camino al cliente"),
+        ),
+    ),
+    AdminTodayOrdersCategory(
+        title = "Finalizados",
+        summary = "Pedidos del día cerrados correctamente",
+        contextText = "Ordena cierres correctos del día sin mostrar listados reales.",
+        entries = listOf(
+            AdminEntry("Entregados", "Llegaron al cliente"),
+            AdminEntry("Retirados", "Retirados en local"),
+            AdminEntry("Enviados", "Completados por envío"),
+        ),
+    ),
+    AdminTodayOrdersCategory(
+        title = "Cancelados",
+        summary = "Pedidos del día cerrados sin completar",
+        contextText = "Separa motivos de cancelación sin cancelar, contactar ni modificar estados.",
+        entries = listOf(
+            AdminEntry("Cancelados por cliente", "Cierre solicitado por cliente"),
+            AdminEntry("Cancelados por local", "Cierre iniciado por local"),
+            AdminEntry("Cancelados por operación", "Cierre desde operación"),
+        ),
+    ),
+    AdminTodayOrdersCategory(
+        title = "Demorados",
+        summary = "Pedidos del día con tiempo excedido",
+        contextText = "Agrupa retrasos por momento operativo sin resolver casos todavía.",
+        entries = listOf(
+            AdminEntry("Esperando local", "Demora de aceptación"),
+            AdminEntry("Preparando", "Demora de preparación"),
+            AdminEntry("En entrega", "Demora de reparto"),
+        ),
+    ),
+    AdminTodayOrdersCategory(
+        title = "Con problemas",
+        summary = "Pedidos del día marcados con incidencia",
+        contextText = "Clasifica incidencias del día sin abrir Solucionar ni acciones finales.",
+        entries = listOf(
+            AdminEntry("Local no responde", "Requiere seguimiento"),
+            AdminEntry("Reclamo del cliente", "Requiere revisión"),
+        ),
+    ),
 )
 
 private val operationSections = listOf(
@@ -81,11 +147,11 @@ private val operationSections = listOf(
         contextTitle = "Vista del día",
         contextText = "Agrupa los estados principales sin abrir pedidos ni resolver casos.",
         entries = listOf(
-            AdminEntry("Activos", "Pedidos en movimiento"),
-            AdminEntry("Finalizados", "Cierres del día"),
-            AdminEntry("Cancelados", "Pedidos detenidos"),
-            AdminEntry("Demorados", "Revisión de tiempos"),
-            AdminEntry("Con problemas", "Casos para clasificar"),
+            AdminEntry("Activos", "Pedidos del día que siguen en curso"),
+            AdminEntry("Finalizados", "Pedidos cerrados correctamente"),
+            AdminEntry("Cancelados", "Pedidos cerrados sin completar"),
+            AdminEntry("Demorados", "Pedidos con tiempo excedido"),
+            AdminEntry("Con problemas", "Pedidos marcados con incidencia"),
         ),
     ),
     AdminOperationSection(
@@ -167,6 +233,10 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
 
     BackHandler(enabled = route !is AdminRoute.Operation && route !is AdminRoute.Configuration && route !is AdminRoute.RoleAccess) {
         route = when (val current = route) {
+            is AdminRoute.TodayOrdersSubsection -> AdminRoute.TodayOrdersCategory(current.category)
+            is AdminRoute.TodayOrdersCategory -> operationSections.first { it.title == "Pedidos del día" }.let {
+                AdminRoute.OperationSection(it)
+            }
             is AdminRoute.OperationSubsection -> AdminRoute.OperationSection(current.section)
             is AdminRoute.OperationSection -> AdminRoute.Operation
             is AdminRoute.Section -> when (current.root) {
@@ -219,7 +289,15 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             )
             is AdminRoute.OperationSection -> AdminOperationSectionScreen(
                 section = current.section,
-                onEntry = { route = AdminRoute.OperationSubsection(current.section, it.title) },
+                onEntry = { entry ->
+                    if (current.section.title == "Pedidos del día") {
+                        todayOrdersCategories.firstOrNull { it.title == entry.title }?.let {
+                            route = AdminRoute.TodayOrdersCategory(it)
+                        }
+                    } else {
+                        route = AdminRoute.OperationSubsection(current.section, entry.title)
+                    }
+                },
             )
             is AdminRoute.OperationSubsection -> AdminSectionScreen(
                 root = AdminRoot.Operation,
@@ -227,6 +305,17 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 summary = "Submundo operativo preparado para organizar la siguiente capa.",
                 panelTitle = current.section.title,
                 panelText = "Este espacio mantiene la separación operativa sin abrir pedidos, resolver casos ni ejecutar acciones.",
+            )
+            is AdminRoute.TodayOrdersCategory -> AdminTodayOrdersCategoryScreen(
+                category = current.category,
+                onEntry = { route = AdminRoute.TodayOrdersSubsection(current.category, it.title) },
+            )
+            is AdminRoute.TodayOrdersSubsection -> AdminSectionScreen(
+                root = AdminRoot.Operation,
+                title = current.title,
+                summary = "Submundo de pedidos del día preparado para organizar la siguiente capa.",
+                panelTitle = current.category.title,
+                panelText = "Este espacio clasifica el movimiento del día sin mostrar pedidos reales, abrir Pedido # ni ejecutar acciones.",
             )
             is AdminRoute.Section -> AdminSectionScreen(
                 root = current.root,
@@ -278,8 +367,9 @@ private fun AdminRootScreen(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
-            .padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(top = 18.dp, bottom = 118.dp),
+            .padding(horizontal = 16.dp)
+            .padding(bottom = adminBottomBarReservedPadding),
+        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
@@ -306,8 +396,9 @@ private fun AdminOperationSectionScreen(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
-            .padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(top = 18.dp, bottom = 118.dp),
+            .padding(horizontal = 16.dp)
+            .padding(bottom = adminBottomBarReservedPadding),
+        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
@@ -329,6 +420,38 @@ private fun AdminOperationSectionScreen(
 }
 
 @Composable
+private fun AdminTodayOrdersCategoryScreen(
+    category: AdminTodayOrdersCategory,
+    onEntry: (AdminEntry) -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = adminBottomBarReservedPadding),
+        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            AdminHeader(
+                title = category.title,
+                eyebrow = "Pedidos del día",
+                summary = category.summary,
+                onSignOut = {},
+                showSignOut = false,
+            )
+        }
+        item {
+            AdminInfoPanel(title = category.title, text = category.contextText)
+        }
+        items(category.entries) {
+            AdminEntryCard(entry = it, onClick = { onEntry(it) })
+        }
+    }
+}
+
+@Composable
 private fun AdminSectionScreen(
     root: AdminRoot,
     title: String,
@@ -340,8 +463,9 @@ private fun AdminSectionScreen(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
-            .padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(top = 18.dp, bottom = 118.dp),
+            .padding(horizontal = 16.dp)
+            .padding(bottom = adminBottomBarReservedPadding),
+        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
@@ -459,6 +583,7 @@ private fun AdminBottomBar(
         modifier = modifier
             .fillMaxWidth()
             .height(94.dp)
+            .navigationBarsPadding()
             .background(Brush.verticalGradient(listOf(PediloPanelSoft.copy(alpha = 0.96f), PediloPanel)), RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
             .border(1.dp, PediloLine, RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
             .padding(horizontal = 8.dp, vertical = 10.dp),
@@ -508,5 +633,7 @@ private fun AdminRoute.root(): AdminRoot = when (this) {
     AdminRoute.RoleAccess -> AdminRoot.RoleAccess
     is AdminRoute.OperationSection -> AdminRoot.Operation
     is AdminRoute.OperationSubsection -> AdminRoot.Operation
+    is AdminRoute.TodayOrdersCategory -> AdminRoot.Operation
+    is AdminRoute.TodayOrdersSubsection -> AdminRoot.Operation
     is AdminRoute.Section -> root
 }
