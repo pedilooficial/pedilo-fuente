@@ -57,11 +57,11 @@ private data class AdminEntry(
 )
 
 private val operationEntries = listOf(
-    AdminEntry("Pedidos del día", "Sin datos conectados"),
-    AdminEntry("Pedidos activos", "Sin datos conectados"),
-    AdminEntry("Pedidos con problemas", "Visual"),
-    AdminEntry("Repartidores activos", "Sin datos conectados"),
-    AdminEntry("Locales activos", "Sin datos conectados"),
+    AdminEntry("Pedidos del día", "Seguimiento operativo"),
+    AdminEntry("Pedidos activos", "Resumen operativo"),
+    AdminEntry("Pedidos con problemas", "Revisión pendiente"),
+    AdminEntry("Repartidores activos", "Organización del bloque"),
+    AdminEntry("Locales activos", "Sección disponible"),
 )
 
 private val configurationEntries = listOf(
@@ -75,7 +75,7 @@ private val configurationEntries = listOf(
     "Auditoría",
     "Emergencias",
     "General",
-).map { AdminEntry(it, "Estructura visual futura") }
+).map { AdminEntry(it, "Ajustes preparados para la app") }
 
 private val roleEntries = listOf(
     "Usuarios del equipo",
@@ -85,7 +85,7 @@ private val roleEntries = listOf(
     "Altas pendientes",
     "Usuarios inactivos",
     "Vinculaciones pendientes",
-).map { AdminEntry(it, "Acceso visual futuro") }
+).map { AdminEntry(it, "Organización de accesos") }
 
 @Composable
 fun AdminApp(onSignOutConfirmed: () -> Unit) {
@@ -109,15 +109,15 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             AdminRoute.Operation -> AdminRootScreen(
                 title = "Pédilo Admin",
                 eyebrow = "Operación",
-                summary = "Base visual para monitorear lo vivo cuando se conecten datos reales.",
+                summary = "Vista inicial para seguir la operación.",
                 entries = operationEntries,
                 onEntry = { route = AdminRoute.Section(AdminRoot.Operation, it.title) },
                 onSignOut = { showSignOut = true },
             )
             AdminRoute.Configuration -> AdminRootScreen(
                 title = "Configuración",
-                eyebrow = "Estructura editable futura",
-                summary = "Raíz visual para organizar parámetros sin editar nada todavía.",
+                eyebrow = "Secciones de configuración",
+                summary = "Organizá cómo funciona Pédilo.",
                 entries = configurationEntries,
                 onEntry = { route = AdminRoute.Section(AdminRoot.Configuration, it.title) },
                 onSignOut = { showSignOut = true },
@@ -125,7 +125,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             AdminRoute.RoleAccess -> AdminRootScreen(
                 title = "Alta de roles",
                 eyebrow = "Usuarios y accesos",
-                summary = "Raíz visual para futuras cuentas, roles y vinculaciones.",
+                summary = "Cuentas, roles y vinculaciones.",
                 entries = roleEntries,
                 onEntry = { route = AdminRoute.Section(AdminRoot.RoleAccess, it.title) },
                 onSignOut = { showSignOut = true },
@@ -216,14 +216,14 @@ private fun AdminSectionScreen(
             AdminHeader(
                 title = title,
                 eyebrow = root.label,
-                summary = "Pantalla visual sin datos conectados ni acciones reales.",
+                summary = "Sección lista para organizar el próximo paso.",
                 onSignOut = onSignOut,
             )
         }
         item {
             AdminInfoPanel(
-                title = "Base visual",
-                text = "Esta sección queda preparada para el siguiente bloque. No lee datos, no guarda cambios y no opera pedidos.",
+                title = "Sección preparada",
+                text = "Este espacio ordena el bloque sin leer información, guardar cambios ni operar pedidos.",
             )
         }
         item {
@@ -249,23 +249,14 @@ private fun AdminHeader(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    eyebrow,
-                    color = PediloWarning,
-                    fontSize = 12.sp,
-                    lineHeight = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    title,
-                    color = PediloOrange,
-                    fontSize = 31.sp,
-                    lineHeight = 35.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    style = TextStyle(brush = PediloPrimaryBrush),
-                )
-            }
+            Text(
+                eyebrow,
+                color = PediloWarning,
+                fontSize = 12.sp,
+                lineHeight = 15.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f),
+            )
             Text(
                 "Cerrar sesión",
                 color = PediloText,
@@ -279,6 +270,14 @@ private fun AdminHeader(
                     .padding(horizontal = 10.dp, vertical = 8.dp),
             )
         }
+        Text(
+            title,
+            color = PediloOrange,
+            fontSize = 30.sp,
+            lineHeight = 34.sp,
+            fontWeight = FontWeight.ExtraBold,
+            style = TextStyle(brush = PediloPrimaryBrush),
+        )
         Text(summary, color = PediloMuted, fontSize = 14.sp, lineHeight = 19.sp)
     }
 }
@@ -342,11 +341,11 @@ private fun AdminBottomBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(88.dp)
+            .height(94.dp)
             .background(Brush.verticalGradient(listOf(PediloPanelSoft.copy(alpha = 0.96f), PediloPanel)), RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
             .border(1.dp, PediloLine, RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
-            .padding(horizontal = 10.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AdminBottomItem("Operación", current == AdminRoot.Operation, onOperation, Modifier.weight(1f))
@@ -364,20 +363,20 @@ private fun AdminBottomItem(
 ) {
     Column(
         modifier = modifier
-            .height(62.dp)
+            .height(68.dp)
             .clip(RoundedCornerShape(15.dp))
             .background(if (selected) PediloOrange.copy(alpha = 0.18f) else Color.Transparent, RoundedCornerShape(15.dp))
             .border(1.dp, if (selected) PediloOrange.copy(alpha = 0.62f) else PediloLine.copy(alpha = 0.45f), RoundedCornerShape(15.dp))
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 6.dp),
+            .padding(horizontal = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
             label,
             color = if (selected) PediloOrange else PediloMuted,
-            fontSize = 12.sp,
-            lineHeight = 15.sp,
+            fontSize = 11.sp,
+            lineHeight = 14.sp,
             fontWeight = FontWeight.ExtraBold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,

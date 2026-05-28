@@ -35,7 +35,7 @@ test("admin operation root exposes visual operation cards only", () => {
     "Repartidores activos",
     "Locales activos",
   ].forEach((label) => assert.match(source, new RegExp(label)));
-  assert.match(source, /Sin datos conectados|Visual/);
+  assert.match(source, /Seguimiento operativo|Resumen operativo|Revisión pendiente/);
 });
 
 test("admin configuration and role access roots expose their planned entries", () => {
@@ -66,6 +66,7 @@ test("admin visual shell does not touch real data or operational systems", () =>
   const source = fs.readFileSync(admin, "utf8");
 
   assert.doesNotMatch(source, /Firebase|Firestore|collection\(|orders|createLocalOrder|createPlusOrder|getPublicOrderTracking|payments|WhatsApp|whatsapp|driverId/);
+  assert.doesNotMatch(source, /Sin datos conectados|Estructura visual futura|Acceso visual futuro/);
   assert.match(source, /"¿Querés cerrar sesión\?"/);
   assert.match(source, /Text\("No"\)/);
   assert.match(source, /Text\("Sí"\)/);
