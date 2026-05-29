@@ -52,6 +52,13 @@ private enum class OperationOrderVariant {
     ActionUnavailable,
 }
 
+private enum class OperationSolveStage {
+    Start,
+    Options,
+    SensitiveAction,
+    Result,
+}
+
 private sealed interface AdminRoute {
     data object Operation : AdminRoute
     data object Configuration : AdminRoute
@@ -59,9 +66,16 @@ private sealed interface AdminRoute {
     data class OperationSection(val section: AdminOperationSection) : AdminRoute
     data class OperationSubsection(val section: AdminOperationSection, val title: String) : AdminRoute
     data class OperationOrderDetail(val returnRoute: AdminRoute, val variant: OperationOrderVariant) : AdminRoute
+    data class OperationOrderSolve(val returnRoute: AdminRoute, val stage: OperationSolveStage) : AdminRoute
+    data class OperationOperationalProfile(val kind: AdminOperationalProfileKind, val state: String) : AdminRoute
     data class TodayOrdersCategory(val category: AdminTodayOrdersCategory) : AdminRoute
     data class TodayOrdersSubsection(val category: AdminTodayOrdersCategory, val title: String) : AdminRoute
     data class Section(val root: AdminRoot, val title: String) : AdminRoute
+}
+
+private enum class AdminOperationalProfileKind {
+    Store,
+    Driver,
 }
 
 private data class AdminEntry(
@@ -262,6 +276,13 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
 
     BackHandler(enabled = route !is AdminRoute.Operation && route !is AdminRoute.Configuration && route !is AdminRoute.RoleAccess) {
         route = when (val current = route) {
+            is AdminRoute.OperationOrderSolve -> when (current.stage) {
+                OperationSolveStage.Start -> current.returnRoute
+                OperationSolveStage.Options -> AdminRoute.OperationOrderSolve(current.returnRoute, OperationSolveStage.Start)
+                OperationSolveStage.SensitiveAction -> AdminRoute.OperationOrderSolve(current.returnRoute, OperationSolveStage.Options)
+                OperationSolveStage.Result -> AdminRoute.OperationOrderSolve(current.returnRoute, OperationSolveStage.SensitiveAction)
+            }
+            is AdminRoute.OperationOperationalProfile -> AdminRoute.Operation
             is AdminRoute.OperationOrderDetail -> current.returnRoute
             is AdminRoute.TodayOrdersSubsection -> AdminRoute.TodayOrdersCategory(current.category)
             is AdminRoute.TodayOrdersCategory -> operationSections.first { it.title == "Pedidos del día" }.let {
@@ -344,9 +365,45 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                             variant = variant,
                         )
                     },
+                    onOperationalProfile = { kind ->
+                        route = AdminRoute.OperationOperationalProfile(
+                            kind = kind,
+                            state = current.title,
+                        )
+                    },
                 )
             }
-            is AdminRoute.OperationOrderDetail -> AdminOrderDetailScreen(variant = current.variant)
+            is AdminRoute.OperationOrderDetail -> AdminOrderDetailScreen(
+                variant = current.variant,
+                onSolve = {
+                    route = AdminRoute.OperationOrderSolve(
+                        returnRoute = AdminRoute.OperationOrderDetail(current.returnRoute, current.variant),
+                        stage = OperationSolveStage.Start,
+                    )
+                },
+                onOpenStore = {
+                    route = AdminRoute.OperationOperationalProfile(
+                        kind = AdminOperationalProfileKind.Store,
+                        state = "Necesita atención",
+                    )
+                },
+                onOpenDriver = {
+                    route = AdminRoute.OperationOperationalProfile(
+                        kind = AdminOperationalProfileKind.Driver,
+                        state = "En seguimiento",
+                    )
+                },
+            )
+            is AdminRoute.OperationOrderSolve -> AdminOrderSolveScreen(
+                stage = current.stage,
+                onNext = { next ->
+                    route = AdminRoute.OperationOrderSolve(current.returnRoute, next)
+                },
+            )
+            is AdminRoute.OperationOperationalProfile -> AdminOperationalProfileScreen(
+                kind = current.kind,
+                state = current.state,
+            )
             is AdminRoute.TodayOrdersCategory -> AdminTodayOrdersCategoryScreen(
                 category = current.category,
                 onEntry = { route = AdminRoute.TodayOrdersSubsection(current.category, it.title) },
@@ -501,7 +558,24 @@ private fun AdminSectionScreen(
     panelText: String,
     orderDetailEntries: List<AdminOrderDetailEntry> = emptyList(),
     onOrderDetail: (OperationOrderVariant) -> Unit = {},
+    onOperationalProfile: (AdminOperationalProfileKind) -> Unit = {},
 ) {
+    val allowStoreProfile = title in listOf(
+        "Vendiendo ahora",
+        "Sin respuesta",
+        "Pausados",
+        "Con configuración pendiente",
+        "Sin productos vendibles",
+        "Local no responde",
+    )
+    val allowDriverProfile = title in listOf(
+        "Libres",
+        "Ocupados",
+        "Pendientes de respuesta",
+        "Con incidencia",
+        "Esperando repartidor",
+        "En entrega",
+    )
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -529,11 +603,32 @@ private fun AdminSectionScreen(
         items(orderDetailEntries) { entry ->
             AdminEntryCard(entry = AdminEntry(entry.label, entry.note), onClick = { onOrderDetail(entry.variant) })
         }
+        if (allowStoreProfile) {
+            item {
+                AdminEntryCard(
+                    entry = AdminEntry("Local operativo", "Estado operativo del local relacionado"),
+                    onClick = { onOperationalProfile(AdminOperationalProfileKind.Store) },
+                )
+            }
+        }
+        if (allowDriverProfile) {
+            item {
+                AdminEntryCard(
+                    entry = AdminEntry("Repartidor operativo", "Estado operativo del repartidor relacionado"),
+                    onClick = { onOperationalProfile(AdminOperationalProfileKind.Driver) },
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun AdminOrderDetailScreen(variant: OperationOrderVariant) {
+private fun AdminOrderDetailScreen(
+    variant: OperationOrderVariant,
+    onSolve: () -> Unit,
+    onOpenStore: () -> Unit,
+    onOpenDriver: () -> Unit,
+) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -560,7 +655,7 @@ private fun AdminOrderDetailScreen(variant: OperationOrderVariant) {
                 item {
                     AdminInfoPanel(
                         title = "Contexto",
-                        text = "Cliente esperando entrega · Local confirmó preparación · Reparto en curso.",
+                        text = "Persona esperando entrega · Local confirmó preparación · Reparto en curso.",
                     )
                 }
                 item {
@@ -608,9 +703,16 @@ private fun AdminOrderDetailScreen(variant: OperationOrderVariant) {
                     )
                 }
                 item {
-                    AdminDisabledActionCard(
+                    AdminActionCard(
                         title = "Solucionar",
-                        note = "Disponible en el próximo bloque de operación",
+                        note = "Revisá opciones de resolución sin ejecutar cambios reales.",
+                        onClick = onSolve,
+                    )
+                }
+                item {
+                    AdminEntryCard(
+                        entry = AdminEntry("Local relacionado", "Ver estado operativo del local"),
+                        onClick = onOpenStore,
                     )
                 }
             }
@@ -625,6 +727,12 @@ private fun AdminOrderDetailScreen(variant: OperationOrderVariant) {
                     AdminInfoPanel(
                         title = "Qué podés hacer ahora",
                         text = "Revisá el estado y volvé cuando haya una acción habilitada.",
+                    )
+                }
+                item {
+                    AdminEntryCard(
+                        entry = AdminEntry("Repartidor relacionado", "Ver estado operativo del repartidor"),
+                        onClick = onOpenDriver,
                     )
                 }
             }
@@ -685,6 +793,125 @@ private fun AdminDisabledActionCard(title: String, note: String) {
     ) {
         Text(title, color = PediloMuted, fontSize = 19.sp, lineHeight = 23.sp, fontWeight = FontWeight.ExtraBold)
         Text(note, color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp)
+    }
+}
+
+@Composable
+private fun AdminActionCard(title: String, note: String, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .pediloCardDepth(RoundedCornerShape(15.dp))
+            .background(PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine, RoundedCornerShape(15.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Text(title, color = PediloText, fontSize = 19.sp, lineHeight = 23.sp, fontWeight = FontWeight.ExtraBold)
+        Text(note, color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp)
+    }
+}
+
+@Composable
+private fun AdminOrderSolveScreen(stage: OperationSolveStage, onNext: (OperationSolveStage) -> Unit) {
+    val content = when (stage) {
+        OperationSolveStage.Start -> SolveStageContent(
+            title = "Solucionar",
+            summary = "Inicio de revisión para este pedido.",
+            panelTitle = "Contexto",
+            panelText = "El pedido requiere intervención y revisión de impacto antes de cualquier acción operativa.",
+            actionTitle = "Ver opciones",
+            actionNote = "Abrí las alternativas de resolución disponibles en esta etapa.",
+            next = OperationSolveStage.Options,
+        )
+        OperationSolveStage.Options -> SolveStageContent(
+            title = "Opciones",
+            summary = "Elegí una línea de trabajo para este caso.",
+            panelTitle = "Opciones de resolución",
+            panelText = "Acción recomendada: Revisar respuesta pendiente. Acciones secundarias: Marcar para seguimiento. Excepción Admin: Intervención excepcional.",
+            actionTitle = "Continuar",
+            actionNote = "Revisá la acción sensible antes del resultado.",
+            next = OperationSolveStage.SensitiveAction,
+        )
+        OperationSolveStage.SensitiveAction -> SolveStageContent(
+            title = "Acción sensible",
+            summary = "Revisión previa de impacto.",
+            panelTitle = "Impacto",
+            panelText = "Esta representación muestra qué cambiaría en operación y qué quedaría sin cambios. No ejecuta modificaciones reales.",
+            actionTitle = "Confirmar visualmente",
+            actionNote = "Pasá al resultado representado.",
+            next = OperationSolveStage.Result,
+        )
+        OperationSolveStage.Result -> SolveStageContent(
+            title = "Resultado",
+            summary = "Cierre de la secuencia guiada.",
+            panelTitle = "Resultado preparado",
+            panelText = "La revisión quedó lista para volver al pedido y continuar el seguimiento operativo.",
+            actionTitle = "Reiniciar recorrido",
+            actionNote = "Revisar nuevamente el flujo de solución.",
+            next = OperationSolveStage.Start,
+        )
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = adminBottomBarReservedPadding),
+        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            AdminHeader(title = content.title, eyebrow = "Operación", summary = content.summary, onSignOut = {}, showSignOut = false)
+        }
+        item {
+            AdminInfoPanel(title = content.panelTitle, text = content.panelText)
+        }
+        item {
+            AdminActionCard(title = content.actionTitle, note = content.actionNote, onClick = { onNext(content.next) })
+        }
+    }
+}
+private data class SolveStageContent(
+    val title: String,
+    val summary: String,
+    val panelTitle: String,
+    val panelText: String,
+    val actionTitle: String,
+    val actionNote: String,
+    val next: OperationSolveStage,
+)
+
+@Composable
+private fun AdminOperationalProfileScreen(kind: AdminOperationalProfileKind, state: String) {
+    val title = if (kind == AdminOperationalProfileKind.Store) "Local operativo" else "Repartidor operativo"
+    val context = if (kind == AdminOperationalProfileKind.Store) {
+        "Este estado se usa para seguimiento operativo del local sin cambiar su configuración ni productos."
+    } else {
+        "Este estado se usa para seguimiento operativo del repartidor sin cambios de cuenta, permisos ni accesos."
+    }
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = adminBottomBarReservedPadding),
+        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            AdminHeader(title = title, eyebrow = "Operación", summary = "Seguimiento operativo concreto.", onSignOut = {}, showSignOut = false)
+        }
+        item { AdminInfoPanel(title = "Estado", text = state) }
+        item { AdminInfoPanel(title = "Contexto", text = context) }
+        item {
+            AdminDisabledActionCard(
+                title = "Acción no disponible desde esta vista",
+                note = "Las acciones operativas finales se habilitan en etapas posteriores.",
+            )
+        }
     }
 }
 
@@ -836,6 +1063,8 @@ private fun AdminRoute.root(): AdminRoot = when (this) {
     is AdminRoute.OperationSection -> AdminRoot.Operation
     is AdminRoute.OperationSubsection -> AdminRoot.Operation
     is AdminRoute.OperationOrderDetail -> AdminRoot.Operation
+    is AdminRoute.OperationOrderSolve -> AdminRoot.Operation
+    is AdminRoute.OperationOperationalProfile -> AdminRoot.Operation
     is AdminRoute.TodayOrdersCategory -> AdminRoot.Operation
     is AdminRoute.TodayOrdersSubsection -> AdminRoot.Operation
     is AdminRoute.Section -> root

@@ -154,7 +154,7 @@ test("admin configuration and role access roots expose their planned entries", (
   ].forEach((label) => assert.match(source, new RegExp(label)));
 });
 
-test("admin order detail convergence exposes Pedido #____ variants without real data", () => {
+test("admin order detail convergence exposes Pedido #____ variants and solve flow without real data", () => {
   const source = fs.readFileSync(admin, "utf8");
   const forbiddenTitles = ["Pedido vivo", "Detalle del pedido", "Resolución del pedido"];
 
@@ -169,7 +169,15 @@ test("admin order detail convergence exposes Pedido #____ variants without real 
     "Acción no disponible",
   ].forEach((label) => assert.match(source, new RegExp(label)));
   forbiddenTitles.forEach((title) => assert.doesNotMatch(source, new RegExp(`"${title}"`)));
-  assert.doesNotMatch(source, /OperationOrderSolve|AdminSolveScreen/);
+  assert.match(source, /OperationOrderSolve/);
+  assert.match(source, /OperationSolveStage/);
+  assert.match(source, /AdminOrderSolveScreen/);
+  [
+    "Solucionar",
+    "Opciones",
+    "Acción sensible",
+    "Resultado",
+  ].forEach((label) => assert.match(source, new RegExp(label)));
 });
 
 test("admin order detail keeps shell rules and visual entry paths", () => {
@@ -181,9 +189,12 @@ test("admin order detail keeps shell rules and visual entry paths", () => {
   assert.match(source, /sectionTitle == "Pedidos activos" && subsectionTitle == "Esperando local"/);
   assert.match(source, /sectionTitle == "Pedidos con problemas" && subsectionTitle == "Local no responde"/);
   assert.match(source, /is AdminRoute\.OperationOrderDetail -> current\.returnRoute/);
+  assert.match(source, /is AdminRoute\.OperationOrderSolve -> when \(current\.stage\)/);
   assert.match(source, /is AdminRoute\.OperationOrderDetail -> AdminOrderDetailScreen/);
-  assert.match(source, /AdminDisabledActionCard/);
-  assert.match(source, /Disponible en el próximo bloque de operación/);
+  assert.match(source, /AdminActionCard/);
+  assert.match(source, /Revisá opciones de resolución sin ejecutar cambios reales/);
+  assert.match(source, /Local operativo/);
+  assert.match(source, /Repartidor operativo/);
   forbiddenReturnLabels.forEach((label) => assert.doesNotMatch(source, new RegExp(`"${label}"`)));
   assert.match(source, /private fun AdminOrderDetailScreen[\s\S]*showSignOut = false/);
 });
