@@ -22,9 +22,11 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +40,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pedilo.app.core.model.AdminOrderDetail
+import com.pedilo.app.core.model.AdminOrderSummary
+import com.pedilo.app.core.result.CoreResult
+import com.pedilo.app.core.runtime.adminOrdersUseCase
+import kotlinx.coroutines.launch
 
 private enum class AdminRoot(val label: String) {
     Operation("Operación"),
@@ -65,7 +72,11 @@ private sealed interface AdminRoute {
     data object RoleAccess : AdminRoute
     data class OperationSection(val section: AdminOperationSection) : AdminRoute
     data class OperationSubsection(val section: AdminOperationSection, val title: String) : AdminRoute
-    data class OperationOrderDetail(val returnRoute: AdminRoute, val variant: OperationOrderVariant) : AdminRoute
+    data class OperationOrderDetail(
+        val returnRoute: AdminRoute,
+        val variant: OperationOrderVariant,
+        val realOrderId: String? = null,
+    ) : AdminRoute
     data class OperationOrderSolve(val returnRoute: AdminRoute, val stage: OperationSolveStage) : AdminRoute
     data class OperationOperationalProfile(val kind: AdminOperationalProfileKind, val state: String) : AdminRoute
     data class TodayOrdersCategory(val category: AdminTodayOrdersCategory) : AdminRoute
@@ -137,6 +148,7 @@ private data class AdminOrderDetailEntry(
     val label: String,
     val note: String,
     val variant: OperationOrderVariant,
+    val realOrderId: String? = null,
 )
 
 private data class AdminConfigurationSection(
@@ -544,25 +556,59 @@ private val roleAccessSections = listOf(
     ),
 )
 
-private fun orderDetailEntriesFor(sectionTitle: String, subsectionTitle: String): List<AdminOrderDetailEntry> {
-    val primary = when {
-        sectionTitle == "Pedidos activos" && subsectionTitle == "En entrega" ->
-            AdminOrderDetailEntry("Pedido #____", "Estado normal", OperationOrderVariant.Normal)
-        sectionTitle == "Pedidos activos" && subsectionTitle == "Esperando local" ->
-            AdminOrderDetailEntry("Pedido #____", "Necesita atención", OperationOrderVariant.NeedsAttention)
-        sectionTitle == "Pedidos con problemas" && subsectionTitle == "Local no responde" ->
-            AdminOrderDetailEntry("Pedido #____", "Con problema", OperationOrderVariant.WithProblem)
-        sectionTitle == "Pedidos activos" && subsectionTitle == "Esperando repartidor" ->
-            AdminOrderDetailEntry("Pedido #____", "Acción no disponible", OperationOrderVariant.ActionUnavailable)
-        else -> null
+private fun orderDetailEntriesFor(
+    sectionTitle: String,
+    subsectionTitle: String,
+    orders: List<AdminOrderSummary>,
+): List<AdminOrderDetailEntry> {
+    val real = orders.firstOrNull()
+    val variant = when {
+        sectionTitle == "Pedidos con problemas" && subsectionTitle == "Local no responde" -> OperationOrderVariant.WithProblem
+        sectionTitle == "Pedidos activos" && subsectionTitle == "Esperando repartidor" -> OperationOrderVariant.ActionUnavailable
+        sectionTitle == "Pedidos activos" && subsectionTitle == "Esperando local" -> OperationOrderVariant.NeedsAttention
+        else -> OperationOrderVariant.Normal
     }
-    return primary?.let { listOf(it) } ?: emptyList()
+    return real?.let {
+        listOf(
+            AdminOrderDetailEntry(
+                label = if (it.trackingNumber.isNotBlank()) it.trackingNumber else "Pedido #____",
+                note = it.publicStatus.ifBlank { "Pedido recibido" },
+                variant = variant,
+                realOrderId = it.id,
+            ),
+        )
+    } ?: emptyList()
 }
 
 @Composable
 fun AdminApp(onSignOutConfirmed: () -> Unit) {
     var route by remember { mutableStateOf<AdminRoute>(AdminRoute.Operation) }
     var showSignOut by remember { mutableStateOf(false) }
+    var readOnlyOrders by remember { mutableStateOf<List<AdminOrderSummary>>(emptyList()) }
+    var readOnlyOrderDetails by remember { mutableStateOf<Map<String, AdminOrderDetail>>(emptyMap()) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        when (val result = adminOrdersUseCase().invoke()) {
+            is CoreResult.Success -> readOnlyOrders = result.value
+            is CoreResult.Failure -> readOnlyOrders = emptyList()
+        }
+    }
+
+    val operationEntriesLive = operationEntries.map { entry ->
+        val count = when (entry.title) {
+            "Pedidos del día" -> readOnlyOrders.todayOrders().size
+            "Pedidos activos" -> readOnlyOrders.activeOrders().size
+            "Pedidos con problemas" -> readOnlyOrders.problemOrders().size
+            else -> 0
+        }
+        val note = if (entry.title in setOf("Repartidores activos", "Locales activos")) {
+            "No hay datos para mostrar en esta sección."
+        } else {
+            "${entry.note} · $count"
+        }
+        entry.copy(note = note)
+    }
 
     BackHandler(enabled = route !is AdminRoute.Operation && route !is AdminRoute.Configuration && route !is AdminRoute.RoleAccess) {
         route = when (val current = route) {
@@ -630,7 +676,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 title = "Pédilo Admin",
                 eyebrow = "Operación",
                 summary = "Vista inicial para seguir la operación.",
-                entries = operationEntries,
+                entries = operationEntriesLive,
                 onEntry = { entry ->
                     operationSections.firstOrNull { it.title == entry.title }?.let {
                         route = AdminRoute.OperationSection(it)
@@ -678,7 +724,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 },
             )
             is AdminRoute.OperationSubsection -> {
-                val orderEntries = orderDetailEntriesFor(current.section.title, current.title)
+                val orderEntries = orderDetailEntriesFor(current.section.title, current.title, readOnlyOrders)
                 AdminSectionScreen(
                     root = AdminRoot.Operation,
                     title = current.title,
@@ -690,6 +736,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                         route = AdminRoute.OperationOrderDetail(
                             returnRoute = AdminRoute.OperationSubsection(current.section, current.title),
                             variant = variant,
+                            realOrderId = orderEntries.firstOrNull { it.variant == variant }?.realOrderId,
                         )
                     },
                     onOperationalProfile = { kind ->
@@ -702,9 +749,11 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             }
             is AdminRoute.OperationOrderDetail -> AdminOrderDetailScreen(
                 variant = current.variant,
+                orderId = current.realOrderId,
+                detail = current.realOrderId?.let { readOnlyOrderDetails[it] },
                 onSolve = {
                     route = AdminRoute.OperationOrderSolve(
-                        returnRoute = AdminRoute.OperationOrderDetail(current.returnRoute, current.variant),
+                        returnRoute = AdminRoute.OperationOrderDetail(current.returnRoute, current.variant, current.realOrderId),
                         stage = OperationSolveStage.Start,
                     )
                 },
@@ -719,6 +768,15 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                         kind = AdminOperationalProfileKind.Driver,
                         state = "En seguimiento",
                     )
+                },
+                onLoadDetail = { orderId ->
+                    if (readOnlyOrderDetails.containsKey(orderId)) return@AdminOrderDetailScreen
+                    scope.launch {
+                        when (val result = adminOrdersUseCase().getDetail(orderId)) {
+                            is CoreResult.Success -> readOnlyOrderDetails = readOnlyOrderDetails + (orderId to result.value)
+                            is CoreResult.Failure -> Unit
+                        }
+                    }
                 },
             )
             is AdminRoute.OperationOrderSolve -> AdminOrderSolveScreen(
@@ -1263,10 +1321,14 @@ private fun AdminConfigurationConvergenceScreen(
 @Composable
 private fun AdminOrderDetailScreen(
     variant: OperationOrderVariant,
+    orderId: String?,
+    detail: AdminOrderDetail?,
     onSolve: () -> Unit,
     onOpenStore: () -> Unit,
     onOpenDriver: () -> Unit,
+    onLoadDetail: (String) -> Unit,
 ) {
+    orderId?.let { LaunchedEffect(it) { onLoadDetail(it) } }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1278,9 +1340,9 @@ private fun AdminOrderDetailScreen(
     ) {
         item {
             AdminHeader(
-                title = "Pedido #____",
+                title = detail?.trackingNumber?.ifBlank { "Pedido #____" } ?: "Pedido #____",
                 eyebrow = "Operación",
-                summary = "Qué está pasando con este pedido ahora.",
+                summary = detail?.publicStatus?.ifBlank { "Lectura read-only del pedido." } ?: "Qué está pasando con este pedido ahora.",
                 onSignOut = {},
                 showSignOut = false,
             )
@@ -1299,7 +1361,12 @@ private fun AdminOrderDetailScreen(
                 item {
                     AdminInfoPanel(
                         title = "Datos del pedido",
-                        text = "Referencia ·----\nLocal asignado ·----\nReparto ·----",
+                        text = buildString {
+                            appendLine("Estado: ${detail?.status.orEmpty().ifBlank { "Sin dato" }}")
+                            appendLine("Origen: ${detail?.source.orEmpty().ifBlank { "Sin dato" }}")
+                            appendLine("Tipo: ${detail?.requestType.orEmpty().ifBlank { "Sin dato" }}")
+                            append("Local: ${detail?.storeName.orEmpty().ifBlank { "Sin dato" }}")
+                        },
                     )
                 }
             }
@@ -1713,3 +1780,11 @@ private fun AdminRoute.root(): AdminRoot = when (this) {
     is AdminRoute.TodayOrdersSubsection -> AdminRoot.Operation
     is AdminRoute.Section -> root
 }
+
+private fun List<AdminOrderSummary>.todayOrders(): List<AdminOrderSummary> = this
+
+private fun List<AdminOrderSummary>.activeOrders(): List<AdminOrderSummary> =
+    filter { it.status.lowercase() in setOf("created", "received", "pending") || it.publicStatus.contains("recib", ignoreCase = true) }
+
+private fun List<AdminOrderSummary>.problemOrders(): List<AdminOrderSummary> =
+    filter { it.publicStatus.contains("problema", ignoreCase = true) || it.publicStatus.contains("reclamo", ignoreCase = true) }

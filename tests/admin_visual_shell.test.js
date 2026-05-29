@@ -351,9 +351,8 @@ test("admin order detail keeps shell rules and visual entry paths", () => {
   const forbiddenReturnLabels = [`Volv${"er"}`, `Atr${"ás"}`];
 
   assert.match(source, /orderDetailEntriesFor/);
-  assert.match(source, /sectionTitle == "Pedidos activos" && subsectionTitle == "En entrega"/);
-  assert.match(source, /sectionTitle == "Pedidos activos" && subsectionTitle == "Esperando local"/);
   assert.match(source, /sectionTitle == "Pedidos con problemas" && subsectionTitle == "Local no responde"/);
+  assert.match(source, /sectionTitle == "Pedidos activos" && subsectionTitle == "Esperando repartidor"/);
   assert.match(source, /is AdminRoute\.OperationOrderDetail -> current\.returnRoute/);
   assert.match(source, /is AdminRoute\.OperationOrderSolve -> when \(current\.stage\)/);
   assert.match(source, /is AdminRoute\.OperationOrderDetail -> AdminOrderDetailScreen/);
@@ -365,7 +364,7 @@ test("admin order detail keeps shell rules and visual entry paths", () => {
   assert.match(source, /private fun AdminOrderDetailScreen[\s\S]*showSignOut = false/);
 });
 
-test("admin visual shell does not touch real data or operational systems", () => {
+test("admin visual shell keeps non-operational actions and avoids writes", () => {
   const source = fs.readFileSync(admin, "utf8");
   const oldCopy = [
     `Sin datos conect${"ados"}`,
@@ -373,7 +372,7 @@ test("admin visual shell does not touch real data or operational systems", () =>
     `Acceso visual fut${"uro"}`,
   ];
 
-  assert.doesNotMatch(source, /Firebase|Firestore|collection\(|orders|createLocalOrder|createPlusOrder|getPublicOrderTracking|payments|WhatsApp|whatsapp|driverId/);
+  assert.doesNotMatch(source, /set\(|add\(|update\(|delete\(|runTransaction|writeBatch|createLocalOrder|createPlusOrder|getPublicOrderTracking|payments|WhatsApp|whatsapp|driverId/);
   assert.doesNotMatch(source, /reasignar|desactivar usuario|editar perfil|editar local|cargar catálogo/);
   oldCopy.forEach((text) => assert.doesNotMatch(source, new RegExp(text)));
   assert.match(source, /"¿Querés cerrar sesión\?"/);
