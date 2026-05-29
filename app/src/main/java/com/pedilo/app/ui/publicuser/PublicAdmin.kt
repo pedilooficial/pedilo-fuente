@@ -45,12 +45,20 @@ private enum class AdminRoot(val label: String) {
     RoleAccess("Alta de roles"),
 }
 
+private enum class OperationOrderVariant {
+    Normal,
+    NeedsAttention,
+    WithProblem,
+    ActionUnavailable,
+}
+
 private sealed interface AdminRoute {
     data object Operation : AdminRoute
     data object Configuration : AdminRoute
     data object RoleAccess : AdminRoute
     data class OperationSection(val section: AdminOperationSection) : AdminRoute
     data class OperationSubsection(val section: AdminOperationSection, val title: String) : AdminRoute
+    data class OperationOrderDetail(val returnRoute: AdminRoute, val variant: OperationOrderVariant) : AdminRoute
     data class TodayOrdersCategory(val category: AdminTodayOrdersCategory) : AdminRoute
     data class TodayOrdersSubsection(val category: AdminTodayOrdersCategory, val title: String) : AdminRoute
     data class Section(val root: AdminRoot, val title: String) : AdminRoute
@@ -74,6 +82,12 @@ private data class AdminTodayOrdersCategory(
     val summary: String,
     val contextText: String,
     val entries: List<AdminEntry>,
+)
+
+private data class AdminOrderDetailEntry(
+    val label: String,
+    val note: String,
+    val variant: OperationOrderVariant,
 )
 
 private val adminBottomBarReservedPadding = 112.dp
@@ -226,6 +240,21 @@ private val roleEntries = listOf(
     "Vinculaciones pendientes",
 ).map { AdminEntry(it, "Organización de accesos") }
 
+private fun orderDetailEntriesFor(sectionTitle: String, subsectionTitle: String): List<AdminOrderDetailEntry> {
+    val primary = when {
+        sectionTitle == "Pedidos activos" && subsectionTitle == "En entrega" ->
+            AdminOrderDetailEntry("Pedido #____", "Estado normal", OperationOrderVariant.Normal)
+        sectionTitle == "Pedidos activos" && subsectionTitle == "Esperando local" ->
+            AdminOrderDetailEntry("Pedido #____", "Necesita atención", OperationOrderVariant.NeedsAttention)
+        sectionTitle == "Pedidos con problemas" && subsectionTitle == "Local no responde" ->
+            AdminOrderDetailEntry("Pedido #____", "Con problema", OperationOrderVariant.WithProblem)
+        sectionTitle == "Pedidos activos" && subsectionTitle == "Esperando repartidor" ->
+            AdminOrderDetailEntry("Pedido #____", "Acción no disponible", OperationOrderVariant.ActionUnavailable)
+        else -> null
+    }
+    return primary?.let { listOf(it) } ?: emptyList()
+}
+
 @Composable
 fun AdminApp(onSignOutConfirmed: () -> Unit) {
     var route by remember { mutableStateOf<AdminRoute>(AdminRoute.Operation) }
@@ -233,6 +262,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
 
     BackHandler(enabled = route !is AdminRoute.Operation && route !is AdminRoute.Configuration && route !is AdminRoute.RoleAccess) {
         route = when (val current = route) {
+            is AdminRoute.OperationOrderDetail -> current.returnRoute
             is AdminRoute.TodayOrdersSubsection -> AdminRoute.TodayOrdersCategory(current.category)
             is AdminRoute.TodayOrdersCategory -> operationSections.first { it.title == "Pedidos del día" }.let {
                 AdminRoute.OperationSection(it)
@@ -299,13 +329,24 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                     }
                 },
             )
-            is AdminRoute.OperationSubsection -> AdminSectionScreen(
-                root = AdminRoot.Operation,
-                title = current.title,
-                summary = "Submundo operativo preparado para organizar la siguiente capa.",
-                panelTitle = current.section.title,
-                panelText = "Este espacio mantiene la separación operativa sin listados reales ni acciones disponibles.",
-            )
+            is AdminRoute.OperationSubsection -> {
+                val orderEntries = orderDetailEntriesFor(current.section.title, current.title)
+                AdminSectionScreen(
+                    root = AdminRoot.Operation,
+                    title = current.title,
+                    summary = "Submundo operativo preparado para organizar la siguiente capa.",
+                    panelTitle = current.section.title,
+                    panelText = "Este espacio mantiene la separación operativa sin listados reales ni acciones disponibles.",
+                    orderDetailEntries = orderEntries,
+                    onOrderDetail = { variant ->
+                        route = AdminRoute.OperationOrderDetail(
+                            returnRoute = AdminRoute.OperationSubsection(current.section, current.title),
+                            variant = variant,
+                        )
+                    },
+                )
+            }
+            is AdminRoute.OperationOrderDetail -> AdminOrderDetailScreen(variant = current.variant)
             is AdminRoute.TodayOrdersCategory -> AdminTodayOrdersCategoryScreen(
                 category = current.category,
                 onEntry = { route = AdminRoute.TodayOrdersSubsection(current.category, it.title) },
@@ -458,6 +499,8 @@ private fun AdminSectionScreen(
     summary: String,
     panelTitle: String,
     panelText: String,
+    orderDetailEntries: List<AdminOrderDetailEntry> = emptyList(),
+    onOrderDetail: (OperationOrderVariant) -> Unit = {},
 ) {
     LazyColumn(
         modifier = Modifier
@@ -483,6 +526,165 @@ private fun AdminSectionScreen(
                 text = panelText,
             )
         }
+        items(orderDetailEntries) { entry ->
+            AdminEntryCard(entry = AdminEntry(entry.label, entry.note), onClick = { onOrderDetail(entry.variant) })
+        }
+    }
+}
+
+@Composable
+private fun AdminOrderDetailScreen(variant: OperationOrderVariant) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = adminBottomBarReservedPadding),
+        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            AdminHeader(
+                title = "Pedido #____",
+                eyebrow = "Operación",
+                summary = "Qué está pasando con este pedido ahora.",
+                onSignOut = {},
+                showSignOut = false,
+            )
+        }
+        item {
+            AdminOrderStatusPanel(variant = variant)
+        }
+        when (variant) {
+            OperationOrderVariant.Normal -> {
+                item {
+                    AdminInfoPanel(
+                        title = "Contexto",
+                        text = "Cliente esperando entrega · Local confirmó preparación · Reparto en curso.",
+                    )
+                }
+                item {
+                    AdminInfoPanel(
+                        title = "Datos del pedido",
+                        text = "Referencia ·----\nLocal asignado ·----\nReparto ·----",
+                    )
+                }
+            }
+            OperationOrderVariant.NeedsAttention -> {
+                item {
+                    AdminInfoPanel(
+                        title = "Atención requerida",
+                        text = "El local aún no confirmó este pedido.",
+                    )
+                }
+                item {
+                    AdminOrderFactPanel(
+                        facts = listOf(
+                            "Qué necesita" to "Confirmación del local",
+                            "Quién debería actuar" to "Equipo de operación",
+                            "Desde cuándo" to "Hace unos minutos",
+                            "Impacto" to "El cliente sigue esperando respuesta",
+                        ),
+                    )
+                }
+                item {
+                    AdminDisabledActionCard(
+                        title = "Revisión pendiente",
+                        note = "Acción guiada en próximo bloque",
+                    )
+                }
+            }
+            OperationOrderVariant.WithProblem -> {
+                item {
+                    AdminOrderFactPanel(
+                        facts = listOf(
+                            "Problema" to "El local no responde",
+                            "Qué se esperaba" to "Aceptación del pedido",
+                            "Qué no ocurrió" to "Sin confirmación del local",
+                            "Responsable actual" to "Local asignado",
+                            "Tiempo detenido" to "Desde hace unos minutos",
+                            "Impacto" to "Pedido detenido sin avanzar",
+                        ),
+                    )
+                }
+                item {
+                    AdminDisabledActionCard(
+                        title = "Solucionar",
+                        note = "Disponible en el próximo bloque de operación",
+                    )
+                }
+            }
+            OperationOrderVariant.ActionUnavailable -> {
+                item {
+                    AdminInfoPanel(
+                        title = "Motivo",
+                        text = "Este pedido no admite cambios desde aquí en este momento.",
+                    )
+                }
+                item {
+                    AdminInfoPanel(
+                        title = "Qué podés hacer ahora",
+                        text = "Revisá el estado y volvé cuando haya una acción habilitada.",
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdminOrderStatusPanel(variant: OperationOrderVariant) {
+    val (status, detail) = when (variant) {
+        OperationOrderVariant.Normal -> "Estado normal" to "El pedido avanza dentro de lo previsto."
+        OperationOrderVariant.NeedsAttention -> "Necesita atención" to "Hay un punto que requiere seguimiento operativo."
+        OperationOrderVariant.WithProblem -> "Con problema" to "El pedido quedó detenido por una incidencia."
+        OperationOrderVariant.ActionUnavailable -> "Acción no disponible" to "No hay gestiones habilitadas en este momento."
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(PediloPanelSoft, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine, RoundedCornerShape(15.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("Estado general", color = PediloMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Text(status, color = PediloOrange, fontSize = 22.sp, lineHeight = 26.sp, fontWeight = FontWeight.ExtraBold)
+        Text(detail, color = PediloText, fontSize = 14.sp, lineHeight = 20.sp)
+    }
+}
+
+@Composable
+private fun AdminOrderFactPanel(facts: List<Pair<String, String>>) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(PediloPanelSoft, RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine, RoundedCornerShape(15.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        facts.forEach { (label, value) ->
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(label, color = PediloMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(value, color = PediloText, fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdminDisabledActionCard(title: String, note: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(PediloPanel.copy(alpha = 0.55f), RoundedCornerShape(15.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.7f), RoundedCornerShape(15.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Text(title, color = PediloMuted, fontSize = 19.sp, lineHeight = 23.sp, fontWeight = FontWeight.ExtraBold)
+        Text(note, color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp)
     }
 }
 
@@ -633,6 +835,7 @@ private fun AdminRoute.root(): AdminRoot = when (this) {
     AdminRoute.RoleAccess -> AdminRoot.RoleAccess
     is AdminRoute.OperationSection -> AdminRoot.Operation
     is AdminRoute.OperationSubsection -> AdminRoot.Operation
+    is AdminRoute.OperationOrderDetail -> AdminRoot.Operation
     is AdminRoute.TodayOrdersCategory -> AdminRoot.Operation
     is AdminRoute.TodayOrdersSubsection -> AdminRoot.Operation
     is AdminRoute.Section -> root

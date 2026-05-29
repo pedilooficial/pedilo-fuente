@@ -154,6 +154,40 @@ test("admin configuration and role access roots expose their planned entries", (
   ].forEach((label) => assert.match(source, new RegExp(label)));
 });
 
+test("admin order detail convergence exposes Pedido #____ variants without real data", () => {
+  const source = fs.readFileSync(admin, "utf8");
+  const forbiddenTitles = ["Pedido vivo", "Detalle del pedido", "Resolución del pedido"];
+
+  assert.match(source, /OperationOrderDetail/);
+  assert.match(source, /OperationOrderVariant/);
+  assert.match(source, /"Pedido #____"/);
+  assert.match(source, /AdminOrderDetailScreen/);
+  [
+    "Estado normal",
+    "Necesita atención",
+    "Con problema",
+    "Acción no disponible",
+  ].forEach((label) => assert.match(source, new RegExp(label)));
+  forbiddenTitles.forEach((title) => assert.doesNotMatch(source, new RegExp(`"${title}"`)));
+  assert.doesNotMatch(source, /OperationOrderSolve|AdminSolveScreen/);
+});
+
+test("admin order detail keeps shell rules and visual entry paths", () => {
+  const source = fs.readFileSync(admin, "utf8");
+  const forbiddenReturnLabels = [`Volv${"er"}`, `Atr${"ás"}`];
+
+  assert.match(source, /orderDetailEntriesFor/);
+  assert.match(source, /sectionTitle == "Pedidos activos" && subsectionTitle == "En entrega"/);
+  assert.match(source, /sectionTitle == "Pedidos activos" && subsectionTitle == "Esperando local"/);
+  assert.match(source, /sectionTitle == "Pedidos con problemas" && subsectionTitle == "Local no responde"/);
+  assert.match(source, /is AdminRoute\.OperationOrderDetail -> current\.returnRoute/);
+  assert.match(source, /is AdminRoute\.OperationOrderDetail -> AdminOrderDetailScreen/);
+  assert.match(source, /AdminDisabledActionCard/);
+  assert.match(source, /Disponible en el próximo bloque de operación/);
+  forbiddenReturnLabels.forEach((label) => assert.doesNotMatch(source, new RegExp(`"${label}"`)));
+  assert.match(source, /private fun AdminOrderDetailScreen[\s\S]*showSignOut = false/);
+});
+
 test("admin visual shell does not touch real data or operational systems", () => {
   const source = fs.readFileSync(admin, "utf8");
   const oldCopy = [
@@ -163,7 +197,7 @@ test("admin visual shell does not touch real data or operational systems", () =>
   ];
 
   assert.doesNotMatch(source, /Firebase|Firestore|collection\(|orders|createLocalOrder|createPlusOrder|getPublicOrderTracking|payments|WhatsApp|whatsapp|driverId/);
-  assert.doesNotMatch(source, /Pedido #|Solucionar|reasignar|desactivar usuario|editar perfil|editar local|cargar catálogo/);
+  assert.doesNotMatch(source, /reasignar|desactivar usuario|editar perfil|editar local|cargar catálogo/);
   oldCopy.forEach((text) => assert.doesNotMatch(source, new RegExp(text)));
   assert.match(source, /"¿Querés cerrar sesión\?"/);
   assert.match(source, /Text\("No"\)/);
