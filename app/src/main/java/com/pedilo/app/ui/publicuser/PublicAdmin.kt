@@ -78,6 +78,8 @@ private sealed interface AdminRoute {
         val subsection: String,
         val step: AdminConfigurationConvergenceStep,
     ) : AdminRoute
+    data class RoleAccessSection(val section: AdminRoleAccessSection) : AdminRoute
+    data class RoleAccessSubsection(val section: AdminRoleAccessSection, val title: String) : AdminRoute
 }
 
 private enum class AdminConfigurationConvergenceStep {
@@ -121,6 +123,14 @@ private data class AdminOrderDetailEntry(
 )
 
 private data class AdminConfigurationSection(
+    val title: String,
+    val summary: String,
+    val contextTitle: String,
+    val contextText: String,
+    val entries: List<AdminEntry>,
+)
+
+private data class AdminRoleAccessSection(
     val title: String,
     val summary: String,
     val contextTitle: String,
@@ -424,6 +434,99 @@ private val roleEntries = listOf(
     "Vinculaciones pendientes",
 ).map { AdminEntry(it, "Organización de accesos") }
 
+private val roleAccessSections = listOf(
+    AdminRoleAccessSection(
+        title = "Usuarios del equipo",
+        summary = "Vista general de cuentas vinculadas al sistema.",
+        contextTitle = "Cuentas del equipo",
+        contextText = "Organiza estado de acceso y roles sin consultar cuentas reales.",
+        entries = listOf(
+            AdminEntry("Cuentas activas", "Acceso habilitado en revisión"),
+            AdminEntry("Cuentas en revisión", "Pendientes de validación"),
+            AdminEntry("Roles asignados", "Distribución de Admin, Local y Repartidor"),
+            AdminEntry("Estado de acceso", "Lectura de habilitación"),
+            AdminEntry("Vínculos operativos", "Relación con entidad operativa"),
+        ),
+    ),
+    AdminRoleAccessSection(
+        title = "Administradores",
+        summary = "Cuentas con alcance administrativo.",
+        contextTitle = "Acceso administrativo",
+        contextText = "Revisión de cuentas Admin sin modificar permisos reales.",
+        entries = listOf(
+            AdminEntry("Cuentas Admin", "Listado conceptual de acceso"),
+            AdminEntry("Estado de revisión", "Control de vigencia administrativa"),
+            AdminEntry("Acceso administrativo", "Alcance de acciones permitido"),
+            AdminEntry("Sensibilidad del rol", "Nivel de impacto del acceso"),
+        ),
+    ),
+    AdminRoleAccessSection(
+        title = "Locales store",
+        summary = "Cuentas con rol Local.",
+        contextTitle = "Cuentas store",
+        contextText = "Organiza relación de cuenta y local sin editar la entidad comercial.",
+        entries = listOf(
+            AdminEntry("Cuentas Local", "Estado de cuentas store"),
+            AdminEntry("Local vinculado", "Relación con local asignado"),
+            AdminEntry("Estado de acceso", "Lectura de habilitación de ingreso"),
+            AdminEntry("Vinculación pendiente", "Cuenta sin relación completa"),
+            AdminEntry("Revisión de cuenta", "Control administrativo de consistencia"),
+        ),
+    ),
+    AdminRoleAccessSection(
+        title = "Repartidores driver",
+        summary = "Cuentas con rol Repartidor.",
+        contextTitle = "Cuentas driver",
+        contextText = "Organiza relación de cuenta y repartidor sin operar entregas.",
+        entries = listOf(
+            AdminEntry("Cuentas Repartidor", "Estado de cuentas driver"),
+            AdminEntry("Estado de acceso", "Lectura de habilitación de ingreso"),
+            AdminEntry("Repartidor vinculado", "Relación con entidad de reparto"),
+            AdminEntry("Vinculación pendiente", "Cuenta con vínculo incompleto"),
+            AdminEntry("Revisión de cuenta", "Control administrativo de consistencia"),
+        ),
+    ),
+    AdminRoleAccessSection(
+        title = "Altas pendientes",
+        summary = "Cuentas en proceso de alta.",
+        contextTitle = "Pendientes de alta",
+        contextText = "Ordena estados previos a habilitación sin crear cuentas reales.",
+        entries = listOf(
+            AdminEntry("Cuentas por revisar", "Pendientes de validación administrativa"),
+            AdminEntry("Rol previsto", "Perfil objetivo de la cuenta"),
+            AdminEntry("Datos faltantes", "Información pendiente para completar"),
+            AdminEntry("Estado pendiente", "Situación actual de la alta"),
+            AdminEntry("Revisión antes de activar", "Chequeo previo a habilitación"),
+        ),
+    ),
+    AdminRoleAccessSection(
+        title = "Usuarios inactivos",
+        summary = "Cuentas con acceso detenido.",
+        contextTitle = "Acceso inactivo",
+        contextText = "Representa inactividad sin borrar historial ni reactivar cuentas.",
+        entries = listOf(
+            AdminEntry("Cuentas inactivas", "Acceso actualmente detenido"),
+            AdminEntry("Acceso detenido", "Estado de bloqueo de ingreso"),
+            AdminEntry("Motivo visible", "Causa administrativa declarada"),
+            AdminEntry("Revisión pendiente", "Control previo a cambio de estado"),
+            AdminEntry("Posible reactivación futura", "Ruta de revisión posterior"),
+        ),
+    ),
+    AdminRoleAccessSection(
+        title = "Vinculaciones pendientes",
+        summary = "Cuentas con rol asignado y vínculo incompleto.",
+        contextTitle = "Relaciones pendientes",
+        contextText = "Ordena relaciones faltantes sin crear entidades ni aplicar vínculos reales.",
+        entries = listOf(
+            AdminEntry("Cuenta store sin local vinculado", "Relación comercial incompleta"),
+            AdminEntry("Cuenta driver sin repartidor vinculado", "Relación operativa incompleta"),
+            AdminEntry("Relación incompleta", "Pendiente de asociación final"),
+            AdminEntry("Entidad pendiente", "Entidad destino por definir"),
+            AdminEntry("Revisión de vínculo", "Control de consistencia de asociación"),
+        ),
+    ),
+)
+
 private fun orderDetailEntriesFor(sectionTitle: String, subsectionTitle: String): List<AdminOrderDetailEntry> {
     val primary = when {
         sectionTitle == "Pedidos activos" && subsectionTitle == "En entrega" ->
@@ -464,6 +567,8 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 AdminConfigurationConvergenceStep.SensitiveConfirmation -> current.copy(step = AdminConfigurationConvergenceStep.Impact)
                 AdminConfigurationConvergenceStep.Result -> current.copy(step = AdminConfigurationConvergenceStep.SensitiveConfirmation)
             }
+            is AdminRoute.RoleAccessSubsection -> AdminRoute.RoleAccessSection(current.section)
+            is AdminRoute.RoleAccessSection -> AdminRoute.RoleAccess
             is AdminRoute.ConfigurationSubsection -> AdminRoute.ConfigurationSection(current.section)
             is AdminRoute.ConfigurationSection -> AdminRoute.Configuration
             is AdminRoute.OperationOrderDetail -> current.returnRoute
@@ -521,7 +626,11 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 eyebrow = "Usuarios y accesos",
                 summary = "Cuentas, roles y vinculaciones.",
                 entries = roleEntries,
-                onEntry = { route = AdminRoute.Section(AdminRoot.RoleAccess, it.title) },
+                onEntry = { entry ->
+                    roleAccessSections.firstOrNull { it.title == entry.title }?.let {
+                        route = AdminRoute.RoleAccessSection(it)
+                    }
+                },
                 onSignOut = { showSignOut = true },
                 showSignOut = false,
             )
@@ -625,6 +734,17 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 subsection = current.subsection,
                 step = current.step,
                 onNext = { next -> route = current.copy(step = next) },
+            )
+            is AdminRoute.RoleAccessSection -> AdminRoleAccessSectionScreen(
+                section = current.section,
+                onEntry = { route = AdminRoute.RoleAccessSubsection(current.section, it.title) },
+            )
+            is AdminRoute.RoleAccessSubsection -> AdminSectionScreen(
+                root = AdminRoot.RoleAccess,
+                title = current.title,
+                summary = "Subsección de acceso lista para revisión administrativa.",
+                panelTitle = current.section.title,
+                panelText = "Este espacio ordena cuentas y vínculos de forma visual sin modificar usuarios ni roles.",
             )
             is AdminRoute.Section -> AdminSectionScreen(
                 root = current.root,
@@ -778,6 +898,38 @@ private fun AdminConfigurationSectionScreen(
             AdminHeader(
                 title = section.title,
                 eyebrow = "Configuración",
+                summary = section.summary,
+                onSignOut = {},
+                showSignOut = false,
+            )
+        }
+        item {
+            AdminInfoPanel(title = section.contextTitle, text = section.contextText)
+        }
+        items(section.entries) {
+            AdminEntryCard(entry = it, onClick = { onEntry(it) })
+        }
+    }
+}
+
+@Composable
+private fun AdminRoleAccessSectionScreen(
+    section: AdminRoleAccessSection,
+    onEntry: (AdminEntry) -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = adminBottomBarReservedPadding),
+        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            AdminHeader(
+                title = section.title,
+                eyebrow = "Alta de roles",
                 summary = section.summary,
                 onSignOut = {},
                 showSignOut = false,
@@ -1405,6 +1557,8 @@ private fun AdminRoute.root(): AdminRoot = when (this) {
     is AdminRoute.ConfigurationSection -> AdminRoot.Configuration
     is AdminRoute.ConfigurationSubsection -> AdminRoot.Configuration
     is AdminRoute.ConfigurationConvergence -> AdminRoot.Configuration
+    is AdminRoute.RoleAccessSection -> AdminRoot.RoleAccess
+    is AdminRoute.RoleAccessSubsection -> AdminRoot.RoleAccess
     is AdminRoute.TodayOrdersCategory -> AdminRoot.Operation
     is AdminRoute.TodayOrdersSubsection -> AdminRoot.Operation
     is AdminRoute.Section -> root

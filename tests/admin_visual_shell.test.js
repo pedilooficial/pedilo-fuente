@@ -249,6 +249,54 @@ test("admin configuration convergence flow is available and remains visual only"
   assert.match(source, /onConfigurationConvergence/);
 });
 
+test("admin role access exposes internal visual sections without touching real users", () => {
+  const source = fs.readFileSync(admin, "utf8");
+  [
+    "Usuarios del equipo",
+    "Administradores",
+    "Locales store",
+    "Repartidores driver",
+    "Altas pendientes",
+    "Usuarios inactivos",
+    "Vinculaciones pendientes",
+    "Cuentas activas",
+    "Cuentas en revisión",
+    "Roles asignados",
+    "Estado de acceso",
+    "Vínculos operativos",
+    "Cuentas Admin",
+    "Estado de revisión",
+    "Acceso administrativo",
+    "Sensibilidad del rol",
+    "Cuentas Local",
+    "Local vinculado",
+    "Vinculación pendiente",
+    "Revisión de cuenta",
+    "Cuentas Repartidor",
+    "Repartidor vinculado",
+    "Cuentas por revisar",
+    "Rol previsto",
+    "Datos faltantes",
+    "Estado pendiente",
+    "Revisión antes de activar",
+    "Cuentas inactivas",
+    "Acceso detenido",
+    "Motivo visible",
+    "Revisión pendiente",
+    "Posible reactivación futura",
+    "Cuenta store sin local vinculado",
+    "Cuenta driver sin repartidor vinculado",
+    "Relación incompleta",
+    "Entidad pendiente",
+    "Revisión de vínculo",
+  ].forEach((label) => assert.match(source, new RegExp(label)));
+
+  assert.match(source, /AdminRoleAccessSectionScreen/);
+  assert.match(source, /AdminRoute\.RoleAccessSection/);
+  assert.match(source, /AdminRoute\.RoleAccessSubsection/);
+  assert.match(source, /AdminRoute\.RoleAccess -> AdminRootScreen[\s\S]*showSignOut = false/);
+});
+
 test("admin order detail convergence exposes Pedido #____ variants and solve flow without real data", () => {
   const source = fs.readFileSync(admin, "utf8");
   const forbiddenTitles = ["Pedido vivo", "Detalle del pedido", "Resolución del pedido"];
