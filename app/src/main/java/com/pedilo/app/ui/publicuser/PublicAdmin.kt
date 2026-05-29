@@ -80,12 +80,29 @@ private sealed interface AdminRoute {
     ) : AdminRoute
     data class RoleAccessSection(val section: AdminRoleAccessSection) : AdminRoute
     data class RoleAccessSubsection(val section: AdminRoleAccessSection, val title: String) : AdminRoute
+    data class RoleAccessConvergence(
+        val section: String,
+        val subsection: String,
+        val step: AdminRoleAccessConvergenceStep,
+    ) : AdminRoute
 }
 
 private enum class AdminConfigurationConvergenceStep {
     Entity,
     Editor,
     Preview,
+    Impact,
+    SensitiveConfirmation,
+    Result,
+}
+
+private enum class AdminRoleAccessConvergenceStep {
+    Account,
+    CreateAccount,
+    AccessEditor,
+    ChangeRole,
+    ToggleAccess,
+    LinkEntity,
     Impact,
     SensitiveConfirmation,
     Result,
@@ -568,6 +585,20 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 AdminConfigurationConvergenceStep.Result -> current.copy(step = AdminConfigurationConvergenceStep.SensitiveConfirmation)
             }
             is AdminRoute.RoleAccessSubsection -> AdminRoute.RoleAccessSection(current.section)
+            is AdminRoute.RoleAccessConvergence -> when (current.step) {
+                AdminRoleAccessConvergenceStep.Account -> AdminRoute.RoleAccessSubsection(
+                    section = roleAccessSections.first { it.title == current.section },
+                    title = current.subsection,
+                )
+                AdminRoleAccessConvergenceStep.CreateAccount -> current.copy(step = AdminRoleAccessConvergenceStep.Account)
+                AdminRoleAccessConvergenceStep.AccessEditor -> current.copy(step = AdminRoleAccessConvergenceStep.Account)
+                AdminRoleAccessConvergenceStep.ChangeRole -> current.copy(step = AdminRoleAccessConvergenceStep.Account)
+                AdminRoleAccessConvergenceStep.ToggleAccess -> current.copy(step = AdminRoleAccessConvergenceStep.Account)
+                AdminRoleAccessConvergenceStep.LinkEntity -> current.copy(step = AdminRoleAccessConvergenceStep.Account)
+                AdminRoleAccessConvergenceStep.Impact -> current.copy(step = AdminRoleAccessConvergenceStep.Account)
+                AdminRoleAccessConvergenceStep.SensitiveConfirmation -> current.copy(step = AdminRoleAccessConvergenceStep.Impact)
+                AdminRoleAccessConvergenceStep.Result -> current.copy(step = AdminRoleAccessConvergenceStep.SensitiveConfirmation)
+            }
             is AdminRoute.RoleAccessSection -> AdminRoute.RoleAccess
             is AdminRoute.ConfigurationSubsection -> AdminRoute.ConfigurationSection(current.section)
             is AdminRoute.ConfigurationSection -> AdminRoute.Configuration
@@ -745,6 +776,19 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 summary = "Subsección de acceso lista para revisión administrativa.",
                 panelTitle = current.section.title,
                 panelText = "Este espacio ordena cuentas y vínculos de forma visual sin modificar usuarios ni roles.",
+                onRoleAccessConvergence = { initial ->
+                    route = AdminRoute.RoleAccessConvergence(
+                        section = current.section.title,
+                        subsection = current.title,
+                        step = initial,
+                    )
+                },
+            )
+            is AdminRoute.RoleAccessConvergence -> AdminRoleAccessConvergenceScreen(
+                section = current.section,
+                subsection = current.subsection,
+                step = current.step,
+                onNext = { next -> route = current.copy(step = next) },
             )
             is AdminRoute.Section -> AdminSectionScreen(
                 root = current.root,
@@ -955,6 +999,7 @@ private fun AdminSectionScreen(
     onOrderDetail: (OperationOrderVariant) -> Unit = {},
     onOperationalProfile: (AdminOperationalProfileKind) -> Unit = {},
     onConfigurationConvergence: () -> Unit = {},
+    onRoleAccessConvergence: (AdminRoleAccessConvergenceStep) -> Unit = {},
 ) {
     val allowStoreProfile = title in listOf(
         "Vendiendo ahora",
@@ -1022,6 +1067,110 @@ private fun AdminSectionScreen(
                     onClick = onConfigurationConvergence,
                 )
             }
+        }
+        if (root == AdminRoot.RoleAccess) {
+            val initialStep = when (title) {
+                "Altas pendientes" -> AdminRoleAccessConvergenceStep.CreateAccount
+                "Usuarios inactivos" -> AdminRoleAccessConvergenceStep.ToggleAccess
+                "Vinculaciones pendientes" -> AdminRoleAccessConvergenceStep.LinkEntity
+                else -> AdminRoleAccessConvergenceStep.Account
+            }
+            item {
+                AdminEntryCard(
+                    entry = AdminEntry("Cuenta concreta", "Abrir detalle de cuenta y acciones disponibles"),
+                    onClick = { onRoleAccessConvergence(initialStep) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdminRoleAccessConvergenceScreen(
+    section: String,
+    subsection: String,
+    step: AdminRoleAccessConvergenceStep,
+    onNext: (AdminRoleAccessConvergenceStep) -> Unit,
+) {
+    val title = when (step) {
+        AdminRoleAccessConvergenceStep.Account -> "Cuenta concreta"
+        AdminRoleAccessConvergenceStep.CreateAccount -> "Alta de cuenta"
+        AdminRoleAccessConvergenceStep.AccessEditor -> "Editor de acceso"
+        AdminRoleAccessConvergenceStep.ChangeRole -> "Cambio de rol"
+        AdminRoleAccessConvergenceStep.ToggleAccess -> "Activar o desactivar"
+        AdminRoleAccessConvergenceStep.LinkEntity -> "Vincular entidad"
+        AdminRoleAccessConvergenceStep.Impact -> "Impacto"
+        AdminRoleAccessConvergenceStep.SensitiveConfirmation -> "Confirmación sensible"
+        AdminRoleAccessConvergenceStep.Result -> "Resultado"
+    }
+    val summary = when (step) {
+        AdminRoleAccessConvergenceStep.Account -> "Detalle de cuenta y acciones de acceso."
+        AdminRoleAccessConvergenceStep.CreateAccount -> "Preparación de alta sin crear usuario real."
+        AdminRoleAccessConvergenceStep.AccessEditor -> "Revisión de datos permitidos de acceso."
+        AdminRoleAccessConvergenceStep.ChangeRole -> "Revisión de cambio entre Admin, Local y Repartidor."
+        AdminRoleAccessConvergenceStep.ToggleAccess -> "Revisión de habilitación o detención de ingreso."
+        AdminRoleAccessConvergenceStep.LinkEntity -> "Revisión de vínculo operativo de la cuenta."
+        AdminRoleAccessConvergenceStep.Impact -> "Evaluación de alcance antes de confirmar."
+        AdminRoleAccessConvergenceStep.SensitiveConfirmation -> "Validación final previa al resultado."
+        AdminRoleAccessConvergenceStep.Result -> "Cierre de revisión sin aplicación real."
+    }
+    val context = when (step) {
+        AdminRoleAccessConvergenceStep.Account -> "Cuenta: persona@equipo.com · Nombre visible: Referencia de cuenta · Rol: Local · Estado: En revisión · Puede ingresar: Pendiente."
+        AdminRoleAccessConvergenceStep.CreateAccount -> "Email, nombre visible, rol previsto y vínculo requerido.\nNo se crean cuentas reales en este bloque."
+        AdminRoleAccessConvergenceStep.AccessEditor -> "Campos permitidos: nombre visible, observación administrativa y estado de revisión.\nNo se editan datos sensibles de autenticación."
+        AdminRoleAccessConvergenceStep.ChangeRole -> "Rol actual y rol nuevo dentro de Admin, Local y Repartidor.\nNo modifica pedidos, tickets ni catálogo."
+        AdminRoleAccessConvergenceStep.ToggleAccess -> "Estado actual y nuevo estado de ingreso.\nDesactivar corta ingreso pero no borra historial ni pedidos."
+        AdminRoleAccessConvergenceStep.LinkEntity -> "Cuenta y vínculo operativo pendiente.\nLa entidad se gestiona en su bloque dueño."
+        AdminRoleAccessConvergenceStep.Impact -> "Qué cambia en acceso y vínculo, y qué no cambia.\nNo afecta pedidos existentes, tracking, catálogo ni operación viva."
+        AdminRoleAccessConvergenceStep.SensitiveConfirmation -> "Acción sensible en revisión final para cuenta del equipo.\nNo aplica cambios reales en esta etapa."
+        AdminRoleAccessConvergenceStep.Result -> "La revisión quedó preparada.\nNo se aplicaron cambios reales."
+    }
+    val next = when (step) {
+        AdminRoleAccessConvergenceStep.Account -> AdminRoleAccessConvergenceStep.AccessEditor
+        AdminRoleAccessConvergenceStep.CreateAccount -> AdminRoleAccessConvergenceStep.Impact
+        AdminRoleAccessConvergenceStep.AccessEditor -> AdminRoleAccessConvergenceStep.ChangeRole
+        AdminRoleAccessConvergenceStep.ChangeRole -> AdminRoleAccessConvergenceStep.Impact
+        AdminRoleAccessConvergenceStep.ToggleAccess -> AdminRoleAccessConvergenceStep.Impact
+        AdminRoleAccessConvergenceStep.LinkEntity -> AdminRoleAccessConvergenceStep.Impact
+        AdminRoleAccessConvergenceStep.Impact -> AdminRoleAccessConvergenceStep.SensitiveConfirmation
+        AdminRoleAccessConvergenceStep.SensitiveConfirmation -> AdminRoleAccessConvergenceStep.Result
+        AdminRoleAccessConvergenceStep.Result -> AdminRoleAccessConvergenceStep.Account
+    }
+    val actionLabel = when (step) {
+        AdminRoleAccessConvergenceStep.Account -> "Abrir editor de acceso"
+        AdminRoleAccessConvergenceStep.CreateAccount -> "Revisar impacto"
+        AdminRoleAccessConvergenceStep.AccessEditor -> "Revisar cambio de rol"
+        AdminRoleAccessConvergenceStep.ChangeRole -> "Evaluar impacto"
+        AdminRoleAccessConvergenceStep.ToggleAccess -> "Evaluar impacto"
+        AdminRoleAccessConvergenceStep.LinkEntity -> "Evaluar impacto"
+        AdminRoleAccessConvergenceStep.Impact -> "Ir a confirmación"
+        AdminRoleAccessConvergenceStep.SensitiveConfirmation -> "Confirmar de forma visual"
+        AdminRoleAccessConvergenceStep.Result -> "Reiniciar revisión"
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = adminBottomBarReservedPadding),
+        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item { AdminHeader(title = title, eyebrow = "Alta de roles", summary = summary, onSignOut = {}, showSignOut = false) }
+        item { AdminInfoPanel(title = "Contexto", text = "Sección: $section · Subsección: $subsection\n$context") }
+        item {
+            AdminInfoPanel(
+                title = "Roles permitidos",
+                text = "Admin · Local · Repartidor",
+            )
+        }
+        item {
+            AdminActionCard(
+                title = actionLabel,
+                note = "Continuar sin aplicar cambios reales.",
+                onClick = { onNext(next) },
+            )
         }
     }
 }
@@ -1559,6 +1708,7 @@ private fun AdminRoute.root(): AdminRoot = when (this) {
     is AdminRoute.ConfigurationConvergence -> AdminRoot.Configuration
     is AdminRoute.RoleAccessSection -> AdminRoot.RoleAccess
     is AdminRoute.RoleAccessSubsection -> AdminRoot.RoleAccess
+    is AdminRoute.RoleAccessConvergence -> AdminRoot.RoleAccess
     is AdminRoute.TodayOrdersCategory -> AdminRoot.Operation
     is AdminRoute.TodayOrdersSubsection -> AdminRoot.Operation
     is AdminRoute.Section -> root

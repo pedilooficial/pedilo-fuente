@@ -294,7 +294,30 @@ test("admin role access exposes internal visual sections without touching real u
   assert.match(source, /AdminRoleAccessSectionScreen/);
   assert.match(source, /AdminRoute\.RoleAccessSection/);
   assert.match(source, /AdminRoute\.RoleAccessSubsection/);
+  assert.match(source, /AdminRoute\.RoleAccessConvergence/);
   assert.match(source, /AdminRoute\.RoleAccess -> AdminRootScreen[\s\S]*showSignOut = false/);
+});
+
+test("admin role access convergence flow is available and restricted to visual mode", () => {
+  const source = fs.readFileSync(admin, "utf8");
+  [
+    "Cuenta concreta",
+    "Alta de cuenta",
+    "Editor de acceso",
+    "Cambio de rol",
+    "Activar o desactivar",
+    "Vincular entidad",
+    "Impacto",
+    "Confirmación sensible",
+    "Resultado",
+    "No se aplicaron cambios reales",
+    "Admin · Local · Repartidor",
+  ].forEach((label) => assert.match(source, new RegExp(label)));
+
+  assert.match(source, /AdminRoleAccessConvergenceScreen/);
+  assert.match(source, /AdminRoleAccessConvergenceStep/);
+  assert.match(source, /onRoleAccessConvergence/);
+  assert.doesNotMatch(source, /supervisor|soporte|cajero|operador|owner|manager/);
 });
 
 test("admin order detail convergence exposes Pedido #____ variants and solve flow without real data", () => {
