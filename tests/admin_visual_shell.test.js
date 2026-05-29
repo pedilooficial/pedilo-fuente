@@ -154,6 +154,83 @@ test("admin configuration and role access roots expose their planned entries", (
   ].forEach((label) => assert.match(source, new RegExp(label)));
 });
 
+test("admin configuration exposes internal visual sections without operational mixing", () => {
+  const source = fs.readFileSync(admin, "utf8");
+
+  [
+    "Presentación pública",
+    "Banners y avisos",
+    "Textos visibles",
+    "Seguimiento público",
+    "Orden y visibilidad de secciones",
+    "Datos del local",
+    "Información pública",
+    "Horarios y descripción",
+    "Estado de configuración",
+    "Revisión estructural",
+    "Categorías",
+    "Subcategorías",
+    "Productos",
+    "Precios",
+    "Imágenes",
+    "Disponibilidad",
+    "Visibilidad",
+    "Reglas de creación",
+    "Estados visibles",
+    "Seguimiento futuro",
+    "Reglas de tiempos extendidos",
+    "Reglas de cancelación",
+    "Comportamiento del pedido",
+    "Plantillas",
+    "Avisos",
+    "Destinatario conceptual",
+    "Canal previsto",
+    "Revisión de mensaje",
+    "Impacto del cambio",
+    "Criterios de retraso",
+    "Criterios de problemas",
+    "Umbrales operativos",
+    "Clasificaciones",
+    "Reglas de atención",
+    "Condiciones para revisión",
+    "Datos mínimos",
+    "Reglas de publicación",
+    "Bloqueos por incompleto",
+    "Validaciones de pedido",
+    "Validaciones de local",
+    "Validaciones de producto",
+    "Condiciones generales",
+    "Cambios de configuración",
+    "Publicaciones",
+    "Desactivaciones",
+    "Cambios sensibles",
+    "Intervenciones Admin registradas",
+    "Detalle de registro",
+    "Impacto registrado",
+    "Resultado registrado",
+    "Modo seguro",
+    "Restricciones temporales",
+    "Avisos globales excepcionales",
+    "Estado de emergencia",
+    "Alcance",
+    "Confirmación futura",
+    "Registro posterior",
+    "Parámetros generales",
+    "Preferencias administrativas",
+    "Estado general de configuración",
+    "Pendientes globales",
+    "Derivación al bloque dueño",
+  ].forEach((label) => assert.match(source, new RegExp(label)));
+
+  assert.match(source, /AdminConfigurationSectionScreen/);
+  assert.match(source, /AdminRoute\.ConfigurationSection/);
+  assert.match(source, /AdminRoute\.ConfigurationSubsection/);
+  assert.match(
+    source,
+    /AdminRoute\.Configuration -> AdminRootScreen[\s\S]*showSignOut = false/,
+  );
+});
+
 test("admin order detail convergence exposes Pedido #____ variants and solve flow without real data", () => {
   const source = fs.readFileSync(admin, "utf8");
   const forbiddenTitles = ["Pedido vivo", "Detalle del pedido", "Resolución del pedido"];

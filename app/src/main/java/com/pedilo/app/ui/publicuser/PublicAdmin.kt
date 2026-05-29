@@ -71,6 +71,8 @@ private sealed interface AdminRoute {
     data class TodayOrdersCategory(val category: AdminTodayOrdersCategory) : AdminRoute
     data class TodayOrdersSubsection(val category: AdminTodayOrdersCategory, val title: String) : AdminRoute
     data class Section(val root: AdminRoot, val title: String) : AdminRoute
+    data class ConfigurationSection(val section: AdminConfigurationSection) : AdminRoute
+    data class ConfigurationSubsection(val section: AdminConfigurationSection, val title: String) : AdminRoute
 }
 
 private enum class AdminOperationalProfileKind {
@@ -102,6 +104,14 @@ private data class AdminOrderDetailEntry(
     val label: String,
     val note: String,
     val variant: OperationOrderVariant,
+)
+
+private data class AdminConfigurationSection(
+    val title: String,
+    val summary: String,
+    val contextTitle: String,
+    val contextText: String,
+    val entries: List<AdminEntry>,
 )
 
 private val adminBottomBarReservedPadding = 112.dp
@@ -244,6 +254,152 @@ private val configurationEntries = listOf(
     "General",
 ).map { AdminEntry(it, "Ajustes preparados para la app") }
 
+private val configurationSections = listOf(
+    AdminConfigurationSection(
+        title = "Usuario público",
+        summary = "Definiciones de experiencia visible para personas usuarias.",
+        contextTitle = "Experiencia pública",
+        contextText = "Ordena criterios de presentación sin cambiar flujos reales ni guardar cambios.",
+        entries = listOf(
+            AdminEntry("Presentación pública", "Lineamientos de portada y acceso"),
+            AdminEntry("Banners y avisos", "Espacios de comunicación visible"),
+            AdminEntry("Textos visibles", "Mensajes y etiquetas públicas"),
+            AdminEntry("Seguimiento público", "Criterios de lectura de seguimiento"),
+            AdminEntry("Orden y visibilidad de secciones", "Prioridad de bloques en pantalla"),
+        ),
+    ),
+    AdminConfigurationSection(
+        title = "Locales",
+        summary = "Estructura de información de comercios.",
+        contextTitle = "Estructura del local",
+        contextText = "Prepara criterios de datos del local sin operar pedidos ni cuentas.",
+        entries = listOf(
+            AdminEntry("Datos del local", "Identidad y referencia comercial"),
+            AdminEntry("Información pública", "Datos mostrables al usuario público"),
+            AdminEntry("Horarios y descripción", "Disponibilidad declarativa"),
+            AdminEntry("Estado de configuración", "Nivel de preparación del local"),
+            AdminEntry("Revisión estructural", "Control de consistencia administrativa"),
+        ),
+    ),
+    AdminConfigurationSection(
+        title = "Catálogo y productos",
+        summary = "Estructura de entidades vendibles.",
+        contextTitle = "Oferta configurable",
+        contextText = "Prepara categorías y criterios de oferta para pedidos futuros.",
+        entries = listOf(
+            AdminEntry("Categorías", "Agrupación principal de oferta"),
+            AdminEntry("Subcategorías", "Detalle interno de categorías"),
+            AdminEntry("Productos", "Entidades publicables"),
+            AdminEntry("Precios", "Criterios de valor"),
+            AdminEntry("Imágenes", "Recursos visuales de producto"),
+            AdminEntry("Disponibilidad", "Condiciones de oferta"),
+            AdminEntry("Visibilidad", "Reglas de exposición pública"),
+        ),
+    ),
+    AdminConfigurationSection(
+        title = "Pedidos",
+        summary = "Criterios estructurales del flujo de pedido.",
+        contextTitle = "Reglas del pedido",
+        contextText = "Define parámetros generales sin abrir pedidos concretos ni estados vivos.",
+        entries = listOf(
+            AdminEntry("Reglas de creación", "Condiciones para iniciar pedidos"),
+            AdminEntry("Estados visibles", "Etapas mostrables al público"),
+            AdminEntry("Seguimiento futuro", "Criterios de lectura de avance"),
+            AdminEntry("Reglas de tiempos extendidos", "Criterios de tiempos extendidos"),
+            AdminEntry("Reglas de cancelación", "Criterios generales de cancelación"),
+            AdminEntry("Comportamiento del pedido", "Normas de consistencia del flujo"),
+        ),
+    ),
+    AdminConfigurationSection(
+        title = "Comunicación",
+        summary = "Estructura de mensajes y avisos.",
+        contextTitle = "Mensajería administrativa",
+        contextText = "Organiza plantillas y criterios de comunicación sin envío real.",
+        entries = listOf(
+            AdminEntry("Plantillas", "Base de mensajes reutilizables"),
+            AdminEntry("Avisos", "Comunicaciones puntuales"),
+            AdminEntry("Destinatario conceptual", "Segmentación administrativa"),
+            AdminEntry("Canal previsto", "Canal definido para futuras etapas"),
+            AdminEntry("Revisión de mensaje", "Control de claridad y tono"),
+            AdminEntry("Impacto del cambio", "Efecto esperado del ajuste"),
+        ),
+    ),
+    AdminConfigurationSection(
+        title = "Operación",
+        summary = "Criterios de lectura operativa.",
+        contextTitle = "Marco de operación",
+        contextText = "Define criterios de interpretación, no la operación viva del día.",
+        entries = listOf(
+            AdminEntry("Criterios de retraso", "Reglas para identificar retrasos"),
+            AdminEntry("Criterios de problemas", "Reglas de clasificación de incidencias"),
+            AdminEntry("Umbrales operativos", "Límites para alertas de seguimiento"),
+            AdminEntry("Clasificaciones", "Ejes de agrupación operativa"),
+            AdminEntry("Reglas de atención", "Prioridades de revisión"),
+            AdminEntry("Condiciones para revisión", "Cuándo escalar un caso"),
+        ),
+    ),
+    AdminConfigurationSection(
+        title = "Reglas y validaciones",
+        summary = "Condiciones generales de integridad.",
+        contextTitle = "Base de validación",
+        contextText = "Define mínimos de calidad sin tocar reglas técnicas de infraestructura.",
+        entries = listOf(
+            AdminEntry("Datos mínimos", "Campos requeridos por bloque"),
+            AdminEntry("Reglas de publicación", "Condiciones para mostrar cambios"),
+            AdminEntry("Bloqueos por incompleto", "Contenciones por faltantes"),
+            AdminEntry("Validaciones de pedido", "Consistencia del flujo de pedido"),
+            AdminEntry("Validaciones de local", "Consistencia de estructura comercial"),
+            AdminEntry("Validaciones de producto", "Consistencia de oferta vendible"),
+            AdminEntry("Condiciones generales", "Reglas comunes entre bloques"),
+        ),
+    ),
+    AdminConfigurationSection(
+        title = "Auditoría",
+        summary = "Trazabilidad administrativa de cambios.",
+        contextTitle = "Registro administrativo",
+        contextText = "Representa seguimiento de cambios sin exponer detalles técnicos crudos.",
+        entries = listOf(
+            AdminEntry("Cambios de configuración", "Registro por bloque"),
+            AdminEntry("Publicaciones", "Eventos de publicación"),
+            AdminEntry("Desactivaciones", "Eventos de desactivación"),
+            AdminEntry("Cambios sensibles", "Ajustes de mayor impacto"),
+            AdminEntry("Intervenciones Admin registradas", "Acciones administrativas documentadas"),
+            AdminEntry("Detalle de registro", "Resumen de contexto"),
+            AdminEntry("Impacto registrado", "Efecto administrativo declarado"),
+            AdminEntry("Resultado registrado", "Cierre del cambio representado"),
+        ),
+    ),
+    AdminConfigurationSection(
+        title = "Emergencias",
+        summary = "Marco excepcional de configuración.",
+        contextTitle = "Gestión excepcional",
+        contextText = "Define criterios de contingencia sin activar acciones reales.",
+        entries = listOf(
+            AdminEntry("Modo seguro", "Perfil de contingencia"),
+            AdminEntry("Restricciones temporales", "Alcance limitado por ventana"),
+            AdminEntry("Avisos globales excepcionales", "Comunicación de contingencia"),
+            AdminEntry("Estado de emergencia", "Lectura de situación"),
+            AdminEntry("Alcance", "Bloques potencialmente impactados"),
+            AdminEntry("Impacto", "Efecto esperado en la experiencia"),
+            AdminEntry("Confirmación futura", "Paso de verificación previa"),
+            AdminEntry("Registro posterior", "Trazabilidad luego de la contingencia"),
+        ),
+    ),
+    AdminConfigurationSection(
+        title = "General",
+        summary = "Parámetros globales de administración.",
+        contextTitle = "Marco general",
+        contextText = "Agrupa criterios transversales y deriva cada tema a su bloque dueño.",
+        entries = listOf(
+            AdminEntry("Parámetros generales", "Ajustes de alcance amplio"),
+            AdminEntry("Preferencias administrativas", "Preferencias de gestión"),
+            AdminEntry("Estado general de configuración", "Lectura consolidada de preparación"),
+            AdminEntry("Pendientes globales", "Tareas por asignar al bloque dueño"),
+            AdminEntry("Derivación al bloque dueño", "Ruta al universo responsable"),
+        ),
+    ),
+)
+
 private val roleEntries = listOf(
     "Usuarios del equipo",
     "Administradores",
@@ -283,6 +439,8 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 OperationSolveStage.Result -> AdminRoute.OperationOrderSolve(current.returnRoute, OperationSolveStage.SensitiveAction)
             }
             is AdminRoute.OperationOperationalProfile -> AdminRoute.Operation
+            is AdminRoute.ConfigurationSubsection -> AdminRoute.ConfigurationSection(current.section)
+            is AdminRoute.ConfigurationSection -> AdminRoute.Configuration
             is AdminRoute.OperationOrderDetail -> current.returnRoute
             is AdminRoute.TodayOrdersSubsection -> AdminRoute.TodayOrdersCategory(current.category)
             is AdminRoute.TodayOrdersCategory -> operationSections.first { it.title == "Pedidos del día" }.let {
@@ -325,7 +483,11 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 eyebrow = "Secciones de configuración",
                 summary = "Organizá cómo funciona Pédilo.",
                 entries = configurationEntries,
-                onEntry = { route = AdminRoute.Section(AdminRoot.Configuration, it.title) },
+                onEntry = { entry ->
+                    configurationSections.firstOrNull { it.title == entry.title }?.let {
+                        route = AdminRoute.ConfigurationSection(it)
+                    }
+                },
                 onSignOut = { showSignOut = true },
                 showSignOut = false,
             )
@@ -414,6 +576,17 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 summary = "Submundo de pedidos del día preparado para organizar la siguiente capa.",
                 panelTitle = current.category.title,
                 panelText = "Este espacio clasifica el movimiento del día sin mostrar listados reales ni acciones disponibles.",
+            )
+            is AdminRoute.ConfigurationSection -> AdminConfigurationSectionScreen(
+                section = current.section,
+                onEntry = { route = AdminRoute.ConfigurationSubsection(current.section, it.title) },
+            )
+            is AdminRoute.ConfigurationSubsection -> AdminSectionScreen(
+                root = AdminRoot.Configuration,
+                title = current.title,
+                summary = "Subsección lista para revisión administrativa.",
+                panelTitle = current.section.title,
+                panelText = "Este espacio organiza criterios sin editar datos, publicar cambios ni ejecutar acciones reales.",
             )
             is AdminRoute.Section -> AdminSectionScreen(
                 root = current.root,
@@ -544,6 +717,38 @@ private fun AdminTodayOrdersCategoryScreen(
             AdminInfoPanel(title = category.title, text = category.contextText)
         }
         items(category.entries) {
+            AdminEntryCard(entry = it, onClick = { onEntry(it) })
+        }
+    }
+}
+
+@Composable
+private fun AdminConfigurationSectionScreen(
+    section: AdminConfigurationSection,
+    onEntry: (AdminEntry) -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = adminBottomBarReservedPadding),
+        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            AdminHeader(
+                title = section.title,
+                eyebrow = "Configuración",
+                summary = section.summary,
+                onSignOut = {},
+                showSignOut = false,
+            )
+        }
+        item {
+            AdminInfoPanel(title = section.contextTitle, text = section.contextText)
+        }
+        items(section.entries) {
             AdminEntryCard(entry = it, onClick = { onEntry(it) })
         }
     }
@@ -1065,6 +1270,8 @@ private fun AdminRoute.root(): AdminRoot = when (this) {
     is AdminRoute.OperationOrderDetail -> AdminRoot.Operation
     is AdminRoute.OperationOrderSolve -> AdminRoot.Operation
     is AdminRoute.OperationOperationalProfile -> AdminRoot.Operation
+    is AdminRoute.ConfigurationSection -> AdminRoot.Configuration
+    is AdminRoute.ConfigurationSubsection -> AdminRoot.Configuration
     is AdminRoute.TodayOrdersCategory -> AdminRoot.Operation
     is AdminRoute.TodayOrdersSubsection -> AdminRoot.Operation
     is AdminRoute.Section -> root
