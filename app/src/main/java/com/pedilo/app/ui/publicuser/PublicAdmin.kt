@@ -73,6 +73,20 @@ private sealed interface AdminRoute {
     data class Section(val root: AdminRoot, val title: String) : AdminRoute
     data class ConfigurationSection(val section: AdminConfigurationSection) : AdminRoute
     data class ConfigurationSubsection(val section: AdminConfigurationSection, val title: String) : AdminRoute
+    data class ConfigurationConvergence(
+        val section: String,
+        val subsection: String,
+        val step: AdminConfigurationConvergenceStep,
+    ) : AdminRoute
+}
+
+private enum class AdminConfigurationConvergenceStep {
+    Entity,
+    Editor,
+    Preview,
+    Impact,
+    SensitiveConfirmation,
+    Result,
 }
 
 private enum class AdminOperationalProfileKind {
@@ -439,6 +453,17 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 OperationSolveStage.Result -> AdminRoute.OperationOrderSolve(current.returnRoute, OperationSolveStage.SensitiveAction)
             }
             is AdminRoute.OperationOperationalProfile -> AdminRoute.Operation
+            is AdminRoute.ConfigurationConvergence -> when (current.step) {
+                AdminConfigurationConvergenceStep.Entity -> AdminRoute.ConfigurationSubsection(
+                    section = configurationSections.first { it.title == current.section },
+                    title = current.subsection,
+                )
+                AdminConfigurationConvergenceStep.Editor -> current.copy(step = AdminConfigurationConvergenceStep.Entity)
+                AdminConfigurationConvergenceStep.Preview -> current.copy(step = AdminConfigurationConvergenceStep.Editor)
+                AdminConfigurationConvergenceStep.Impact -> current.copy(step = AdminConfigurationConvergenceStep.Preview)
+                AdminConfigurationConvergenceStep.SensitiveConfirmation -> current.copy(step = AdminConfigurationConvergenceStep.Impact)
+                AdminConfigurationConvergenceStep.Result -> current.copy(step = AdminConfigurationConvergenceStep.SensitiveConfirmation)
+            }
             is AdminRoute.ConfigurationSubsection -> AdminRoute.ConfigurationSection(current.section)
             is AdminRoute.ConfigurationSection -> AdminRoute.Configuration
             is AdminRoute.OperationOrderDetail -> current.returnRoute
@@ -587,6 +612,19 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 summary = "Subsección lista para revisión administrativa.",
                 panelTitle = current.section.title,
                 panelText = "Este espacio organiza criterios sin editar datos, publicar cambios ni ejecutar acciones reales.",
+                onConfigurationConvergence = {
+                    route = AdminRoute.ConfigurationConvergence(
+                        section = current.section.title,
+                        subsection = current.title,
+                        step = AdminConfigurationConvergenceStep.Entity,
+                    )
+                },
+            )
+            is AdminRoute.ConfigurationConvergence -> AdminConfigurationConvergenceScreen(
+                section = current.section,
+                subsection = current.subsection,
+                step = current.step,
+                onNext = { next -> route = current.copy(step = next) },
             )
             is AdminRoute.Section -> AdminSectionScreen(
                 root = current.root,
@@ -764,6 +802,7 @@ private fun AdminSectionScreen(
     orderDetailEntries: List<AdminOrderDetailEntry> = emptyList(),
     onOrderDetail: (OperationOrderVariant) -> Unit = {},
     onOperationalProfile: (AdminOperationalProfileKind) -> Unit = {},
+    onConfigurationConvergence: () -> Unit = {},
 ) {
     val allowStoreProfile = title in listOf(
         "Vendiendo ahora",
@@ -823,6 +862,99 @@ private fun AdminSectionScreen(
                     onClick = { onOperationalProfile(AdminOperationalProfileKind.Driver) },
                 )
             }
+        }
+        if (root == AdminRoot.Configuration) {
+            item {
+                AdminEntryCard(
+                    entry = AdminEntry("Entidad configurable", "Abrir flujo de revisión del cambio"),
+                    onClick = onConfigurationConvergence,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdminConfigurationConvergenceScreen(
+    section: String,
+    subsection: String,
+    step: AdminConfigurationConvergenceStep,
+    onNext: (AdminConfigurationConvergenceStep) -> Unit,
+) {
+    val title = when (step) {
+        AdminConfigurationConvergenceStep.Entity -> "Entidad configurable"
+        AdminConfigurationConvergenceStep.Editor -> "Editor"
+        AdminConfigurationConvergenceStep.Preview -> "Preview y revisión"
+        AdminConfigurationConvergenceStep.Impact -> "Impacto"
+        AdminConfigurationConvergenceStep.SensitiveConfirmation -> "Confirmación sensible"
+        AdminConfigurationConvergenceStep.Result -> "Resultado"
+    }
+    val summary = when (step) {
+        AdminConfigurationConvergenceStep.Entity -> "Lectura base de lo que se quiere ajustar."
+        AdminConfigurationConvergenceStep.Editor -> "Preparación del cambio sin aplicarlo."
+        AdminConfigurationConvergenceStep.Preview -> "Revisión conceptual antes de continuar."
+        AdminConfigurationConvergenceStep.Impact -> "Evaluación de alcance y efectos esperados."
+        AdminConfigurationConvergenceStep.SensitiveConfirmation -> "Validación previa para cambios sensibles."
+        AdminConfigurationConvergenceStep.Result -> "Cierre de la secuencia de revisión."
+    }
+    val context = when (step) {
+        AdminConfigurationConvergenceStep.Entity -> "Sección: $section · Subsección: $subsection.\nControla alcance, estado actual y restricciones sin ejecutar acciones."
+        AdminConfigurationConvergenceStep.Editor -> "Valor actual y nuevo valor se muestran para revisar.\nNo se guardan cambios reales ni se publica contenido."
+        AdminConfigurationConvergenceStep.Preview -> "Comparación conceptual del cambio.\nTodavía no está aplicado en la app real."
+        AdminConfigurationConvergenceStep.Impact -> "Qué cambia, qué afecta y qué no cambia.\nSolo lectura de impacto, sin aplicación."
+        AdminConfigurationConvergenceStep.SensitiveConfirmation -> "Confirmación humana del alcance y advertencias.\nEl botón de confirmar es solo visual en este bloque."
+        AdminConfigurationConvergenceStep.Result -> "La revisión quedó preparada para una etapa posterior.\nNo se aplicaron cambios reales."
+    }
+    val action = when (step) {
+        AdminConfigurationConvergenceStep.Entity -> "Ir al editor" to AdminConfigurationConvergenceStep.Editor
+        AdminConfigurationConvergenceStep.Editor -> "Ir a preview" to AdminConfigurationConvergenceStep.Preview
+        AdminConfigurationConvergenceStep.Preview -> "Revisar impacto" to AdminConfigurationConvergenceStep.Impact
+        AdminConfigurationConvergenceStep.Impact -> "Continuar a confirmación" to AdminConfigurationConvergenceStep.SensitiveConfirmation
+        AdminConfigurationConvergenceStep.SensitiveConfirmation -> "Confirmar de forma visual" to AdminConfigurationConvergenceStep.Result
+        AdminConfigurationConvergenceStep.Result -> "Reiniciar revisión" to AdminConfigurationConvergenceStep.Entity
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = adminBottomBarReservedPadding),
+        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            AdminHeader(
+                title = title,
+                eyebrow = "Configuración",
+                summary = summary,
+                onSignOut = {},
+                showSignOut = false,
+            )
+        }
+        item { AdminInfoPanel(title = "Contexto", text = context) }
+        if (step == AdminConfigurationConvergenceStep.Editor) {
+            item {
+                AdminInfoPanel(
+                    title = "Campos del editor",
+                    text = "Valor actual · Nuevo valor · Campo requerido · Campo bloqueado · Guardado como borrador (solo visual).",
+                )
+            }
+        }
+        if (step == AdminConfigurationConvergenceStep.Impact || step == AdminConfigurationConvergenceStep.SensitiveConfirmation) {
+            item {
+                AdminInfoPanel(
+                    title = "Impacto esperado",
+                    text = "Qué cambia · Qué afecta · Qué no afecta · Requisitos previos.",
+                )
+            }
+        }
+        item {
+            AdminActionCard(
+                title = action.first,
+                note = "Continuar sin aplicar cambios reales.",
+                onClick = { onNext(action.second) },
+            )
         }
     }
 }
@@ -1272,6 +1404,7 @@ private fun AdminRoute.root(): AdminRoot = when (this) {
     is AdminRoute.OperationOperationalProfile -> AdminRoot.Operation
     is AdminRoute.ConfigurationSection -> AdminRoot.Configuration
     is AdminRoute.ConfigurationSubsection -> AdminRoot.Configuration
+    is AdminRoute.ConfigurationConvergence -> AdminRoot.Configuration
     is AdminRoute.TodayOrdersCategory -> AdminRoot.Operation
     is AdminRoute.TodayOrdersSubsection -> AdminRoot.Operation
     is AdminRoute.Section -> root

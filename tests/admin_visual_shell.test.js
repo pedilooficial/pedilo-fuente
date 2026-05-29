@@ -225,10 +225,28 @@ test("admin configuration exposes internal visual sections without operational m
   assert.match(source, /AdminConfigurationSectionScreen/);
   assert.match(source, /AdminRoute\.ConfigurationSection/);
   assert.match(source, /AdminRoute\.ConfigurationSubsection/);
+  assert.match(source, /AdminRoute\.ConfigurationConvergence/);
   assert.match(
     source,
     /AdminRoute\.Configuration -> AdminRootScreen[\s\S]*showSignOut = false/,
   );
+});
+
+test("admin configuration convergence flow is available and remains visual only", () => {
+  const source = fs.readFileSync(admin, "utf8");
+  [
+    "Entidad configurable",
+    "Editor",
+    "Preview y revisión",
+    "Impacto",
+    "Confirmación sensible",
+    "Resultado",
+    "No se aplicaron cambios reales",
+  ].forEach((label) => assert.match(source, new RegExp(label)));
+
+  assert.match(source, /AdminConfigurationConvergenceScreen/);
+  assert.match(source, /AdminConfigurationConvergenceStep/);
+  assert.match(source, /onConfigurationConvergence/);
 });
 
 test("admin order detail convergence exposes Pedido #____ variants and solve flow without real data", () => {
