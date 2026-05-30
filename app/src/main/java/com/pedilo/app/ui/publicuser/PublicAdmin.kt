@@ -40,8 +40,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pedilo.app.core.model.AdminActiveOrdersBucket
+import com.pedilo.app.core.model.AdminOperationOrderClassification
+import com.pedilo.app.core.model.AdminOperationOrderSignals
 import com.pedilo.app.core.model.AdminOrderDetail
 import com.pedilo.app.core.model.AdminOrderSummary
+import com.pedilo.app.core.model.AdminProblemOrdersBucket
+import com.pedilo.app.core.model.AdminTodayOrdersBucket
 import com.pedilo.app.core.result.CoreResult
 import com.pedilo.app.core.runtime.adminOrdersUseCase
 import kotlinx.coroutines.launch
@@ -182,7 +187,7 @@ private val todayOrdersCategories = listOf(
     AdminTodayOrdersCategory(
         title = "Activos",
         summary = "Pedidos del día que siguen en curso",
-        contextText = "Pedidos con status=created y publicStatus=Pedido recibido. Clasificación real basada en contrato.",
+        contextText = "Pedidos recibidos que siguen abiertos dentro del día.",
         entries = listOf(
             AdminEntry("Esperando local", "Pedidos creados esperando respuesta del local"),
         ),
@@ -190,7 +195,7 @@ private val todayOrdersCategories = listOf(
     AdminTodayOrdersCategory(
         title = "Finalizados",
         summary = "Pedidos del día cerrados correctamente",
-        contextText = "Pedidos con estados de entrega/cierre/archivado. Sin datos reales actualmente.",
+        contextText = "Pedidos entregados, retirados o enviados dentro del día.",
         entries = listOf(
             AdminEntry("Entregados", "Pedidos completados exitosamente"),
             AdminEntry("Retirados", "Retirados en local"),
@@ -199,26 +204,28 @@ private val todayOrdersCategories = listOf(
     ),
     AdminTodayOrdersCategory(
         title = "Cancelados",
-        summary = "Pedidos del día cancelados",
-        contextText = "Pedidos con status=cancelled. Clasificación real basada en contrato.",
+        summary = "Pedidos del día cerrados sin completar",
+        contextText = "Pedidos cancelados antes de completarse.",
         entries = listOf(
-            AdminEntry("Cancelados", "Pedidos cancelados sin completar"),
+            AdminEntry("Cancelados por cliente", "Iniciados por la persona usuaria"),
+            AdminEntry("Cancelados por local", "Iniciados por el comercio"),
+            AdminEntry("Cancelados por operación", "Iniciados por el equipo"),
         ),
     ),
     AdminTodayOrdersCategory(
         title = "Demorados",
         summary = "Pedidos del día con tiempo excedido",
-        contextText = "Pedidos con señal de demora. Sin criterio real actualmente.",
+        contextText = "Pedidos con tiempo de espera excedido en alguna etapa.",
         entries = listOf(
-            AdminEntry("Esperando local", "Demora de aceptación"),
-            AdminEntry("Preparando", "Demora de preparación"),
-            AdminEntry("En entrega", "Demora de reparto"),
+            AdminEntry("Esperando local", "Espera de aceptación"),
+            AdminEntry("Preparando", "Espera de preparación"),
+            AdminEntry("En entrega", "Espera de reparto"),
         ),
     ),
     AdminTodayOrdersCategory(
         title = "Con problemas",
-        summary = "Pedidos del día con incidencias",
-        contextText = "Pedidos con señal de problema. Sin señal real actualmente.",
+        summary = "Pedidos del día marcados con incidencia",
+        contextText = "Pedidos con incidencias que requieren revisión operativa.",
         entries = listOf(
             AdminEntry("Local no responde", "Requiere seguimiento"),
             AdminEntry("Reclamo del cliente", "Requiere revisión"),
@@ -564,7 +571,6 @@ private fun orderDetailEntriesFor(
         else -> OperationOrderVariant.Normal
     }
     return real?.let {
-        val signals = AdminOperationOrderSignals.from(it)
         val sourceLabel = AdminOperationOrderClassification.sourceLabel(it.source, it.requestType)
         listOf(
             AdminOrderDetailEntry(
@@ -1339,7 +1345,7 @@ private fun AdminOrderDetailScreen(
             AdminHeader(
                 title = detail?.trackingNumber?.ifBlank { "Pedido #____" } ?: "Pedido #____",
                 eyebrow = "Operación",
-                summary = detail?.publicStatus?.ifBlank { "Lectura read-only del pedido." } ?: "Qué está pasando con este pedido ahora.",
+                summary = detail?.publicStatus?.ifBlank { "Seguimiento del pedido." } ?: "Qué está pasando con este pedido ahora.",
                 onSignOut = {},
                 showSignOut = false,
             )
@@ -1780,24 +1786,27 @@ private fun AdminRoute.root(): AdminRoot = when (this) {
 
 private fun List<AdminOrderSummary>.todayOrders(): Map<AdminTodayOrdersBucket, List<AdminOrderSummary>> {
     val ordersWithSignals = map { order -> order to AdminOperationOrderSignals.from(order) }
-    return ordersWithSignals.groupBy { (_, signals) -> signals.todayBucket(signals) ?: AdminTodayOrdersBucket.WITH_PROBLEMS }
-        .filterKeys { it != null }
-        .mapKeys { it.key!! }
-        .mapValues { (_, orders) -> orders.map { it.first } }
+    return ordersWithSignals
+        .mapNotNull { (order, signals) ->
+            AdminOperationOrderClassification.todayBucket(signals)?.let { it to order }
+        }
+        .groupBy({ it.first }, { it.second })
 }
 
 private fun List<AdminOrderSummary>.activeOrders(): Map<AdminActiveOrdersBucket, List<AdminOrderSummary>> {
     val ordersWithSignals = map { order -> order to AdminOperationOrderSignals.from(order) }
-    return ordersWithSignals.groupBy { (_, signals) -> signals.activeBucket(signals) ?: AdminActiveOrdersBucket.WAITING_STORE }
-        .filterKeys { it != null }
-        .mapKeys { it.key!! }
-        .mapValues { (_, orders) -> orders.map { it.first } }
+    return ordersWithSignals
+        .mapNotNull { (order, signals) ->
+            AdminOperationOrderClassification.activeBucket(signals)?.let { it to order }
+        }
+        .groupBy({ it.first }, { it.second })
 }
 
 private fun List<AdminOrderSummary>.problemOrders(): Map<AdminProblemOrdersBucket, List<AdminOrderSummary>> {
     val ordersWithSignals = map { order -> order to AdminOperationOrderSignals.from(order) }
-    return ordersWithSignals.groupBy { (_, signals) -> signals.problemBucket(signals) ?: AdminProblemOrdersBucket.STORE_NOT_RESPONDING }
-        .filterKeys { it != null }
-        .mapKeys { it.key!! }
-        .mapValues { (_, orders) -> orders.map { it.first } }
+    return ordersWithSignals
+        .mapNotNull { (order, signals) ->
+            AdminOperationOrderClassification.problemBucket(signals)?.let { it to order }
+        }
+        .groupBy({ it.first }, { it.second })
 }
