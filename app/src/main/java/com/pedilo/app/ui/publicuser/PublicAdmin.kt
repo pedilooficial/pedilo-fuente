@@ -135,10 +135,12 @@ private data class AdminEntry(
 )
 
 private data class AdminPriorityCard(
+    val icon: String,
     val title: String,
     val count: Int,
     val note: String,
     val priority: String,
+    val tension: String,
     val targetSection: String? = null,
 )
 
@@ -615,45 +617,57 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
 
     val operationDeskCards = listOf(
         AdminPriorityCard(
+            icon = "!",
             title = "Necesitan atención",
             count = problemCount,
             note = if (problemCount == 0) "No hay pedidos con revisión urgente." else "Pedidos que requieren revisión operativa.",
             priority = "Prioridad alta",
+            tension = "Casos sensibles",
             targetSection = "Pedidos con problemas",
         ),
         AdminPriorityCard(
+            icon = "R",
             title = "Demorados",
             count = delayedCount,
             note = if (delayedCount == 0) "Sin pedidos Demorados por ahora." else "Pedidos con tiempo excedido o espera prolongada.",
             priority = "Prioridad media",
+            tension = "Ritmo afectado",
             targetSection = "Pedidos del día",
         ),
         AdminPriorityCard(
+            icon = "?",
             title = "Sin responsable",
             count = 0,
             note = "Sin información disponible todavía.",
             priority = "Prioridad operativa",
+            tension = "Cobertura parcial",
             targetSection = "Pedidos activos",
         ),
         AdminPriorityCard(
+            icon = "OK",
             title = "En curso normal",
             count = activeCount,
             note = if (activeCount == 0) "No hay pedidos activos ahora." else "Pedidos avanzando sin alertas visibles.",
             priority = "Seguimiento",
+            tension = "Sin alertas",
             targetSection = "Pedidos activos",
         ),
         AdminPriorityCard(
+            icon = ">",
             title = "En entrega",
             count = inDeliveryCount,
             note = if (inDeliveryCount == 0) "No hay pedidos en entrega ahora." else "Pedidos actualmente en etapa de entrega.",
             priority = "Seguimiento",
+            tension = "Tránsito activo",
             targetSection = "Pedidos activos",
         ),
         AdminPriorityCard(
+            icon = "✓",
             title = "Finalizados recientes",
             count = finishedRecentCount,
             note = if (finishedRecentCount == 0) "No hay cierres recientes para mostrar." else "Pedidos cerrados recientemente.",
             priority = "Cierre del ciclo",
+            tension = "Cierre estable",
             targetSection = "Pedidos del día",
         ),
     )
@@ -1070,15 +1084,26 @@ private fun AdminPriorityCardView(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = card.title,
-                style = TextStyle(
-                    color = PediloText,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 0.sp,
-                ),
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(PediloOrange.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                        .border(1.dp, PediloOrange.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text(card.icon, color = PediloOrange, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                }
+                Text(
+                    text = card.title,
+                    style = TextStyle(
+                        color = PediloText,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.sp,
+                    ),
+                )
+            }
             Text(
                 text = card.priority,
                 style = TextStyle(
@@ -1104,6 +1129,15 @@ private fun AdminPriorityCardView(
                 color = PediloMuted,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
+                letterSpacing = 0.sp,
+            ),
+        )
+        Text(
+            text = card.tension,
+            style = TextStyle(
+                color = PediloOrange.copy(alpha = 0.9f),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
                 letterSpacing = 0.sp,
             ),
         )
