@@ -134,6 +134,14 @@ private data class AdminEntry(
     val note: String,
 )
 
+private data class AdminPriorityCard(
+    val title: String,
+    val count: Int,
+    val note: String,
+    val priority: String,
+    val targetSection: String? = null,
+)
+
 private data class AdminOperationSection(
     val title: String,
     val summary: String,
@@ -598,20 +606,57 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
         }
     }
 
-    val operationEntriesLive = operationEntries.map { entry ->
-        val count = when (entry.title) {
-            "Pedidos del día" -> readOnlyOrders.todayOrders().values.sumOf { it.size }
-            "Pedidos activos" -> readOnlyOrders.activeOrders().values.sumOf { it.size }
-            "Pedidos con problemas" -> readOnlyOrders.problemOrders().values.sumOf { it.size }
-            else -> 0
-        }
-        val note = if (entry.title in setOf("Repartidores activos", "Locales activos")) {
-            "No hay datos para mostrar en esta sección."
-        } else {
-            "${entry.note} · $count"
-        }
-        entry.copy(note = note)
-    }
+    val todayCount = readOnlyOrders.todayOrders().values.sumOf { it.size }
+    val activeCount = readOnlyOrders.activeOrders().values.sumOf { it.size }
+    val problemCount = readOnlyOrders.problemOrders().values.sumOf { it.size }
+    val inDeliveryCount = readOnlyOrders.activeOrders()[AdminActiveOrdersBucket.IN_DELIVERY]?.size ?: 0
+    val finishedRecentCount = readOnlyOrders.todayOrders()[AdminTodayOrdersBucket.FINISHED]?.size ?: 0
+    val delayedCount = readOnlyOrders.todayOrders()[AdminTodayOrdersBucket.DELAYED]?.size ?: 0
+
+    val operationDeskCards = listOf(
+        AdminPriorityCard(
+            title = "Necesitan atención",
+            count = problemCount,
+            note = if (problemCount == 0) "No hay pedidos con revisión urgente." else "Pedidos que requieren revisión operativa.",
+            priority = "Prioridad alta",
+            targetSection = "Pedidos con problemas",
+        ),
+        AdminPriorityCard(
+            title = "Demorados",
+            count = delayedCount,
+            note = if (delayedCount == 0) "Sin pedidos Demorados por ahora." else "Pedidos con tiempo excedido o espera prolongada.",
+            priority = "Prioridad media",
+            targetSection = "Pedidos del día",
+        ),
+        AdminPriorityCard(
+            title = "Sin responsable",
+            count = 0,
+            note = "Sin información disponible todavía.",
+            priority = "Prioridad operativa",
+            targetSection = "Pedidos activos",
+        ),
+        AdminPriorityCard(
+            title = "En curso normal",
+            count = activeCount,
+            note = if (activeCount == 0) "No hay pedidos activos ahora." else "Pedidos avanzando sin alertas visibles.",
+            priority = "Seguimiento",
+            targetSection = "Pedidos activos",
+        ),
+        AdminPriorityCard(
+            title = "En entrega",
+            count = inDeliveryCount,
+            note = if (inDeliveryCount == 0) "No hay pedidos en entrega ahora." else "Pedidos actualmente en etapa de entrega.",
+            priority = "Seguimiento",
+            targetSection = "Pedidos activos",
+        ),
+        AdminPriorityCard(
+            title = "Finalizados recientes",
+            count = finishedRecentCount,
+            note = if (finishedRecentCount == 0) "No hay cierres recientes para mostrar." else "Pedidos cerrados recientemente.",
+            priority = "Cierre del ciclo",
+            targetSection = "Pedidos del día",
+        ),
+    )
 
     BackHandler(enabled = route !is AdminRoute.Operation && route !is AdminRoute.Configuration && route !is AdminRoute.RoleAccess) {
         route = when (val current = route) {
@@ -675,18 +720,15 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             .background(PediloBg),
     ) {
         when (val current = route) {
-            AdminRoute.Operation -> AdminRootScreen(
-                title = "Pédilo Admin",
-                eyebrow = "Operación",
-                summary = "Vista inicial para seguir la operación.",
-                entries = operationEntriesLive,
-                onEntry = { entry ->
-                    operationSections.firstOrNull { it.title == entry.title }?.let {
+            AdminRoute.Operation -> AdminOperationDeskScreen(
+                deskCards = operationDeskCards,
+                totalOrdersToday = todayCount,
+                onOpenSection = { title ->
+                    operationSections.firstOrNull { it.title == title }?.let {
                         route = AdminRoute.OperationSection(it)
                     }
                 },
                 onSignOut = { showSignOut = true },
-                showSignOut = true,
             )
             AdminRoute.Configuration -> AdminRootScreen(
                 title = "Configuración",
@@ -950,6 +992,118 @@ private fun AdminOperationSectionScreen(
         items(section.entries) {
             AdminEntryCard(entry = it, onClick = { onEntry(it) })
         }
+    }
+}
+
+@Composable
+private fun AdminOperationDeskScreen(
+    deskCards: List<AdminPriorityCard>,
+    totalOrdersToday: Int,
+    onOpenSection: (String) -> Unit,
+    onSignOut: () -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = adminBottomBarReservedPadding),
+        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            AdminHeader(
+                title = "Pédilo Admin",
+                eyebrow = "Mesa Operativa Viva",
+                summary = "Lectura en tiempo real sin ejecutar acciones operativas.",
+                onSignOut = onSignOut,
+                showSignOut = true,
+            )
+        }
+        item {
+            AdminInfoPanel(
+                title = "Resumen operativo",
+                text = if (totalOrdersToday == 0) {
+                    "No hay pedidos para mostrar en esta sección."
+                } else {
+                    "Pedidos del día registrados: $totalOrdersToday"
+                },
+            )
+        }
+        items(deskCards) { card ->
+            AdminPriorityCardView(
+                card = card,
+                onClick = { card.targetSection?.let(onOpenSection) },
+            )
+        }
+        items(operationEntries) { entry ->
+            AdminEntryCard(entry = entry, onClick = { onOpenSection(entry.title) })
+        }
+    }
+}
+
+@Composable
+private fun AdminPriorityCardView(
+    card: AdminPriorityCard,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                Brush.verticalGradient(
+                    listOf(PediloPanel, PediloPanel.copy(alpha = 0.9f)),
+                ),
+                RoundedCornerShape(16.dp),
+            )
+            .border(1.dp, PediloLine.copy(alpha = 0.55f), RoundedCornerShape(16.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = card.title,
+                style = TextStyle(
+                    color = PediloText,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 0.sp,
+                ),
+            )
+            Text(
+                text = card.priority,
+                style = TextStyle(
+                    color = PediloOrange,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.sp,
+                ),
+            )
+        }
+        Text(
+            text = "${card.count} pedidos",
+            style = TextStyle(
+                color = PediloText,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 0.sp,
+            ),
+        )
+        Text(
+            text = card.note,
+            style = TextStyle(
+                color = PediloMuted,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 0.sp,
+            ),
+        )
     }
 }
 

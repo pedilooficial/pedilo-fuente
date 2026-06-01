@@ -35,9 +35,16 @@ test("admin operation root exposes visual operation cards only", () => {
     "Repartidores activos",
     "Locales activos",
   ].forEach((label) => assert.match(source, new RegExp(label)));
-  assert.match(source, /Movimiento completo de hoy/);
-  assert.match(source, /Pedidos que siguen en curso/);
-  assert.match(source, /Casos que necesitan revisión/);
+  assert.match(source, /Mesa Operativa Viva/);
+  assert.match(source, /Necesitan atención/);
+  assert.match(source, /Demorados/);
+  assert.match(source, /Sin responsable/);
+  assert.match(source, /En curso normal/);
+  assert.match(source, /En entrega/);
+  assert.match(source, /Finalizados recientes/);
+  assert.match(source, /Prioridad alta/);
+  assert.match(source, /Prioridad media/);
+  assert.match(source, /Prioridad operativa/);
 });
 
 test("admin operation internal screens expose planned operation subworlds", () => {
