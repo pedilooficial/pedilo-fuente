@@ -1036,8 +1036,11 @@ private fun AdminOperationDeskScreen(
                 onClick = { card.targetSection?.let(onOpenSection) },
             )
         }
-        items(operationEntries) { entry ->
-            AdminEntryCard(entry = entry, onClick = { onOpenSection(entry.title) })
+        item {
+            AdminInfoPanel(
+                title = "Capas de lectura",
+                text = "Entrá por prioridad para abrir detalle por estado y después cada pedido.",
+            )
         }
     }
 }
