@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const admin = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicAdmin.kt";
+const admin = "app/src/main/java/com/pedilo/app/ui/admin/AdminApp.kt";
 const app = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicApp.kt";
 
 test("admin role opens visual admin shell instead of empty placeholder", () => {

@@ -1,4 +1,4 @@
-package com.pedilo.app.ui.publicuser
+package com.pedilo.app.ui.admin
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -49,6 +49,19 @@ import com.pedilo.app.core.model.AdminProblemOrdersBucket
 import com.pedilo.app.core.model.AdminTodayOrdersBucket
 import com.pedilo.app.core.result.CoreResult
 import com.pedilo.app.core.runtime.adminOrdersUseCase
+import com.pedilo.app.ui.publicuser.PediloBg
+import com.pedilo.app.ui.publicuser.PediloCardBrush
+import com.pedilo.app.ui.publicuser.PediloGoldLine
+import com.pedilo.app.ui.publicuser.PediloLine
+import com.pedilo.app.ui.publicuser.PediloMuted
+import com.pedilo.app.ui.publicuser.PediloOrange
+import com.pedilo.app.ui.publicuser.PediloPanel
+import com.pedilo.app.ui.publicuser.PediloPanelSoft
+import com.pedilo.app.ui.publicuser.PediloPrimaryBrush
+import com.pedilo.app.ui.publicuser.PediloText
+import com.pedilo.app.ui.publicuser.PediloWarning
+import com.pedilo.app.ui.publicuser.PediloWarmPanelBrush
+import com.pedilo.app.ui.publicuser.pediloCardDepth
 import kotlinx.coroutines.launch
 
 private enum class AdminRoot(val label: String) {
