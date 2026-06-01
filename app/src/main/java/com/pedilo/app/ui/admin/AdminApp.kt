@@ -158,6 +158,15 @@ private data class AdminPriorityCard(
     val targetSection: String? = null,
 )
 
+private data class AdminOperationalLiveCard(
+    val icon: String,
+    val title: String,
+    val countLabel: String,
+    val detail: String,
+    val priority: String,
+    val tension: String,
+)
+
 internal data class AdminOperationSection(
     val title: String,
     val summary: String,
@@ -198,6 +207,22 @@ private data class AdminRoleAccessSection(
 
 private val adminBottomBarReservedPadding = 112.dp
 private val adminContentBottomPadding = 24.dp
+
+private fun operationLiveCardFor(entry: AdminEntry): AdminOperationalLiveCard {
+    return when (entry.title) {
+        "Pedidos del día" -> AdminOperationalLiveCard("Hoy", entry.title, "Cobertura diaria", entry.note, "Prioridad alta", "Entrada principal")
+        "Pedidos activos" -> AdminOperationalLiveCard("Run", entry.title, "Flujo en curso", entry.note, "Prioridad alta", "Seguimiento continuo")
+        "Pedidos con problemas" -> AdminOperationalLiveCard("!", entry.title, "Casos sensibles", entry.note, "Prioridad alta", "Requiere foco")
+        "Repartidores activos" -> AdminOperationalLiveCard("Drv", entry.title, "Estado de reparto", entry.note, "Prioridad media", "Cobertura logística")
+        "Locales activos" -> AdminOperationalLiveCard("Loc", entry.title, "Estado comercial", entry.note, "Prioridad media", "Disponibilidad de locales")
+        "Activos" -> AdminOperationalLiveCard("Run", entry.title, "Pedidos abiertos", entry.note, "Prioridad alta", "En movimiento")
+        "Finalizados" -> AdminOperationalLiveCard("Ok", entry.title, "Pedidos cerrados", entry.note, "Prioridad baja", "Cierre correcto")
+        "Cancelados" -> AdminOperationalLiveCard("X", entry.title, "Pedidos cancelados", entry.note, "Prioridad media", "Requiere lectura")
+        "Demorados" -> AdminOperationalLiveCard("R", entry.title, "Pedidos demorados", entry.note, "Prioridad alta", "Ritmo afectado")
+        "Con problemas" -> AdminOperationalLiveCard("!", entry.title, "Pedidos con incidencia", entry.note, "Prioridad alta", "Casos críticos")
+        else -> AdminOperationalLiveCard("•", entry.title, "Lectura operativa", entry.note, "Prioridad operativa", "Seguimiento")
+    }
+}
 
 private val configurationSections = listOf(
     AdminConfigurationSection(
@@ -850,8 +875,11 @@ private fun AdminOperationSectionScreen(
         item {
             AdminInfoPanel(title = section.contextTitle, text = section.contextText)
         }
-        items(section.entries) {
-            AdminEntryCard(entry = it, onClick = { onEntry(it) })
+        items(section.entries) { entry ->
+            AdminOperationLiveCardView(
+                card = operationLiveCardFor(entry),
+                onClick = { onEntry(entry) },
+            )
         }
     }
 }
@@ -1017,9 +1045,55 @@ private fun AdminTodayOrdersCategoryScreen(
         item {
             AdminInfoPanel(title = category.title, text = category.contextText)
         }
-        items(category.entries) {
-            AdminEntryCard(entry = it, onClick = { onEntry(it) })
+        items(category.entries) { entry ->
+            AdminOperationLiveCardView(
+                card = operationLiveCardFor(entry),
+                onClick = { onEntry(entry) },
+            )
         }
+    }
+}
+
+@Composable
+private fun AdminOperationLiveCardView(
+    card: AdminOperationalLiveCard,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                Brush.verticalGradient(listOf(PediloPanel, PediloPanel.copy(alpha = 0.86f))),
+                RoundedCornerShape(16.dp),
+            )
+            .border(1.dp, PediloLine.copy(alpha = 0.55f), RoundedCornerShape(16.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(15.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(PediloOrange.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                        .border(1.dp, PediloOrange.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text(card.icon, color = PediloOrange, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                }
+                Text(card.title, color = PediloText, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
+            }
+            Text(card.priority, color = PediloOrange, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+        Text(card.countLabel, color = PediloText, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        Text(card.detail, color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp)
+        Text(card.tension, color = PediloOrange.copy(alpha = 0.88f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -1141,20 +1215,44 @@ private fun AdminSectionScreen(
             )
         }
         items(orderDetailEntries) { entry ->
-            AdminEntryCard(entry = AdminEntry(entry.label, entry.note), onClick = { onOrderDetail(entry.variant) })
+            AdminOperationLiveCardView(
+                card = AdminOperationalLiveCard(
+                    icon = "Ord",
+                    title = entry.label,
+                    countLabel = "Pedido detectado",
+                    detail = entry.note,
+                    priority = "Prioridad operativa",
+                    tension = "Abrir lectura completa",
+                ),
+                onClick = { onOrderDetail(entry.variant) },
+            )
         }
         if (allowStoreProfile) {
             item {
-                AdminEntryCard(
-                    entry = AdminEntry("Local operativo", "Estado operativo del local relacionado"),
+                AdminOperationLiveCardView(
+                    card = AdminOperationalLiveCard(
+                        icon = "Loc",
+                        title = "Local operativo",
+                        countLabel = "Lectura de local",
+                        detail = "Estado operativo del local relacionado",
+                        priority = "Prioridad media",
+                        tension = "Contexto comercial",
+                    ),
                     onClick = { onOperationalProfile(AdminOperationalProfileKind.Store) },
                 )
             }
         }
         if (allowDriverProfile) {
             item {
-                AdminEntryCard(
-                    entry = AdminEntry("Repartidor operativo", "Estado operativo del repartidor relacionado"),
+                AdminOperationLiveCardView(
+                    card = AdminOperationalLiveCard(
+                        icon = "Drv",
+                        title = "Repartidor operativo",
+                        countLabel = "Lectura de repartidor",
+                        detail = "Estado operativo del repartidor relacionado",
+                        priority = "Prioridad media",
+                        tension = "Contexto de entrega",
+                    ),
                     onClick = { onOperationalProfile(AdminOperationalProfileKind.Driver) },
                 )
             }
