@@ -482,6 +482,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
     val activeCount = readOnlyOrders.activeOrders().values.sumOf { it.size }
     val problemCount = readOnlyOrders.problemOrders().values.sumOf { it.size }
     val inDeliveryCount = readOnlyOrders.activeOrders()[AdminActiveOrdersBucket.IN_DELIVERY]?.size ?: 0
+    val waitingDriverCount = readOnlyOrders.activeOrders()[AdminActiveOrdersBucket.WAITING_DRIVER]?.size ?: 0
     val finishedRecentCount = readOnlyOrders.todayOrders()[AdminTodayOrdersBucket.FINISHED]?.size ?: 0
     val delayedCount = readOnlyOrders.todayOrders()[AdminTodayOrdersBucket.DELAYED]?.size ?: 0
 
@@ -507,10 +508,10 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
         AdminPriorityCard(
             icon = "?",
             title = "Sin responsable",
-            count = 0,
-            note = "Sin información disponible todavía.",
+            count = waitingDriverCount,
+            note = if (waitingDriverCount == 0) "No hay pedidos en espera de responsable por ahora." else "Pedidos a la espera de responsable de reparto.",
             priority = "Prioridad operativa",
-            tension = "Cobertura parcial",
+            tension = if (waitingDriverCount == 0) "Cobertura estable" else "Cobertura pendiente",
             targetSection = "Pedidos activos",
         ),
         AdminPriorityCard(
@@ -653,13 +654,18 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 },
             )
             is AdminRoute.OperationSubsection -> {
-                val orderEntries = orderDetailEntriesFor(current.section.title, current.title, readOnlyOrders)
+                val scopedOrders = readOnlyOrders.forOperationSubsection(current.section.title, current.title)
+                val orderEntries = orderDetailEntriesFor(current.section.title, current.title, scopedOrders)
                 AdminSectionScreen(
                     root = AdminRoot.Operation,
                     title = current.title,
                     summary = "Submundo operativo preparado para organizar la siguiente capa.",
                     panelTitle = current.section.title,
-                    panelText = "Este espacio mantiene la separación operativa sin listados reales ni acciones disponibles.",
+                    panelText = if (orderEntries.isEmpty()) {
+                        "No hay pedidos para mostrar en esta sección."
+                    } else {
+                        "Pedidos detectados en esta sección: ${orderEntries.size}."
+                    },
                     orderDetailEntries = orderEntries,
                     onOrderDetail = { variant ->
                         route = AdminRoute.OperationOrderDetail(
@@ -727,7 +733,12 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 title = current.title,
                 summary = "Submundo de pedidos del día preparado para organizar la siguiente capa.",
                 panelTitle = current.category.title,
-                panelText = "Este espacio clasifica el movimiento del día sin mostrar listados reales ni acciones disponibles.",
+                panelText = "Lectura del día por categoría con datos disponibles.",
+                orderDetailEntries = orderDetailEntriesFor(
+                    sectionTitle = "Pedidos del día",
+                    subsectionTitle = current.title,
+                    orders = readOnlyOrders.forTodaySubsection(current.category.title, current.title),
+                ),
             )
             is AdminRoute.ConfigurationSection -> AdminConfigurationSectionScreen(
                 section = current.section,
@@ -1804,4 +1815,61 @@ private fun List<AdminOrderSummary>.problemOrders(): Map<AdminProblemOrdersBucke
             AdminOperationOrderClassification.problemBucket(signals)?.let { it to order }
         }
         .groupBy({ it.first }, { it.second })
+}
+
+private fun List<AdminOrderSummary>.forOperationSubsection(
+    sectionTitle: String,
+    subsectionTitle: String,
+): List<AdminOrderSummary> {
+    val signals = this.map { it to AdminOperationOrderSignals.from(it) }
+    return when (sectionTitle) {
+        "Pedidos activos" -> signals.filter { (_, s) ->
+            when (subsectionTitle) {
+                "Esperando local" -> AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.WAITING_STORE
+                "Preparando" -> AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.PREPARING
+                "Esperando repartidor" -> AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.WAITING_DRIVER
+                "En entrega" -> AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.IN_DELIVERY
+                else -> false
+            }
+        }.map { it.first }
+        "Pedidos con problemas" -> signals.filter { (_, s) ->
+            when (subsectionTitle) {
+                "Local no responde" -> AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.STORE_NOT_RESPONDING
+                "Reclamo del cliente" -> AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.CUSTOMER_CLAIM
+                else -> false
+            }
+        }.map { it.first }
+        else -> emptyList()
+    }
+}
+
+private fun List<AdminOrderSummary>.forTodaySubsection(
+    categoryTitle: String,
+    subsectionTitle: String,
+): List<AdminOrderSummary> {
+    val signals = this.map { it to AdminOperationOrderSignals.from(it) }
+    return when (categoryTitle) {
+        "Activos" -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.todayBucket(s) == AdminTodayOrdersBucket.ACTIVE &&
+                subsectionTitle == "Esperando local" &&
+                AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.WAITING_STORE
+        }.map { it.first }
+        "Finalizados" -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.todayBucket(s) == AdminTodayOrdersBucket.FINISHED
+        }.map { it.first }
+        "Cancelados" -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.todayBucket(s) == AdminTodayOrdersBucket.CANCELLED
+        }.map { it.first }
+        "Demorados" -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.todayBucket(s) == AdminTodayOrdersBucket.DELAYED
+        }.map { it.first }
+        "Con problemas" -> signals.filter { (_, s) ->
+            when (subsectionTitle) {
+                "Local no responde" -> AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.STORE_NOT_RESPONDING
+                "Reclamo del cliente" -> AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.CUSTOMER_CLAIM
+                else -> false
+            }
+        }.map { it.first }
+        else -> emptyList()
+    }
 }
