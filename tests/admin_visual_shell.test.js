@@ -1,9 +1,26 @@
 const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const admin = "app/src/main/java/com/pedilo/app/ui/admin/AdminApp.kt";
+const adminDir = "app/src/main/java/com/pedilo/app/ui/admin";
 const app = "app/src/main/java/com/pedilo/app/ui/publicuser/PublicApp.kt";
+
+function readAdminSourceTree() {
+  const stack = [adminDir];
+  const files = [];
+  while (stack.length > 0) {
+    const dir = stack.pop();
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) stack.push(full);
+      else if (entry.isFile() && entry.name.endsWith(".kt")) files.push(full);
+    }
+  }
+  files.sort();
+  return files.map((file) => fs.readFileSync(file, "utf8")).join("\n");
+}
 
 test("admin role opens visual admin shell instead of empty placeholder", () => {
   const appSource = fs.readFileSync(app, "utf8");
@@ -16,7 +33,7 @@ test("admin role opens visual admin shell instead of empty placeholder", () => {
 });
 
 test("admin has separated root navigation and no public bottom labels", () => {
-  const source = fs.readFileSync(admin, "utf8");
+  const source = readAdminSourceTree();
 
   assert.match(source, /Operation\("Operación"\)/);
   assert.match(source, /Configuration\("Configuración"\)/);
@@ -26,7 +43,7 @@ test("admin has separated root navigation and no public bottom labels", () => {
 });
 
 test("admin operation root exposes visual operation cards only", () => {
-  const source = fs.readFileSync(admin, "utf8");
+  const source = readAdminSourceTree();
 
   [
     "Pedidos del día",
@@ -48,7 +65,7 @@ test("admin operation root exposes visual operation cards only", () => {
 });
 
 test("admin operation internal screens expose planned operation subworlds", () => {
-  const source = fs.readFileSync(admin, "utf8");
+  const source = readAdminSourceTree();
 
   [
     "Activos",
@@ -75,7 +92,7 @@ test("admin operation internal screens expose planned operation subworlds", () =
 });
 
 test("admin remaining operation roots use safe visual copy", () => {
-  const source = fs.readFileSync(admin, "utf8");
+  const source = readAdminSourceTree();
 
   [
     "Pedidos esperando respuesta del local",
@@ -97,7 +114,7 @@ test("admin remaining operation roots use safe visual copy", () => {
 });
 
 test("admin today orders flow exposes category screens and subworlds", () => {
-  const source = fs.readFileSync(admin, "utf8");
+  const source = readAdminSourceTree();
 
   assert.match(source, /TodayOrdersCategory/);
   assert.match(source, /TodayOrdersSubsection/);
@@ -117,7 +134,7 @@ test("admin today orders flow exposes category screens and subworlds", () => {
 });
 
 test("admin shell reserves safe area for system navigation", () => {
-  const source = fs.readFileSync(admin, "utf8");
+  const source = readAdminSourceTree();
 
   assert.match(source, /navigationBarsPadding\(\)/);
   assert.match(source, /adminBottomBarReservedPadding = 112\.dp/);
@@ -127,7 +144,7 @@ test("admin shell reserves safe area for system navigation", () => {
 });
 
 test("admin relies on native back and only shows sign out on operation root", () => {
-  const source = fs.readFileSync(admin, "utf8");
+  const source = readAdminSourceTree();
   const forbiddenReturnLabels = [`Volv${"er"}`, `Atr${"ás"}`];
 
   assert.match(source, /BackHandler\(enabled = route !is AdminRoute\.Operation/);
@@ -138,7 +155,7 @@ test("admin relies on native back and only shows sign out on operation root", ()
 });
 
 test("admin configuration and role access roots expose their planned entries", () => {
-  const source = fs.readFileSync(admin, "utf8");
+  const source = readAdminSourceTree();
 
   [
     "Usuario público",
@@ -328,7 +345,7 @@ test("admin role access convergence flow is available and restricted to visual m
 });
 
 test("admin order detail convergence exposes Pedido #____ variants and solve flow without real data", () => {
-  const source = fs.readFileSync(admin, "utf8");
+  const source = readAdminSourceTree();
   const forbiddenTitles = ["Pedido vivo", "Detalle del pedido", "Resolución del pedido"];
 
   assert.match(source, /OperationOrderDetail/);
@@ -354,7 +371,7 @@ test("admin order detail convergence exposes Pedido #____ variants and solve flo
 });
 
 test("admin order detail keeps shell rules and visual entry paths", () => {
-  const source = fs.readFileSync(admin, "utf8");
+  const source = readAdminSourceTree();
   const forbiddenReturnLabels = [`Volv${"er"}`, `Atr${"ás"}`];
 
   assert.match(source, /orderDetailEntriesFor/);
@@ -372,7 +389,7 @@ test("admin order detail keeps shell rules and visual entry paths", () => {
 });
 
 test("admin visual shell keeps non-operational actions and avoids writes", () => {
-  const source = fs.readFileSync(admin, "utf8");
+  const source = readAdminSourceTree();
   const oldCopy = [
     `Sin datos conect${"ados"}`,
     `Estructura visual fut${"ura"}`,

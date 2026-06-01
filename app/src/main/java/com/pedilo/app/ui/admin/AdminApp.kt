@@ -49,9 +49,12 @@ import com.pedilo.app.core.model.AdminProblemOrdersBucket
 import com.pedilo.app.core.model.AdminTodayOrdersBucket
 import com.pedilo.app.core.result.CoreResult
 import com.pedilo.app.core.runtime.adminOrdersUseCase
+import com.pedilo.app.ui.admin.components.AdminBottomBar
+import com.pedilo.app.ui.admin.components.AdminEntryCard
+import com.pedilo.app.ui.admin.components.AdminHeader
+import com.pedilo.app.ui.admin.components.AdminInfoPanel
 import com.pedilo.app.ui.publicuser.PediloBg
 import com.pedilo.app.ui.publicuser.PediloCardBrush
-import com.pedilo.app.ui.publicuser.PediloGoldLine
 import com.pedilo.app.ui.publicuser.PediloLine
 import com.pedilo.app.ui.publicuser.PediloMuted
 import com.pedilo.app.ui.publicuser.PediloOrange
@@ -59,18 +62,16 @@ import com.pedilo.app.ui.publicuser.PediloPanel
 import com.pedilo.app.ui.publicuser.PediloPanelSoft
 import com.pedilo.app.ui.publicuser.PediloPrimaryBrush
 import com.pedilo.app.ui.publicuser.PediloText
-import com.pedilo.app.ui.publicuser.PediloWarning
-import com.pedilo.app.ui.publicuser.PediloWarmPanelBrush
 import com.pedilo.app.ui.publicuser.pediloCardDepth
 import kotlinx.coroutines.launch
 
-private enum class AdminRoot(val label: String) {
+enum class AdminRoot(val label: String) {
     Operation("Operación"),
     Configuration("Configuración"),
     RoleAccess("Alta de roles"),
 }
 
-private enum class OperationOrderVariant {
+internal enum class OperationOrderVariant {
     Normal,
     NeedsAttention,
     WithProblem,
@@ -142,7 +143,7 @@ private enum class AdminOperationalProfileKind {
     Driver,
 }
 
-private data class AdminEntry(
+data class AdminEntry(
     val title: String,
     val note: String,
 )
@@ -157,7 +158,7 @@ private data class AdminPriorityCard(
     val targetSection: String? = null,
 )
 
-private data class AdminOperationSection(
+internal data class AdminOperationSection(
     val title: String,
     val summary: String,
     val contextTitle: String,
@@ -165,14 +166,14 @@ private data class AdminOperationSection(
     val entries: List<AdminEntry>,
 )
 
-private data class AdminTodayOrdersCategory(
+internal data class AdminTodayOrdersCategory(
     val title: String,
     val summary: String,
     val contextText: String,
     val entries: List<AdminEntry>,
 )
 
-private data class AdminOrderDetailEntry(
+internal data class AdminOrderDetailEntry(
     val label: String,
     val note: String,
     val variant: OperationOrderVariant,
@@ -197,140 +198,6 @@ private data class AdminRoleAccessSection(
 
 private val adminBottomBarReservedPadding = 112.dp
 private val adminContentBottomPadding = 24.dp
-
-private val operationEntries = listOf(
-    AdminEntry("Pedidos del día", "Movimiento completo de hoy"),
-    AdminEntry("Pedidos activos", "Pedidos que siguen en curso"),
-    AdminEntry("Pedidos con problemas", "Casos que necesitan revisión"),
-    AdminEntry("Repartidores activos", "Estado operativo de repartidores"),
-    AdminEntry("Locales activos", "Estado operativo de locales"),
-)
-
-private val todayOrdersCategories = listOf(
-    AdminTodayOrdersCategory(
-        title = "Activos",
-        summary = "Pedidos del día que siguen en curso",
-        contextText = "Pedidos recibidos que siguen abiertos dentro del día.",
-        entries = listOf(
-            AdminEntry("Esperando local", "Pedidos creados esperando respuesta del local"),
-        ),
-    ),
-    AdminTodayOrdersCategory(
-        title = "Finalizados",
-        summary = "Pedidos del día cerrados correctamente",
-        contextText = "Pedidos entregados, retirados o enviados dentro del día.",
-        entries = listOf(
-            AdminEntry("Entregados", "Pedidos completados exitosamente"),
-            AdminEntry("Retirados", "Retirados en local"),
-            AdminEntry("Enviados", "Completados por envío"),
-        ),
-    ),
-    AdminTodayOrdersCategory(
-        title = "Cancelados",
-        summary = "Pedidos del día cerrados sin completar",
-        contextText = "Pedidos cancelados antes de completarse.",
-        entries = listOf(
-            AdminEntry("Cancelados por cliente", "Iniciados por la persona usuaria"),
-            AdminEntry("Cancelados por local", "Iniciados por el comercio"),
-            AdminEntry("Cancelados por operación", "Iniciados por el equipo"),
-        ),
-    ),
-    AdminTodayOrdersCategory(
-        title = "Demorados",
-        summary = "Pedidos del día con tiempo excedido",
-        contextText = "Pedidos con tiempo de espera excedido en alguna etapa.",
-        entries = listOf(
-            AdminEntry("Esperando local", "Espera de aceptación"),
-            AdminEntry("Preparando", "Espera de preparación"),
-            AdminEntry("En entrega", "Espera de reparto"),
-        ),
-    ),
-    AdminTodayOrdersCategory(
-        title = "Con problemas",
-        summary = "Pedidos del día marcados con incidencia",
-        contextText = "Pedidos con incidencias que requieren revisión operativa.",
-        entries = listOf(
-            AdminEntry("Local no responde", "Requiere seguimiento"),
-            AdminEntry("Reclamo del cliente", "Requiere revisión"),
-        ),
-    ),
-)
-
-private val operationSections = listOf(
-    AdminOperationSection(
-        title = "Pedidos del día",
-        summary = "Movimiento completo de pedidos del día.",
-        contextTitle = "Vista del día",
-        contextText = "Agrupa los estados principales sin abrir pedidos ni resolver casos.",
-        entries = listOf(
-            AdminEntry("Activos", "Pedidos del día que siguen en curso"),
-            AdminEntry("Finalizados", "Pedidos cerrados correctamente"),
-            AdminEntry("Cancelados", "Pedidos cerrados sin completar"),
-            AdminEntry("Demorados", "Pedidos con tiempo excedido"),
-            AdminEntry("Con problemas", "Pedidos marcados con incidencia"),
-        ),
-    ),
-    AdminOperationSection(
-        title = "Pedidos activos",
-        summary = "Pedidos vivos dentro de la operación actual.",
-        contextTitle = "Operación en curso",
-        contextText = "Ordena los momentos del pedido sin abrir acciones finales.",
-        entries = listOf(
-            AdminEntry("Esperando local", "Pedidos esperando respuesta del local"),
-            AdminEntry("Preparando", "Pedidos en preparación"),
-            AdminEntry("Esperando repartidor", "Pedidos listos para asignación"),
-            AdminEntry("En entrega", "Pedidos en camino"),
-        ),
-    ),
-    AdminOperationSection(
-        title = "Pedidos con problemas",
-        summary = "Clasificación inicial de casos que requieren atención.",
-        contextTitle = "Casos a revisar",
-        contextText = "Separa motivos para lectura operativa sin cerrar incidencias.",
-        entries = listOf(
-            AdminEntry("Local no responde", "Pedidos detenidos por falta de respuesta"),
-            AdminEntry("Reclamo del cliente", "Casos iniciados por aviso del cliente"),
-        ),
-    ),
-    AdminOperationSection(
-        title = "Repartidores activos",
-        summary = "Estado operativo de repartidores.",
-        contextTitle = "Equipo en movimiento",
-        contextText = "Agrupa disponibilidad sin tocar perfiles, permisos ni asignaciones.",
-        entries = listOf(
-            AdminEntry("Libres", "Repartidores disponibles"),
-            AdminEntry("Ocupados", "Repartidores con pedido asignado"),
-            AdminEntry("Pendientes de respuesta", "Casos esperando confirmación"),
-            AdminEntry("Con incidencia", "Situaciones que requieren revisión"),
-        ),
-    ),
-    AdminOperationSection(
-        title = "Locales activos",
-        summary = "Estado operativo de locales.",
-        contextTitle = "Locales en operación",
-        contextText = "Ordena señales operativas sin tocar locales, productos ni visibilidad.",
-        entries = listOf(
-            AdminEntry("Vendiendo ahora", "Locales disponibles para recibir pedidos"),
-            AdminEntry("Sin respuesta", "Locales que no respondieron a tiempo"),
-            AdminEntry("Pausados", "Locales temporalmente detenidos"),
-            AdminEntry("Con configuración pendiente", "Locales con datos por revisar"),
-            AdminEntry("Sin productos vendibles", "Locales sin oferta disponible"),
-        ),
-    ),
-)
-
-private val configurationEntries = listOf(
-    "Usuario público",
-    "Locales",
-    "Catálogo y productos",
-    "Pedidos",
-    "Comunicación",
-    "Operación",
-    "Reglas y validaciones",
-    "Auditoría",
-    "Emergencias",
-    "General",
-).map { AdminEntry(it, "Ajustes preparados para la app") }
 
 private val configurationSections = listOf(
     AdminConfigurationSection(
@@ -478,16 +345,6 @@ private val configurationSections = listOf(
     ),
 )
 
-private val roleEntries = listOf(
-    "Usuarios del equipo",
-    "Administradores",
-    "Locales store",
-    "Repartidores driver",
-    "Altas pendientes",
-    "Usuarios inactivos",
-    "Vinculaciones pendientes",
-).map { AdminEntry(it, "Organización de accesos") }
-
 private val roleAccessSections = listOf(
     AdminRoleAccessSection(
         title = "Usuarios del equipo",
@@ -580,31 +437,6 @@ private val roleAccessSections = listOf(
         ),
     ),
 )
-
-private fun orderDetailEntriesFor(
-    sectionTitle: String,
-    subsectionTitle: String,
-    orders: List<AdminOrderSummary>,
-): List<AdminOrderDetailEntry> {
-    val real = orders.firstOrNull()
-    val variant = when {
-        sectionTitle == "Pedidos con problemas" && subsectionTitle == "Local no responde" -> OperationOrderVariant.WithProblem
-        sectionTitle == "Pedidos activos" && subsectionTitle == "Esperando repartidor" -> OperationOrderVariant.ActionUnavailable
-        sectionTitle == "Pedidos activos" && subsectionTitle == "Esperando local" -> OperationOrderVariant.NeedsAttention
-        else -> OperationOrderVariant.Normal
-    }
-    return real?.let {
-        val sourceLabel = AdminOperationOrderClassification.sourceLabel(it.source, it.requestType)
-        listOf(
-            AdminOrderDetailEntry(
-                label = if (it.trackingNumber.isNotBlank()) it.trackingNumber else "Pedido #____",
-                note = "${it.publicStatus.ifBlank { "Pedido recibido" }} · $sourceLabel",
-                variant = variant,
-                realOrderId = it.id,
-            ),
-        )
-    } ?: emptyList()
-}
 
 @Composable
 fun AdminApp(onSignOutConfirmed: () -> Unit) {
@@ -934,7 +766,9 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             onOperation = { route = AdminRoute.Operation },
             onConfiguration = { route = AdminRoute.Configuration },
             onRoleAccess = { route = AdminRoute.RoleAccess },
-            modifier = Modifier.align(Alignment.BottomCenter),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding(),
         )
     }
 
@@ -1824,147 +1658,6 @@ private fun AdminOperationalProfileScreen(kind: AdminOperationalProfileKind, sta
                 note = "Las acciones operativas finales se habilitan en etapas posteriores.",
             )
         }
-    }
-}
-
-@Composable
-private fun AdminHeader(
-    title: String,
-    eyebrow: String,
-    summary: String,
-    onSignOut: () -> Unit,
-    showSignOut: Boolean,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pediloCardDepth(RoundedCornerShape(18.dp))
-            .background(PediloWarmPanelBrush, RoundedCornerShape(18.dp))
-            .border(1.dp, PediloGoldLine, RoundedCornerShape(18.dp))
-            .padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                eyebrow,
-                color = PediloWarning,
-                fontSize = 12.sp,
-                lineHeight = 15.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
-            )
-            if (showSignOut) {
-                Text(
-                    "Cerrar sesión",
-                    color = PediloText,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(PediloPanel.copy(alpha = 0.82f), RoundedCornerShape(14.dp))
-                        .border(1.dp, PediloOrange.copy(alpha = 0.42f), RoundedCornerShape(14.dp))
-                        .clickable(role = Role.Button, onClick = onSignOut)
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                )
-            }
-        }
-        Text(
-            title,
-            color = PediloOrange,
-            fontSize = 30.sp,
-            lineHeight = 34.sp,
-            fontWeight = FontWeight.ExtraBold,
-            style = TextStyle(brush = PediloPrimaryBrush),
-        )
-        Text(summary, color = PediloMuted, fontSize = 14.sp, lineHeight = 19.sp)
-    }
-}
-
-@Composable
-private fun AdminEntryCard(entry: AdminEntry, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pediloCardDepth(RoundedCornerShape(15.dp))
-            .background(PediloCardBrush, RoundedCornerShape(15.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(15.dp))
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(7.dp),
-    ) {
-        Text(entry.title, color = PediloText, fontSize = 19.sp, lineHeight = 23.sp, fontWeight = FontWeight.ExtraBold)
-        Text(entry.note, color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp)
-    }
-}
-
-@Composable
-private fun AdminInfoPanel(title: String, text: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(PediloPanelSoft, RoundedCornerShape(15.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(15.dp))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(title, color = PediloText, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
-        Text(text, color = PediloMuted, fontSize = 14.sp, lineHeight = 20.sp)
-    }
-}
-
-@Composable
-private fun AdminBottomBar(
-    current: AdminRoot,
-    onOperation: () -> Unit,
-    onConfiguration: () -> Unit,
-    onRoleAccess: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(94.dp)
-            .navigationBarsPadding()
-            .background(Brush.verticalGradient(listOf(PediloPanelSoft.copy(alpha = 0.96f), PediloPanel)), RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
-            .padding(horizontal = 8.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AdminBottomItem("Operación", current == AdminRoot.Operation, onOperation, Modifier.weight(1f))
-        AdminBottomItem("Configuración", current == AdminRoot.Configuration, onConfiguration, Modifier.weight(1f))
-        AdminBottomItem("Alta de roles", current == AdminRoot.RoleAccess, onRoleAccess, Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun AdminBottomItem(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .height(68.dp)
-            .clip(RoundedCornerShape(15.dp))
-            .background(if (selected) PediloOrange.copy(alpha = 0.18f) else Color.Transparent, RoundedCornerShape(15.dp))
-            .border(1.dp, if (selected) PediloOrange.copy(alpha = 0.62f) else PediloLine.copy(alpha = 0.45f), RoundedCornerShape(15.dp))
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            label,
-            color = if (selected) PediloOrange else PediloMuted,
-            fontSize = 11.sp,
-            lineHeight = 14.sp,
-            fontWeight = FontWeight.ExtraBold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-        )
     }
 }
 
