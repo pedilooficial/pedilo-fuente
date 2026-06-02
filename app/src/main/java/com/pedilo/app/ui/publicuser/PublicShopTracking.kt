@@ -265,6 +265,7 @@ private fun PublicTrackingState.toTrackingData(): PublicTrackingData =
 
 private fun CoreError.toTrackingMessage(): String = when (this) {
     is CoreError.Validation -> "Ingresá un número de pedido válido."
+    is CoreError.Operational -> "No pudimos consultar el pedido. Probá de nuevo."
     CoreError.IncompleteData -> "Ingresá el número de pedido."
     CoreError.NotAvailable -> "No pudimos consultar el pedido. Probá de nuevo."
     CoreError.Unknown -> "Ocurrió un error al consultar el pedido."

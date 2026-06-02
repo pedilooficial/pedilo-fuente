@@ -130,9 +130,9 @@ if [ -d functions ]; then
   if ! search_regex_quiet "exports[.]getPublicOrderTracking" functions/index.js; then
     fail "functions must expose the getPublicOrderTracking callable"
   fi
-  if search_regex "collection[(][\"'](users|roles|payments|order_tracking)[\"'][)]|whatsapp|WhatsApp|driverId" functions >/tmp/pedilo_guard_match.txt; then
+  if search_regex "collection[(][\"'](roles|payments|order_tracking)[\"'][)]|whatsapp|WhatsApp|driverId" functions >/tmp/pedilo_guard_match.txt; then
     cat /tmp/pedilo_guard_match.txt >&2
-    fail "public order functions must not touch users, roles, payments, WhatsApp or tracking collections"
+    fail "public order functions must not touch roles, payments, WhatsApp or tracking collections"
   fi
 fi
 

@@ -98,13 +98,17 @@ test("orders remain closed to direct client writes", () => {
 
 test("createPlusOrder validates and writes only orders", () => {
   const source = read(fn);
+  const createPlusOrder = source.slice(
+    source.indexOf("exports.createPlusOrder"),
+    source.indexOf("exports.getPublicOrderTracking"),
+  );
 
-  assert.match(source, /exports\.createPlusOrder/);
+  assert.match(createPlusOrder, /exports\.createPlusOrder/);
   assert.match(source, /cleanPlusOrderPayload/);
   assert.match(source, /public_plus_buy/);
   assert.match(source, /public_plus_pickup_shipping/);
-  assert.match(source, /collection\(ORDERS\)\.doc\(\)/);
-  assert.match(source, /plusOrderData/);
-  assert.match(source, /trackingNumber/);
-  assert.doesNotMatch(source, /collection\("(users|roles|payments|order_tracking)"\)|driverId|WhatsApp|whatsapp/);
+  assert.match(createPlusOrder, /collection\(ORDERS\)\.doc\(\)/);
+  assert.match(createPlusOrder, /plusOrderData/);
+  assert.match(createPlusOrder, /trackingNumber/);
+  assert.doesNotMatch(createPlusOrder, /collection\("(users|roles|payments|order_tracking)"\)|driverId|WhatsApp|whatsapp/);
 });

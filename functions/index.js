@@ -15,6 +15,24 @@ const PLUS_BUY_SOURCE = "public_plus_buy";
 const PLUS_PICKUP_SHIPPING_SOURCE = "public_plus_pickup_shipping";
 const STATUS = "created";
 const PUBLIC_STATUS = "Pedido recibido";
+const ADMIN_ACTIONS = {
+  MARK_ADMIN_REVIEWED: "mark_admin_reviewed",
+  CONFIRM_INTERVENTION: "confirm_intervention",
+  MARK_INCIDENT: "mark_incident",
+  RESOLVE_INCIDENT: "resolve_incident",
+  CANCEL_BY_ADMIN: "cancel_by_admin",
+  FORCE_STATUS: "force_status",
+  ASSIGN_RESPONSIBLE: "assign_responsible",
+  CLEAR_RESPONSIBLE: "clear_responsible",
+};
+const TERMINAL_STATUSES = ["cancelled", "canceled", "delivered", "closed", "archived"];
+const FORCEABLE_STATUSES = {
+  created: "Pedido recibido",
+  preparing: "Pedido en preparación",
+  on_the_way: "Pedido en camino",
+  delivered: "Pedido cerrado",
+  under_review: "Pedido en revisión operativa",
+};
 
 exports.createLocalOrder = onCall({region: REGION}, async (request) => {
   const payload = request.data || {};
@@ -77,6 +95,18 @@ exports.createLocalOrder = onCall({region: REGION}, async (request) => {
     trackingNumber,
     publicOrderNumber: trackingNumber,
     isPublicCreated: true,
+    operationalStatus: STATUS,
+    responsibleRole: "",
+    priority: "normal",
+    needsAttention: true,
+    activeIncident: false,
+    adminReviewed: false,
+    nextAllowedActions: allowedAdminActions({
+      status: STATUS,
+      adminReviewed: false,
+      activeIncident: false,
+      responsibleRole: "",
+    }),
     createdAt: now,
     updatedAt: now,
   });
@@ -140,6 +170,255 @@ exports.getPublicOrderTracking = onCall({region: REGION}, async (request) => {
 
   return publicTrackingResponse(snapshot.docs[0].data(), trackingNumber);
 });
+
+exports.adminOrderAction = onCall({region: REGION}, async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if (!uid) {
+    throw new HttpsError("unauthenticated", "Iniciá sesión como Admin para operar pedidos.");
+  }
+
+  const userSnap = await db.collection("users").doc(uid).get();
+  if (!userSnap.exists || userSnap.get("role") !== "admin") {
+    throw new HttpsError("permission-denied", "Solo Admin puede ejecutar esta acción.");
+  }
+
+  const clean = cleanAdminActionPayload(request.data || {});
+  const orderRef = db.collection(ORDERS).doc(clean.orderId);
+  const eventRef = orderRef.collection("events").doc();
+  const incidentRef = clean.action === ADMIN_ACTIONS.MARK_INCIDENT ? orderRef.collection("incidents").doc() : null;
+
+  const result = await db.runTransaction(async (tx) => {
+    const orderSnap = await tx.get(orderRef);
+    if (!orderSnap.exists) {
+      throw new HttpsError("not-found", "No encontramos ese pedido.");
+    }
+
+    const current = operationalOrderState(orderSnap.data() || {});
+    const allowed = allowedAdminActions(current);
+    if (!allowed.includes(clean.action)) {
+      throw new HttpsError("failed-precondition", "Esta acción no está disponible para el estado actual del pedido.");
+    }
+
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    const effect = adminActionEffect(clean, current);
+    const next = {...current, ...effect.patch};
+    next.nextAllowedActions = allowedAdminActions(next);
+
+    const event = {
+      type: clean.action,
+      summary: effect.eventSummary,
+      reason: clean.reason,
+      actorUid: uid,
+      actorRole: "admin",
+      previousStatus: current.status,
+      nextStatus: next.status,
+      previousOperationalStatus: current.operationalStatus,
+      nextOperationalStatus: next.operationalStatus,
+      createdAt: now,
+    };
+
+    tx.update(orderRef, {
+      ...effect.patch,
+      nextAllowedActions: next.nextAllowedActions,
+      lastOperationEvent: {
+        type: clean.action,
+        summary: effect.eventSummary,
+        actorRole: "admin",
+        createdAt: now,
+      },
+      updatedAt: now,
+    });
+    tx.set(eventRef, event);
+    if (incidentRef) {
+      tx.set(incidentRef, {
+        status: "open",
+        reason: clean.reason,
+        actorUid: uid,
+        actorRole: "admin",
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    return {
+      orderId: clean.orderId,
+      status: next.status,
+      publicStatus: next.publicStatus,
+      operationalStatus: next.operationalStatus,
+      responsibleRole: next.responsibleRole,
+      priority: next.priority,
+      needsAttention: next.needsAttention,
+      activeIncident: next.activeIncident,
+      nextAllowedActions: next.nextAllowedActions,
+      eventSummary: effect.eventSummary,
+      humanMessage: effect.humanMessage,
+    };
+  });
+
+  return result;
+});
+
+function cleanAdminActionPayload(payload) {
+  const orderId = cleanText(payload.orderId);
+  const action = cleanText(payload.action);
+  const reason = cleanText(payload.reason);
+  const forcedStatus = cleanText(payload.forcedStatus).toLowerCase();
+  const responsibleRole = cleanText(payload.responsibleRole);
+
+  if (!orderId || !Object.values(ADMIN_ACTIONS).includes(action)) {
+    throw new HttpsError("invalid-argument", "Elegí una acción válida para este pedido.");
+  }
+  if ([
+    ADMIN_ACTIONS.MARK_INCIDENT,
+    ADMIN_ACTIONS.RESOLVE_INCIDENT,
+    ADMIN_ACTIONS.CANCEL_BY_ADMIN,
+    ADMIN_ACTIONS.FORCE_STATUS,
+  ].includes(action) && reason.length < 4) {
+    throw new HttpsError("invalid-argument", "Ingresá un motivo operativo claro.");
+  }
+  if (action === ADMIN_ACTIONS.FORCE_STATUS && !Object.hasOwn(FORCEABLE_STATUSES, forcedStatus)) {
+    throw new HttpsError("invalid-argument", "Elegí un estado permitido por contrato.");
+  }
+  if (action === ADMIN_ACTIONS.ASSIGN_RESPONSIBLE && responsibleRole && responsibleRole !== "admin") {
+    throw new HttpsError("invalid-argument", "V1 sólo permite asignar responsable Admin.");
+  }
+
+  return {
+    orderId,
+    action,
+    reason,
+    forcedStatus,
+    responsibleRole: responsibleRole || "admin",
+  };
+}
+
+function operationalOrderState(order) {
+  const status = cleanText(order.status) || STATUS;
+  return {
+    status,
+    publicStatus: cleanText(order.publicStatus) || PUBLIC_STATUS,
+    operationalStatus: cleanText(order.operationalStatus) || status,
+    responsibleRole: cleanText(order.responsibleRole),
+    priority: cleanText(order.priority) || (order.activeIncident || order.needsAttention ? "high" : "normal"),
+    needsAttention: order.needsAttention === true,
+    activeIncident: order.activeIncident === true,
+    adminReviewed: order.adminReviewed === true,
+  };
+}
+
+function allowedAdminActions(order) {
+  const status = cleanText(order.status).toLowerCase();
+  if (TERMINAL_STATUSES.includes(status)) return [];
+
+  const actions = [];
+  if (order.adminReviewed !== true) actions.push(ADMIN_ACTIONS.MARK_ADMIN_REVIEWED);
+  actions.push(ADMIN_ACTIONS.CONFIRM_INTERVENTION);
+  actions.push(order.activeIncident === true ? ADMIN_ACTIONS.RESOLVE_INCIDENT : ADMIN_ACTIONS.MARK_INCIDENT);
+  actions.push(ADMIN_ACTIONS.CANCEL_BY_ADMIN);
+  actions.push(ADMIN_ACTIONS.FORCE_STATUS);
+  actions.push(cleanText(order.responsibleRole) ? ADMIN_ACTIONS.CLEAR_RESPONSIBLE : ADMIN_ACTIONS.ASSIGN_RESPONSIBLE);
+  return actions;
+}
+
+function adminActionEffect(clean, current) {
+  switch (clean.action) {
+    case ADMIN_ACTIONS.MARK_ADMIN_REVIEWED:
+      return {
+        patch: {
+          adminReviewed: true,
+          needsAttention: current.activeIncident,
+          priority: current.activeIncident ? "high" : "normal",
+          operationalStatus: "admin_reviewed",
+        },
+        eventSummary: "Admin marcó el pedido como revisado.",
+        humanMessage: "Pedido marcado como revisado.",
+      };
+    case ADMIN_ACTIONS.CONFIRM_INTERVENTION:
+      return {
+        patch: {
+          adminReviewed: true,
+          needsAttention: true,
+          responsibleRole: "admin",
+          priority: current.activeIncident ? "high" : "medium",
+          operationalStatus: "admin_intervention",
+        },
+        eventSummary: "Admin confirmó intervención operativa.",
+        humanMessage: "Intervención operativa registrada.",
+      };
+    case ADMIN_ACTIONS.MARK_INCIDENT:
+      return {
+        patch: {
+          activeIncident: true,
+          needsAttention: true,
+          responsibleRole: "admin",
+          priority: "high",
+          operationalStatus: "incident_open",
+          publicStatus: "Pedido en revisión operativa",
+        },
+        eventSummary: `Admin abrió incidencia: ${clean.reason}`,
+        humanMessage: "Incidencia operativa abierta.",
+      };
+    case ADMIN_ACTIONS.RESOLVE_INCIDENT:
+      return {
+        patch: {
+          activeIncident: false,
+          needsAttention: false,
+          priority: "normal",
+          operationalStatus: "incident_resolved",
+          publicStatus: FORCEABLE_STATUSES[current.status] || current.publicStatus || PUBLIC_STATUS,
+        },
+        eventSummary: `Admin resolvió incidencia: ${clean.reason}`,
+        humanMessage: "Incidencia resuelta.",
+      };
+    case ADMIN_ACTIONS.CANCEL_BY_ADMIN:
+      return {
+        patch: {
+          status: "cancelled",
+          publicStatus: "Pedido cerrado",
+          operationalStatus: "cancelled_by_admin",
+          activeIncident: false,
+          needsAttention: false,
+          priority: "closed",
+          cancellationReason: clean.reason,
+          cancelledByRole: "admin",
+        },
+        eventSummary: `Admin canceló el pedido: ${clean.reason}`,
+        humanMessage: "Pedido cancelado por Admin.",
+      };
+    case ADMIN_ACTIONS.FORCE_STATUS:
+      return {
+        patch: {
+          status: clean.forcedStatus,
+          publicStatus: FORCEABLE_STATUSES[clean.forcedStatus],
+          operationalStatus: `forced_${clean.forcedStatus}`,
+          needsAttention: clean.forcedStatus === "under_review",
+          priority: clean.forcedStatus === "under_review" ? "high" : "normal",
+        },
+        eventSummary: `Admin forzó estado a ${clean.forcedStatus}: ${clean.reason}`,
+        humanMessage: "Estado actualizado por contrato operativo.",
+      };
+    case ADMIN_ACTIONS.ASSIGN_RESPONSIBLE:
+      return {
+        patch: {
+          responsibleRole: clean.responsibleRole,
+          operationalStatus: "responsible_assigned",
+        },
+        eventSummary: "Admin asignó responsable operativo.",
+        humanMessage: "Responsable operativo asignado.",
+      };
+    case ADMIN_ACTIONS.CLEAR_RESPONSIBLE:
+      return {
+        patch: {
+          responsibleRole: "",
+          operationalStatus: "responsible_cleared",
+        },
+        eventSummary: "Admin limpió responsable operativo.",
+        humanMessage: "Responsable operativo limpiado.",
+      };
+    default:
+      throw new HttpsError("invalid-argument", "Acción operativa inválida.");
+  }
+}
 
 function cleanOrderPayload(payload) {
   const storeId = cleanText(payload.storeId);
@@ -247,6 +526,18 @@ function plusOrderData(clean, trackingNumber, now) {
     trackingNumber,
     publicOrderNumber: trackingNumber,
     isPublicCreated: true,
+    operationalStatus: STATUS,
+    responsibleRole: "",
+    priority: "normal",
+    needsAttention: true,
+    activeIncident: false,
+    adminReviewed: false,
+    nextAllowedActions: allowedAdminActions({
+      status: STATUS,
+      adminReviewed: false,
+      activeIncident: false,
+      responsibleRole: "",
+    }),
     createdAt: now,
     updatedAt: now,
   };

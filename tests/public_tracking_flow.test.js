@@ -67,7 +67,7 @@ test("getPublicOrderTracking reads and filters public tracking data only", () =>
   const source = read(fn);
   const trackingFunction = source.slice(
     source.indexOf("exports.getPublicOrderTracking"),
-    source.indexOf("function cleanOrderPayload"),
+    source.indexOf("exports.adminOrderAction"),
   );
 
   assert.match(trackingFunction, /exports\.getPublicOrderTracking/);
@@ -76,7 +76,7 @@ test("getPublicOrderTracking reads and filters public tracking data only", () =>
   assert.match(trackingFunction, /where\("publicOrderNumber", "==", trackingNumber\)/);
   assert.match(trackingFunction, /publicTrackingResponse/);
   assert.doesNotMatch(trackingFunction, /\.set\(|\.add\(|\.update\(|\.delete\(/);
-  assert.doesNotMatch(source, /collection\("(users|roles|payments|order_tracking)"\)|driverId|WhatsApp|whatsapp/);
+  assert.doesNotMatch(trackingFunction, /collection\("(users|roles|payments|order_tracking)"\)|driverId|WhatsApp|whatsapp/);
 });
 
 test("orders remain closed to direct public writes and raw public reads", () => {

@@ -97,22 +97,19 @@ internal fun orderDetailEntriesFor(
     subsectionTitle: String,
     orders: List<AdminOrderSummary>,
 ): List<AdminOrderDetailEntry> {
-    val real = orders.firstOrNull()
     val variant = when {
         sectionTitle == "Pedidos con problemas" && subsectionTitle == "Local no responde" -> OperationOrderVariant.WithProblem
         sectionTitle == "Pedidos activos" && subsectionTitle == "Esperando repartidor" -> OperationOrderVariant.ActionUnavailable
         sectionTitle == "Pedidos activos" && subsectionTitle == "Esperando local" -> OperationOrderVariant.NeedsAttention
         else -> OperationOrderVariant.Normal
     }
-    return real?.let {
+    return orders.map {
         val sourceLabel = AdminOperationOrderClassification.sourceLabel(it.source, it.requestType)
-        listOf(
-            AdminOrderDetailEntry(
-                label = if (it.trackingNumber.isNotBlank()) it.trackingNumber else "Pedido #____",
-                note = "${it.publicStatus.ifBlank { "Pedido recibido" }} · $sourceLabel",
-                variant = variant,
-                realOrderId = it.id,
-            ),
+        AdminOrderDetailEntry(
+            label = if (it.trackingNumber.isNotBlank()) it.trackingNumber else "Pedido #____",
+            note = "${it.publicStatus.ifBlank { "Pedido recibido" }} · $sourceLabel",
+            variant = variant,
+            realOrderId = it.id,
         )
-    } ?: emptyList()
+    }
 }

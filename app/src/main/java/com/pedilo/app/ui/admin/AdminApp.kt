@@ -41,6 +41,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pedilo.app.core.model.AdminActiveOrdersBucket
+import com.pedilo.app.core.model.AdminOrderAction
+import com.pedilo.app.core.model.AdminOrderActionRequest
 import com.pedilo.app.core.model.AdminOperationOrderClassification
 import com.pedilo.app.core.model.AdminOperationOrderSignals
 import com.pedilo.app.core.model.AdminOrderDetail
@@ -48,11 +50,13 @@ import com.pedilo.app.core.model.AdminOrderSummary
 import com.pedilo.app.core.model.AdminProblemOrdersBucket
 import com.pedilo.app.core.model.AdminTodayOrdersBucket
 import com.pedilo.app.core.result.CoreResult
+import com.pedilo.app.core.result.CoreError
 import com.pedilo.app.core.runtime.adminOrdersUseCase
 import com.pedilo.app.ui.admin.components.AdminBottomBar
 import com.pedilo.app.ui.admin.components.AdminEntryCard
 import com.pedilo.app.ui.admin.components.AdminHeader
 import com.pedilo.app.ui.admin.components.AdminInfoPanel
+import com.pedilo.app.ui.components.PediloTextField
 import com.pedilo.app.ui.publicuser.PediloBg
 import com.pedilo.app.ui.publicuser.PediloCardBrush
 import com.pedilo.app.ui.publicuser.PediloLine
@@ -469,12 +473,19 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
     var showSignOut by remember { mutableStateOf(false) }
     var readOnlyOrders by remember { mutableStateOf<List<AdminOrderSummary>>(emptyList()) }
     var readOnlyOrderDetails by remember { mutableStateOf<Map<String, AdminOrderDetail>>(emptyMap()) }
+    var pendingAction by remember { mutableStateOf<Pair<String, AdminOrderAction>?>(null) }
+    var pendingReason by remember { mutableStateOf("") }
+    var operationMessage by remember { mutableStateOf("") }
+    var operationError by remember { mutableStateOf("") }
+    val adminOrders = remember { adminOrdersUseCase() }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        when (val result = adminOrdersUseCase().invoke()) {
-            is CoreResult.Success -> readOnlyOrders = result.value
-            is CoreResult.Failure -> readOnlyOrders = emptyList()
+        adminOrders.observe().collect { result ->
+            when (result) {
+                is CoreResult.Success -> readOnlyOrders = result.value
+                is CoreResult.Failure -> readOnlyOrders = emptyList()
+            }
         }
     }
 
@@ -500,7 +511,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             icon = "R",
             title = "Demorados",
             count = delayedCount,
-            note = if (delayedCount == 0) "Sin pedidos Demorados por ahora." else "Pedidos con tiempo excedido o espera prolongada.",
+            note = if (delayedCount == 0) "No hay pedidos demorados ahora." else "Pedidos con tiempo excedido o espera prolongada.",
             priority = "Prioridad media",
             tension = "Ritmo afectado",
             targetSection = "Pedidos del día",
@@ -643,6 +654,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             )
             is AdminRoute.OperationSection -> AdminOperationSectionScreen(
                 section = current.section,
+                orders = readOnlyOrders,
                 onEntry = { entry ->
                     if (current.section.title == "Pedidos del día") {
                         todayOrdersCategories.firstOrNull { it.title == entry.title }?.let {
@@ -659,7 +671,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 AdminSectionScreen(
                     root = AdminRoot.Operation,
                     title = current.title,
-                    summary = "Submundo operativo preparado para organizar la siguiente capa.",
+                    summary = "Lectura operativa por estado.",
                     panelTitle = current.section.title,
                     panelText = if (orderEntries.isEmpty()) {
                         "No hay pedidos para mostrar en esta sección."
@@ -667,11 +679,11 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                         "Pedidos detectados en esta sección: ${orderEntries.size}."
                     },
                     orderDetailEntries = orderEntries,
-                    onOrderDetail = { variant ->
+                    onOrderDetail = { selected ->
                         route = AdminRoute.OperationOrderDetail(
                             returnRoute = AdminRoute.OperationSubsection(current.section, current.title),
-                            variant = variant,
-                            realOrderId = orderEntries.firstOrNull { it.variant == variant }?.realOrderId,
+                            variant = selected.variant,
+                            realOrderId = selected.realOrderId,
                         )
                     },
                     onOperationalProfile = { kind ->
@@ -685,13 +697,10 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             is AdminRoute.OperationOrderDetail -> AdminOrderDetailScreen(
                 variant = current.variant,
                 orderId = current.realOrderId,
+                summary = current.realOrderId?.let { id -> readOnlyOrders.firstOrNull { it.id == id } },
                 detail = current.realOrderId?.let { readOnlyOrderDetails[it] },
-                onSolve = {
-                    route = AdminRoute.OperationOrderSolve(
-                        returnRoute = AdminRoute.OperationOrderDetail(current.returnRoute, current.variant, current.realOrderId),
-                        stage = OperationSolveStage.Start,
-                    )
-                },
+                operationMessage = operationMessage,
+                operationError = operationError,
                 onOpenStore = {
                     route = AdminRoute.OperationOperationalProfile(
                         kind = AdminOperationalProfileKind.Store,
@@ -707,11 +716,17 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 onLoadDetail = { orderId ->
                     if (readOnlyOrderDetails.containsKey(orderId)) return@AdminOrderDetailScreen
                     scope.launch {
-                        when (val result = adminOrdersUseCase().getDetail(orderId)) {
+                        when (val result = adminOrders.getDetail(orderId)) {
                             is CoreResult.Success -> readOnlyOrderDetails = readOnlyOrderDetails + (orderId to result.value)
                             is CoreResult.Failure -> Unit
                         }
                     }
+                },
+                onAction = { orderId, action ->
+                    operationMessage = ""
+                    operationError = ""
+                    pendingReason = ""
+                    pendingAction = orderId to action
                 },
             )
             is AdminRoute.OperationOrderSolve -> AdminOrderSolveScreen(
@@ -731,7 +746,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             is AdminRoute.TodayOrdersSubsection -> AdminSectionScreen(
                 root = AdminRoot.Operation,
                 title = current.title,
-                summary = "Submundo de pedidos del día preparado para organizar la siguiente capa.",
+                summary = "Lectura del día por estado.",
                 panelTitle = current.category.title,
                 panelText = "Lectura del día por categoría con datos disponibles.",
                 orderDetailEntries = orderDetailEntriesFor(
@@ -739,6 +754,13 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                     subsectionTitle = current.title,
                     orders = readOnlyOrders.forTodaySubsection(current.category.title, current.title),
                 ),
+                onOrderDetail = { selected ->
+                    route = AdminRoute.OperationOrderDetail(
+                        returnRoute = AdminRoute.TodayOrdersSubsection(current.category, current.title),
+                        variant = selected.variant,
+                        realOrderId = selected.realOrderId,
+                    )
+                },
             )
             is AdminRoute.ConfigurationSection -> AdminConfigurationSectionScreen(
                 section = current.section,
@@ -824,6 +846,65 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             },
         )
     }
+
+    pendingAction?.let { (orderId, action) ->
+        AlertDialog(
+            onDismissRequest = { pendingAction = null },
+            title = { Text(action.label) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(action.impact)
+                    if (action.requiresReason) {
+                        PediloTextField(
+                            value = pendingReason,
+                            onValueChange = { pendingReason = it },
+                            label = "Motivo operativo",
+                            singleLine = false,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val reason = pendingReason
+                        pendingAction = null
+                        scope.launch {
+                            val request = AdminOrderActionRequest(
+                                orderId = orderId,
+                                action = action,
+                                reason = reason,
+                                forcedStatus = "under_review",
+                                responsibleRole = "admin",
+                            )
+                            when (val result = adminOrders.execute(request)) {
+                                is CoreResult.Success -> {
+                                    operationMessage = result.value.humanMessage.ifBlank { result.value.eventSummary }
+                                    operationError = ""
+                                    when (val detail = adminOrders.getDetail(orderId)) {
+                                        is CoreResult.Success -> readOnlyOrderDetails = readOnlyOrderDetails + (orderId to detail.value)
+                                        is CoreResult.Failure -> Unit
+                                    }
+                                }
+                                is CoreResult.Failure -> {
+                                    operationMessage = ""
+                                    operationError = (result.error as? CoreError.Operational)?.humanMessage
+                                        ?: "No pudimos ejecutar la acción."
+                                }
+                            }
+                        }
+                    },
+                ) {
+                    Text("Confirmar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingAction = null }) {
+                    Text("Cancelar")
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -863,8 +944,16 @@ private fun AdminRootScreen(
 @Composable
 private fun AdminOperationSectionScreen(
     section: AdminOperationSection,
+    orders: List<AdminOrderSummary>,
     onEntry: (AdminEntry) -> Unit,
 ) {
+    val scopedSignals = orders.map { it to AdminOperationOrderSignals.from(it) }
+    val totalInSection = when (section.title) {
+        "Pedidos del día" -> scopedSignals.count { (_, s) -> AdminOperationOrderClassification.todayBucket(s) != null }
+        "Pedidos activos" -> scopedSignals.count { (_, s) -> AdminOperationOrderClassification.activeBucket(s) != null }
+        "Pedidos con problemas" -> scopedSignals.count { (_, s) -> AdminOperationOrderClassification.problemBucket(s) != null }
+        else -> 0
+    }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -886,9 +975,19 @@ private fun AdminOperationSectionScreen(
         item {
             AdminInfoPanel(title = section.contextTitle, text = section.contextText)
         }
+        item {
+            AdminInfoPanel(
+                title = "Estado del grupo",
+                text = if (totalInSection == 0) "No hay pedidos para mostrar en este grupo ahora." else "$totalInSection pedidos en este grupo operativo.",
+            )
+        }
         items(section.entries) { entry ->
             AdminOperationLiveCardView(
-                card = operationLiveCardFor(entry),
+                card = operationLiveCardFor(entry).copy(
+                    countLabel = operationCountLabel(section.title, entry.title, orders),
+                    detail = operationDetailLabel(section.title, entry.title, orders, entry.note),
+                    tension = operationTensionLabel(section.title, entry.title, orders),
+                ),
                 onClick = { onEntry(entry) },
             )
         }
@@ -915,7 +1014,7 @@ private fun AdminOperationDeskScreen(
             AdminHeader(
                 title = "Pédilo Admin",
                 eyebrow = "Mesa Operativa Viva",
-                summary = "Lectura en tiempo real sin ejecutar acciones operativas.",
+                summary = "Lectura operativa en tiempo real.",
                 onSignOut = onSignOut,
                 showSignOut = true,
             )
@@ -950,17 +1049,19 @@ private fun AdminPriorityCardView(
     card: AdminPriorityCard,
     onClick: () -> Unit,
 ) {
+    val cardBorderAlpha = if (card.count == 0) 0.28f else 0.55f
+    val cardBackgroundAlpha = if (card.count == 0) 0.72f else 0.9f
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(
                 Brush.verticalGradient(
-                    listOf(PediloPanel, PediloPanel.copy(alpha = 0.9f)),
+                    listOf(PediloPanel, PediloPanel.copy(alpha = cardBackgroundAlpha)),
                 ),
                 RoundedCornerShape(16.dp),
             )
-            .border(1.dp, PediloLine.copy(alpha = 0.55f), RoundedCornerShape(16.dp))
+            .border(1.dp, PediloLine.copy(alpha = cardBorderAlpha), RoundedCornerShape(16.dp))
             .clickable(role = Role.Button, onClick = onClick)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -1001,7 +1102,7 @@ private fun AdminPriorityCardView(
             )
         }
         Text(
-            text = "${card.count} pedidos",
+            text = if (card.count == 0) "Sin pedidos ahora" else "${card.count} pedidos",
             style = TextStyle(
                 color = PediloText,
                 fontSize = 22.sp,
@@ -1027,6 +1128,45 @@ private fun AdminPriorityCardView(
                 letterSpacing = 0.sp,
             ),
         )
+    }
+}
+
+private fun operationCountLabel(sectionTitle: String, entryTitle: String, orders: List<AdminOrderSummary>): String {
+    val count = when (sectionTitle) {
+        "Pedidos activos", "Pedidos con problemas" -> orders.forOperationSubsection(sectionTitle, entryTitle).size
+        "Pedidos del día" -> orders.forTodaySubsection(entryTitle, entryTitle).size
+        else -> 0
+    }
+    return if (count == 0) "Sin pedidos ahora" else "$count pedidos"
+}
+
+private fun operationDetailLabel(
+    sectionTitle: String,
+    entryTitle: String,
+    orders: List<AdminOrderSummary>,
+    fallback: String,
+): String {
+    val first = when (sectionTitle) {
+        "Pedidos activos", "Pedidos con problemas" -> orders.forOperationSubsection(sectionTitle, entryTitle).firstOrNull()
+        "Pedidos del día" -> orders.forTodaySubsection(entryTitle, entryTitle).firstOrNull()
+        else -> null
+    }
+    if (first == null) return "No hay pedidos para mostrar en esta sección."
+    val source = AdminOperationOrderClassification.sourceLabel(first.source, first.requestType)
+    val store = first.storeName.ifBlank { "Local sin dato disponible" }
+    return "$store · ${first.publicStatus.ifBlank { "Estado sin dato disponible" }} · $source"
+}
+
+private fun operationTensionLabel(sectionTitle: String, entryTitle: String, orders: List<AdminOrderSummary>): String {
+    val count = when (sectionTitle) {
+        "Pedidos activos", "Pedidos con problemas" -> orders.forOperationSubsection(sectionTitle, entryTitle).size
+        "Pedidos del día" -> orders.forTodaySubsection(entryTitle, entryTitle).size
+        else -> 0
+    }
+    return when {
+        count == 0 -> "Sin tensión operativa"
+        entryTitle in listOf("Con problemas", "Demorados", "Local no responde", "Reclamo del cliente") -> "Prioridad alta"
+        else -> "Seguimiento activo"
     }
 }
 
@@ -1180,7 +1320,7 @@ private fun AdminSectionScreen(
     panelTitle: String,
     panelText: String,
     orderDetailEntries: List<AdminOrderDetailEntry> = emptyList(),
-    onOrderDetail: (OperationOrderVariant) -> Unit = {},
+    onOrderDetail: (AdminOrderDetailEntry) -> Unit = {},
     onOperationalProfile: (AdminOperationalProfileKind) -> Unit = {},
     onConfigurationConvergence: () -> Unit = {},
     onRoleAccessConvergence: (AdminRoleAccessConvergenceStep) -> Unit = {},
@@ -1235,7 +1375,7 @@ private fun AdminSectionScreen(
                     priority = "Prioridad operativa",
                     tension = "Abrir lectura completa",
                 ),
-                onClick = { onOrderDetail(entry.variant) },
+                onClick = { onOrderDetail(entry) },
             )
         }
         if (allowStoreProfile) {
@@ -1472,13 +1612,22 @@ private fun AdminConfigurationConvergenceScreen(
 private fun AdminOrderDetailScreen(
     variant: OperationOrderVariant,
     orderId: String?,
+    summary: AdminOrderSummary?,
     detail: AdminOrderDetail?,
-    onSolve: () -> Unit,
+    operationMessage: String,
+    operationError: String,
     onOpenStore: () -> Unit,
     onOpenDriver: () -> Unit,
     onLoadDetail: (String) -> Unit,
+    onAction: (String, AdminOrderAction) -> Unit,
 ) {
     orderId?.let { LaunchedEffect(it) { onLoadDetail(it) } }
+    val actions = detail?.nextAllowedActions ?: summary?.nextAllowedActions ?: emptyList()
+    val responsible = detail?.responsibleRole ?: summary?.responsibleRole.orEmpty()
+    val priority = detail?.priority ?: summary?.priority.orEmpty()
+    val operationalStatus = detail?.operationalStatus ?: summary?.operationalStatus.orEmpty()
+    val needsAttention = detail?.needsAttention ?: summary?.needsAttention ?: false
+    val activeIncident = detail?.activeIncident ?: summary?.activeIncident ?: false
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1490,15 +1639,28 @@ private fun AdminOrderDetailScreen(
     ) {
         item {
             AdminHeader(
-                title = detail?.trackingNumber?.ifBlank { "Pedido #____" } ?: "Pedido #____",
+                title = detail?.trackingNumber?.ifBlank { summary?.trackingNumber.orEmpty().ifBlank { "Pedido #____" } } ?: summary?.trackingNumber.orEmpty().ifBlank { "Pedido #____" },
                 eyebrow = "Operación",
-                summary = detail?.publicStatus?.ifBlank { "Seguimiento del pedido." } ?: "Qué está pasando con este pedido ahora.",
+                summary = detail?.publicStatus?.ifBlank { summary?.publicStatus.orEmpty().ifBlank { "Seguimiento del pedido." } } ?: summary?.publicStatus.orEmpty().ifBlank { "Qué está pasando con este pedido ahora." },
                 onSignOut = {},
                 showSignOut = false,
             )
         }
         item {
-            AdminOrderStatusPanel(variant = variant)
+            AdminOrderStatusPanel(
+                variant = variant,
+                operationalStatus = operationalStatus,
+                responsibleRole = responsible,
+                priority = priority,
+                needsAttention = needsAttention,
+                activeIncident = activeIncident,
+            )
+        }
+        if (operationMessage.isNotBlank()) {
+            item { AdminInfoPanel(title = "Resultado", text = operationMessage) }
+        }
+        if (operationError.isNotBlank()) {
+            item { AdminInfoPanel(title = "Error operativo", text = operationError) }
         }
         when (variant) {
             OperationOrderVariant.Normal -> {
@@ -1513,6 +1675,9 @@ private fun AdminOrderDetailScreen(
                         title = "Datos del pedido",
                         text = buildString {
                             appendLine("Estado: ${detail?.status.orEmpty().ifBlank { "Sin dato" }}")
+                            appendLine("Estado operativo: ${operationalStatus.ifBlank { "Sin dato" }}")
+                            appendLine("Responsable: ${responsible.ifBlank { "Sin asignar" }}")
+                            appendLine("Prioridad: ${priority.ifBlank { "normal" }}")
                             appendLine("Origen: ${detail?.source.orEmpty().ifBlank { "Sin dato" }}")
                             appendLine("Tipo: ${detail?.requestType.orEmpty().ifBlank { "Sin dato" }}")
                             append("Local: ${detail?.storeName.orEmpty().ifBlank { "Sin dato" }}")
@@ -1540,7 +1705,7 @@ private fun AdminOrderDetailScreen(
                 item {
                     AdminDisabledActionCard(
                         title = "Revisión pendiente",
-                        note = "Acción guiada en próximo bloque",
+                        note = "Usá las acciones reales disponibles para este pedido.",
                     )
                 }
             }
@@ -1555,13 +1720,6 @@ private fun AdminOrderDetailScreen(
                             "Tiempo detenido" to "Desde hace unos minutos",
                             "Impacto" to "Pedido detenido sin avanzar",
                         ),
-                    )
-                }
-                item {
-                    AdminActionCard(
-                        title = "Solucionar",
-                        note = "Revisá opciones de resolución sin ejecutar cambios reales.",
-                        onClick = onSolve,
                     )
                 }
                 item {
@@ -1592,16 +1750,54 @@ private fun AdminOrderDetailScreen(
                 }
             }
         }
+        if (detail?.lastEventSummary.orEmpty().isNotBlank()) {
+            item {
+                AdminInfoPanel(
+                    title = "Último evento",
+                    text = detail?.lastEventSummary.orEmpty(),
+                )
+            }
+        }
+        item {
+            AdminInfoPanel(
+                title = "Acciones disponibles",
+                text = if (actions.isEmpty()) {
+                    "No hay acciones operativas habilitadas para el estado actual."
+                } else {
+                    "El backend volverá a validar estado, rol Admin e impacto al confirmar."
+                },
+            )
+        }
+        items(actions) { action ->
+            if (orderId != null) {
+                AdminActionCard(
+                    title = action.label,
+                    note = action.impact,
+                    onClick = { onAction(orderId, action) },
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun AdminOrderStatusPanel(variant: OperationOrderVariant) {
-    val (status, detail) = when (variant) {
+private fun AdminOrderStatusPanel(
+    variant: OperationOrderVariant,
+    operationalStatus: String,
+    responsibleRole: String,
+    priority: String,
+    needsAttention: Boolean,
+    activeIncident: Boolean,
+) {
+    val (status, detail) = when {
+        activeIncident -> "Con incidencia" to "Hay una incidencia operativa activa."
+        needsAttention -> "Necesita atención" to "El pedido requiere seguimiento operativo."
+        else -> when (variant) {
         OperationOrderVariant.Normal -> "Estado normal" to "El pedido avanza dentro de lo previsto."
         OperationOrderVariant.NeedsAttention -> "Necesita atención" to "Hay un punto que requiere seguimiento operativo."
         OperationOrderVariant.WithProblem -> "Con problema" to "El pedido quedó detenido por una incidencia."
         OperationOrderVariant.ActionUnavailable -> "Acción no disponible" to "No hay gestiones habilitadas en este momento."
+        }
     }
     Column(
         modifier = Modifier
@@ -1614,6 +1810,13 @@ private fun AdminOrderStatusPanel(variant: OperationOrderVariant) {
         Text("Estado general", color = PediloMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         Text(status, color = PediloOrange, fontSize = 22.sp, lineHeight = 26.sp, fontWeight = FontWeight.ExtraBold)
         Text(detail, color = PediloText, fontSize = 14.sp, lineHeight = 20.sp)
+        Text(
+            "Operativo: ${operationalStatus.ifBlank { "Sin dato" }} · Responsable: ${responsibleRole.ifBlank { "Sin asignar" }} · Prioridad: ${priority.ifBlank { "normal" }}",
+            color = PediloMuted,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
@@ -1745,7 +1948,7 @@ private fun AdminOperationalProfileScreen(kind: AdminOperationalProfileKind, sta
     val context = if (kind == AdminOperationalProfileKind.Store) {
         "Este estado se usa para seguimiento operativo del local sin cambiar su configuración ni productos."
     } else {
-        "Este estado se usa para seguimiento operativo del repartidor sin cambios de cuenta, permisos ni accesos."
+        "Este estado se usa para seguimiento operativo del repartidor."
     }
     LazyColumn(
         modifier = Modifier
@@ -1764,7 +1967,7 @@ private fun AdminOperationalProfileScreen(kind: AdminOperationalProfileKind, sta
         item {
             AdminDisabledActionCard(
                 title = "Acción no disponible desde esta vista",
-                note = "Las acciones operativas finales se habilitan en etapas posteriores.",
+                note = "Esta vista es de lectura y seguimiento.",
             )
         }
     }

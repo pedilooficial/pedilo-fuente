@@ -566,6 +566,7 @@ private fun PublicCatalogState.romaStoreForOrder() =
 
 private fun CoreError.toLocalOrderMessage(): String = when (this) {
     is CoreError.Validation -> "Revisá los datos del pedido antes de confirmar."
+    is CoreError.Operational -> "No pudimos confirmar el pedido. Probá de nuevo."
     CoreError.IncompleteData -> "Faltan datos para confirmar el pedido."
     CoreError.NotAvailable -> "No pudimos confirmar el pedido. Probá de nuevo."
     CoreError.Unknown -> "Ocurrió un error al confirmar el pedido."

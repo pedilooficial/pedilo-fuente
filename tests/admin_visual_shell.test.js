@@ -381,7 +381,7 @@ test("admin order detail keeps shell rules and visual entry paths", () => {
   assert.match(source, /is AdminRoute\.OperationOrderSolve -> when \(current\.stage\)/);
   assert.match(source, /is AdminRoute\.OperationOrderDetail -> AdminOrderDetailScreen/);
   assert.match(source, /AdminActionCard/);
-  assert.match(source, /Revisá opciones de resolución sin ejecutar cambios reales/);
+  assert.match(source, /Acciones disponibles/);
   assert.match(source, /Local operativo/);
   assert.match(source, /Repartidor operativo/);
   forbiddenReturnLabels.forEach((label) => assert.doesNotMatch(source, new RegExp(`"${label}"`)));

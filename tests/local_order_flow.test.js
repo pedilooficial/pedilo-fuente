@@ -77,15 +77,19 @@ test("orders remain closed to direct client writes", () => {
 
 test("createLocalOrder validates and writes only orders", () => {
   const source = read(fn);
+  const createLocalOrder = source.slice(
+    source.indexOf("exports.createLocalOrder"),
+    source.indexOf("exports.createPlusOrder"),
+  );
 
-  assert.match(source, /exports\.createLocalOrder/);
-  assert.match(source, /cleanOrderPayload/);
+  assert.match(createLocalOrder, /exports\.createLocalOrder/);
+  assert.match(createLocalOrder, /cleanOrderPayload/);
   assert.match(source, /rawItems\.length === 0/);
   assert.match(source, /isValidPhone/);
-  assert.match(source, /collection\(ORDERS\)\.doc\(\)/);
-  assert.match(source, /source: LOCAL_SOURCE/);
-  assert.match(source, /status: STATUS/);
-  assert.match(source, /publicStatus: PUBLIC_STATUS/);
-  assert.match(source, /trackingNumber/);
-  assert.doesNotMatch(source, /collection\("(users|roles|payments|order_tracking)"\)|driverId|WhatsApp|whatsapp/);
+  assert.match(createLocalOrder, /collection\(ORDERS\)\.doc\(\)/);
+  assert.match(createLocalOrder, /source: LOCAL_SOURCE/);
+  assert.match(createLocalOrder, /status: STATUS/);
+  assert.match(createLocalOrder, /publicStatus: PUBLIC_STATUS/);
+  assert.match(createLocalOrder, /trackingNumber/);
+  assert.doesNotMatch(createLocalOrder, /collection\("(users|roles|payments|order_tracking)"\)|driverId|WhatsApp|whatsapp/);
 });

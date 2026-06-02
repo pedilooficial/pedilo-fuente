@@ -17,6 +17,12 @@ sealed interface CoreError {
         override val code: String = "not_available"
     }
 
+    data class Operational(
+        val humanMessage: String,
+    ) : CoreError {
+        override val code: String = "operational"
+    }
+
     data object Unknown : CoreError {
         override val code: String = "unknown"
     }
