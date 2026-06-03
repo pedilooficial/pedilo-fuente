@@ -463,10 +463,6 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
         }
     }
 
-    val todayCount = readOnlyOrders.todayOrders().values.sumOf { it.size }
-    val activeCount = readOnlyOrders.activeOrders().values.sumOf { it.size }
-    val problemCount = readOnlyOrders.problemOrders().values.sumOf { it.size }
-
     BackHandler(enabled = route !is AdminRoute.Operation && route !is AdminRoute.Configuration && route !is AdminRoute.RoleAccess) {
         route = when (val current = route) {
             is AdminRoute.OperationOrderSolve -> when (current.stage) {
@@ -527,19 +523,21 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
     ) {
         when (val current = route) {
             AdminRoute.Operation -> AdminOperationDeskScreen(
-                totalOrdersToday = todayCount,
-                activeOrders = activeCount,
-                problemOrders = problemCount,
-                onOpenToday = {
+                orders = readOnlyOrders,
+                onOpenView = { viewTitle ->
                     operationUniverses.firstOrNull { it.key == AdminOperationUniverseKey.Orders }?.let { universe ->
-                        universe.views.firstOrNull { it.title == "Pedidos del día" }?.let { view ->
+                        universe.views.firstOrNull { it.title == viewTitle }?.let { view ->
                             route = AdminRoute.OperationView(universe, view)
                         }
                     }
                 },
-                onOpenUniverse = { key ->
-                    operationUniverses.firstOrNull { it.key == key }?.let {
-                        route = AdminRoute.OperationUniverse(it)
+                onOpenList = { universeKey, viewTitle, listTitle ->
+                    operationUniverses.firstOrNull { it.key == universeKey }?.let { universe ->
+                        universe.views.firstOrNull { it.title == viewTitle }?.let { view ->
+                            view.lists.firstOrNull { it.title == listTitle }?.let { list ->
+                                route = AdminRoute.OperationList(universe, view, list)
+                            }
+                        }
                     }
                 },
                 onSignOut = { showSignOut = true },
@@ -947,8 +945,8 @@ private fun AdminOperationListScreen(
             AdminOperationLiveCardView(
                 card = AdminOperationalLiveCard(
                     icon = "Ord",
-                    title = "Pedido ${entry.label}",
-                    countLabel = "Abrir pedido",
+                    title = entry.label,
+                    countLabel = "Ver estado",
                     detail = entry.note,
                     priority = "Pedido",
                     tension = "Ver estado",
@@ -961,13 +959,18 @@ private fun AdminOperationListScreen(
 
 @Composable
 private fun AdminOperationDeskScreen(
-    totalOrdersToday: Int,
-    activeOrders: Int,
-    problemOrders: Int,
-    onOpenToday: () -> Unit,
-    onOpenUniverse: (AdminOperationUniverseKey) -> Unit,
+    orders: List<AdminOrderSummary>,
+    onOpenView: (String) -> Unit,
+    onOpenList: (AdminOperationUniverseKey, String, String) -> Unit,
     onSignOut: () -> Unit,
 ) {
+    val orderUniverse = operationUniverses.first { it.key == AdminOperationUniverseKey.Orders }
+    val driverUniverse = operationUniverses.first { it.key == AdminOperationUniverseKey.Drivers }
+    val storeUniverse = operationUniverses.first { it.key == AdminOperationUniverseKey.Stores }
+    val orderViews = orderUniverse.views
+    val driverView = driverUniverse.views.first()
+    val storeView = storeUniverse.views.first()
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -987,86 +990,64 @@ private fun AdminOperationDeskScreen(
             )
         }
         item {
-            AdminTodaySummaryCard(
-                title = "Pedidos del día",
-                subtitle = "Resumen de hoy",
-                count = totalOrdersToday,
-                detail = "${activeOrders.toCompactCount("en curso")} · ${problemOrders.toCompactCount("con problemas")}",
-                onClick = onOpenToday,
-            )
+            AdminOperationHomeBlock(title = "Pedidos") {
+                orderViews.forEach { view ->
+                    AdminOperationUniverseCard(
+                        title = view.title,
+                        note = view.summary,
+                        value = operationViewCountLabel(view, orders),
+                        tone = operationToneFor(view, orders),
+                        onClick = { onOpenView(view.title) },
+                    )
+                }
+            }
         }
         item {
-            AdminOperationUniverseCard(
-                title = "Pedidos",
-                note = "En curso, cerrados o con revisión",
-                value = "Pedidos del día · Activos · Con problemas",
-                tone = AdminOperationMetricTone.Healthy,
-                onClick = { onOpenUniverse(AdminOperationUniverseKey.Orders) },
-            )
+            AdminOperationHomeBlock(title = "Repartidores") {
+                driverView.lists.forEach { list ->
+                    AdminOperationUniverseCard(
+                        title = list.title,
+                        note = list.summary,
+                        value = operationListCountLabel(list, orders),
+                        tone = AdminOperationMetricTone.Neutral,
+                        onClick = { onOpenList(AdminOperationUniverseKey.Drivers, driverView.title, list.title) },
+                    )
+                }
+            }
         }
         item {
-            AdminOperationUniverseCard(
-                title = "Repartidores",
-                note = "Estado del equipo de reparto",
-                value = "Aún no hay información real",
-                tone = AdminOperationMetricTone.Neutral,
-                onClick = { onOpenUniverse(AdminOperationUniverseKey.Drivers) },
-            )
-        }
-        item {
-            AdminOperationUniverseCard(
-                title = "Locales",
-                note = "Estado de los locales activos",
-                value = "Aún no hay información real",
-                tone = AdminOperationMetricTone.Neutral,
-                onClick = { onOpenUniverse(AdminOperationUniverseKey.Stores) },
-            )
+            AdminOperationHomeBlock(title = "Locales") {
+                storeView.lists.forEach { list ->
+                    AdminOperationUniverseCard(
+                        title = list.title,
+                        note = list.summary,
+                        value = operationListCountLabel(list, orders),
+                        tone = AdminOperationMetricTone.Neutral,
+                        onClick = { onOpenList(AdminOperationUniverseKey.Stores, storeView.title, list.title) },
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun AdminTodaySummaryCard(
+private fun AdminOperationHomeBlock(
     title: String,
-    subtitle: String,
-    count: Int,
-    detail: String,
-    onClick: () -> Unit,
+    content: @Composable () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(Brush.verticalGradient(listOf(PediloPanel, PediloPanel.copy(alpha = 0.9f))), RoundedCornerShape(18.dp))
-            .border(1.dp, PediloOrange.copy(alpha = 0.42f), RoundedCornerShape(18.dp))
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(17.dp),
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(title, color = PediloText, fontSize = 20.sp, lineHeight = 24.sp, fontWeight = FontWeight.ExtraBold)
-                Text(subtitle, color = PediloMuted, fontSize = 13.sp, lineHeight = 18.sp)
-            }
-            AdminStatusPill("En vivo", AdminOperationMetricTone.Healthy)
-        }
         Text(
-            text = if (count == 0) "Sin pedidos por ahora" else "$count pedidos",
+            text = title,
             color = PediloText,
-            fontSize = 30.sp,
-            lineHeight = 34.sp,
-            fontWeight = FontWeight.Black,
+            fontSize = 18.sp,
+            lineHeight = 22.sp,
+            fontWeight = FontWeight.ExtraBold,
         )
-        Text(
-            text = detail,
-            color = PediloMuted,
-            fontSize = 12.sp,
-            lineHeight = 17.sp,
-        )
+        content()
     }
 }
 
@@ -1109,8 +1090,6 @@ private fun AdminStatusPill(text: String, tone: AdminOperationMetricTone) {
             .padding(horizontal = 9.dp, vertical = 5.dp),
     )
 }
-
-private fun Int.toCompactCount(label: String): String = "$this $label"
 
 private fun AdminOperationMetricTone.operationToneColor(): Color =
     when (this) {
@@ -1191,6 +1170,16 @@ private fun operationListTensionLabel(list: AdminOperationList, orders: List<Adm
             AdminOperationListKind.ProblemWithoutResponsible,
         ) -> "Prioridad alta"
         else -> "Seguimiento activo"
+    }
+}
+
+private fun operationToneFor(view: AdminOperationView, orders: List<AdminOrderSummary>): AdminOperationMetricTone {
+    val count = view.lists.sumOf { orders.forOperationList(it.kind).size }
+    return when {
+        count == 0 -> AdminOperationMetricTone.Neutral
+        view.title == "Pedidos con problemas" -> AdminOperationMetricTone.Danger
+        view.title == "Pedidos activos" -> AdminOperationMetricTone.Healthy
+        else -> AdminOperationMetricTone.Neutral
     }
 }
 

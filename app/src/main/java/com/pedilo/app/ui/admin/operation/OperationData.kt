@@ -118,7 +118,7 @@ internal fun orderDetailEntriesFor(
         val status = it.publicStatus.ifBlank { "Pedido recibido" }
         val origin = it.storeName.ifBlank { sourceLabel }
         AdminOrderDetailEntry(
-            label = if (it.trackingNumber.isNotBlank()) it.trackingNumber else "Pedido #____",
+            label = if (it.trackingNumber.isNotBlank()) "Pedido #${it.trackingNumber}" else "Pedido #____",
             note = "$status · $origin",
             variant = variant,
             realOrderId = it.id,

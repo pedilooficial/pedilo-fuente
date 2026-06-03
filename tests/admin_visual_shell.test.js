@@ -58,11 +58,14 @@ test("admin operation root exposes visual operation cards only", () => {
     "Locales",
   ].forEach((label) => assert.match(source, new RegExp(label)));
   assert.match(source, /Resumen de hoy/);
-  assert.match(source, /En vivo/);
+  assert.match(source, /Pedidos activos/);
+  assert.match(source, /Pedidos con problemas/);
+  assert.match(source, /En servicio/);
+  assert.match(source, /Operando/);
   assert.match(source, /AdminOperationUniverseCard/);
-  assert.match(source, /onOpenUniverse/);
+  assert.match(source, /onOpenView/);
+  assert.match(source, /onOpenList/);
   assert.match(source, /Aún no hay información real/);
-  assert.match(source, /AdminTodaySummaryCard/);
   assert.doesNotMatch(source, /Mesa Operativa Viva|Necesitan atención|Finalizados recientes|Capas de lectura/);
   assert.match(source, /AdminBottomItem\("Operación"/);
   assert.doesNotMatch(source, /"Moto"|"Cfg"|"Rol"/);
@@ -125,7 +128,7 @@ test("admin remaining operation roots use safe visual copy", () => {
   ].forEach((label) => assert.match(source, new RegExp(label)));
 });
 
-test("admin order universe exposes dynamic views and filtered lists", () => {
+test("admin operation home opens concrete screens and lists directly", () => {
   const source = readAdminSourceTree();
 
   assert.match(source, /AdminOperationUniverseKey\.Orders/);
@@ -134,6 +137,8 @@ test("admin order universe exposes dynamic views and filtered lists", () => {
   assert.match(source, /AdminOperationListKind\.ProblemWithoutResponsible/);
   assert.match(source, /forOperationList/);
   assert.match(source, /returnRoute = AdminRoute\.OperationList/);
+  assert.match(source, /route = AdminRoute\.OperationView\(universe, view\)/);
+  assert.match(source, /route = AdminRoute\.OperationList\(universe, view, list\)/);
   assert.doesNotMatch(source, /TodayOrdersCategory|TodayOrdersSubsection/);
 });
 
@@ -144,6 +149,10 @@ test("admin operation visible strings avoid internal architecture copy", () => {
     "Vista dinámica",
     "Listado filtrado",
     "Entidad central",
+    "Ramas",
+    "Elegí la rama",
+    "A / B / C",
+    "Universo de pedidos",
     "Lecturas dinámicas",
     "El pedido no vive en una carpeta fija",
     "Datos operativos reales",
@@ -152,6 +161,8 @@ test("admin operation visible strings avoid internal architecture copy", () => {
     "Sin tensión operativa",
     "Dato pendiente",
     "No hay núcleo real conectado",
+    "Abrir pedido",
+    "Actualizado hace 1 min",
     "Pedido Vivo Universal",
   ].forEach((text) => assert.doesNotMatch(visible, new RegExp(text)));
 
