@@ -98,8 +98,13 @@ private sealed interface AdminRoute {
     data object Operation : AdminRoute
     data object Configuration : AdminRoute
     data object RoleAccess : AdminRoute
-    data class OperationSection(val section: AdminOperationSection) : AdminRoute
-    data class OperationSubsection(val section: AdminOperationSection, val title: String) : AdminRoute
+    data class OperationUniverse(val universe: AdminOperationUniverse) : AdminRoute
+    data class OperationView(val universe: AdminOperationUniverse, val view: AdminOperationView) : AdminRoute
+    data class OperationList(
+        val universe: AdminOperationUniverse,
+        val view: AdminOperationView,
+        val list: AdminOperationList,
+    ) : AdminRoute
     data class OperationOrderDetail(
         val returnRoute: AdminRoute,
         val variant: OperationOrderVariant,
@@ -107,8 +112,6 @@ private sealed interface AdminRoute {
     ) : AdminRoute
     data class OperationOrderSolve(val returnRoute: AdminRoute, val stage: OperationSolveStage) : AdminRoute
     data class OperationOperationalProfile(val kind: AdminOperationalProfileKind, val state: String) : AdminRoute
-    data class TodayOrdersCategory(val category: AdminTodayOrdersCategory) : AdminRoute
-    data class TodayOrdersSubsection(val category: AdminTodayOrdersCategory, val title: String) : AdminRoute
     data class Section(val root: AdminRoot, val title: String) : AdminRoute
     data class ConfigurationSection(val section: AdminConfigurationSection) : AdminRoute
     data class ConfigurationSubsection(val section: AdminConfigurationSection, val title: String) : AdminRoute
@@ -162,8 +165,6 @@ private data class AdminOperationHomeMetric(
     val note: String,
     val value: String,
     val tone: AdminOperationMetricTone,
-    val targetSection: String? = null,
-    val targetSubsection: String? = null,
 )
 
 private enum class AdminOperationMetricTone {
@@ -180,21 +181,6 @@ private data class AdminOperationalLiveCard(
     val detail: String,
     val priority: String,
     val tension: String,
-)
-
-internal data class AdminOperationSection(
-    val title: String,
-    val summary: String,
-    val contextTitle: String,
-    val contextText: String,
-    val entries: List<AdminEntry>,
-)
-
-internal data class AdminTodayOrdersCategory(
-    val title: String,
-    val summary: String,
-    val contextText: String,
-    val entries: List<AdminEntry>,
 )
 
 internal data class AdminOrderDetailEntry(
@@ -544,12 +530,9 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             is AdminRoute.ConfigurationSubsection -> AdminRoute.ConfigurationSection(current.section)
             is AdminRoute.ConfigurationSection -> AdminRoute.Configuration
             is AdminRoute.OperationOrderDetail -> current.returnRoute
-            is AdminRoute.TodayOrdersSubsection -> AdminRoute.TodayOrdersCategory(current.category)
-            is AdminRoute.TodayOrdersCategory -> operationSections.first { it.title == "Pedidos del día" }.let {
-                AdminRoute.OperationSection(it)
-            }
-            is AdminRoute.OperationSubsection -> AdminRoute.OperationSection(current.section)
-            is AdminRoute.OperationSection -> AdminRoute.Operation
+            is AdminRoute.OperationList -> AdminRoute.OperationView(current.universe, current.view)
+            is AdminRoute.OperationView -> AdminRoute.OperationUniverse(current.universe)
+            is AdminRoute.OperationUniverse -> AdminRoute.Operation
             is AdminRoute.Section -> when (current.root) {
                 AdminRoot.Operation -> AdminRoute.Operation
                 AdminRoot.Configuration -> AdminRoute.Configuration
@@ -572,17 +555,9 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 activeOrders = activeCount,
                 problemOrders = problemCount,
                 delayedOrders = delayedCount,
-                onOpenSection = { title ->
-                    operationSections.firstOrNull { it.title == title }?.let {
-                        route = AdminRoute.OperationSection(it)
-                    }
-                },
-                onOpenMetric = { metric ->
-                    val section = operationSections.firstOrNull { it.title == metric.targetSection }
-                    if (section != null && metric.targetSubsection != null) {
-                        route = AdminRoute.OperationSubsection(section, metric.targetSubsection)
-                    } else if (section != null) {
-                        route = AdminRoute.OperationSection(section)
+                onOpenUniverse = { key ->
+                    operationUniverses.firstOrNull { it.key == key }?.let {
+                        route = AdminRoute.OperationUniverse(it)
                     }
                 },
                 onSignOut = { showSignOut = true },
@@ -613,48 +588,34 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 onSignOut = { showSignOut = true },
                 showSignOut = false,
             )
-            is AdminRoute.OperationSection -> AdminOperationSectionScreen(
-                section = current.section,
+            is AdminRoute.OperationUniverse -> AdminOperationUniverseScreen(
+                universe = current.universe,
                 orders = readOnlyOrders,
-                onEntry = { entry ->
-                    if (current.section.title == "Pedidos del día") {
-                        todayOrdersCategories.firstOrNull { it.title == entry.title }?.let {
-                            route = AdminRoute.TodayOrdersCategory(it)
-                        }
-                    } else {
-                        route = AdminRoute.OperationSubsection(current.section, entry.title)
-                    }
+                onView = { view ->
+                    route = AdminRoute.OperationView(current.universe, view)
                 },
             )
-            is AdminRoute.OperationSubsection -> {
-                val scopedOrders = readOnlyOrders.forOperationSubsection(current.section.title, current.title)
-                val orderEntries = orderDetailEntriesFor(current.section.title, current.title, scopedOrders)
-                AdminSectionScreen(
-                    root = AdminRoot.Operation,
-                    title = current.title,
-                    summary = "Lectura operativa por estado.",
-                    panelTitle = current.section.title,
-                    panelText = if (orderEntries.isEmpty()) {
-                        "No hay pedidos para mostrar en esta sección."
-                    } else {
-                        "Pedidos detectados en esta sección: ${orderEntries.size}."
-                    },
-                    orderDetailEntries = orderEntries,
-                    onOrderDetail = { selected ->
-                        route = AdminRoute.OperationOrderDetail(
-                            returnRoute = AdminRoute.OperationSubsection(current.section, current.title),
-                            variant = selected.variant,
-                            realOrderId = selected.realOrderId,
-                        )
-                    },
-                    onOperationalProfile = { kind ->
-                        route = AdminRoute.OperationOperationalProfile(
-                            kind = kind,
-                            state = current.title,
-                        )
-                    },
-                )
-            }
+            is AdminRoute.OperationView -> AdminOperationViewScreen(
+                universe = current.universe,
+                view = current.view,
+                orders = readOnlyOrders,
+                onList = { list ->
+                    route = AdminRoute.OperationList(current.universe, current.view, list)
+                },
+            )
+            is AdminRoute.OperationList -> AdminOperationListScreen(
+                universe = current.universe,
+                view = current.view,
+                list = current.list,
+                orders = readOnlyOrders,
+                onOrderDetail = { selected ->
+                    route = AdminRoute.OperationOrderDetail(
+                        returnRoute = AdminRoute.OperationList(current.universe, current.view, current.list),
+                        variant = selected.variant,
+                        realOrderId = selected.realOrderId,
+                    )
+                },
+            )
             is AdminRoute.OperationOrderDetail -> AdminOrderDetailScreen(
                 variant = current.variant,
                 orderId = current.realOrderId,
@@ -699,29 +660,6 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             is AdminRoute.OperationOperationalProfile -> AdminOperationalProfileScreen(
                 kind = current.kind,
                 state = current.state,
-            )
-            is AdminRoute.TodayOrdersCategory -> AdminTodayOrdersCategoryScreen(
-                category = current.category,
-                onEntry = { route = AdminRoute.TodayOrdersSubsection(current.category, it.title) },
-            )
-            is AdminRoute.TodayOrdersSubsection -> AdminSectionScreen(
-                root = AdminRoot.Operation,
-                title = current.title,
-                summary = "Lectura del día por estado.",
-                panelTitle = current.category.title,
-                panelText = "Lectura del día por categoría con datos disponibles.",
-                orderDetailEntries = orderDetailEntriesFor(
-                    sectionTitle = "Pedidos del día",
-                    subsectionTitle = current.title,
-                    orders = readOnlyOrders.forTodaySubsection(current.category.title, current.title),
-                ),
-                onOrderDetail = { selected ->
-                    route = AdminRoute.OperationOrderDetail(
-                        returnRoute = AdminRoute.TodayOrdersSubsection(current.category, current.title),
-                        variant = selected.variant,
-                        realOrderId = selected.realOrderId,
-                    )
-                },
             )
             is AdminRoute.ConfigurationSection -> AdminConfigurationSectionScreen(
                 section = current.section,
@@ -903,18 +841,11 @@ private fun AdminRootScreen(
 }
 
 @Composable
-private fun AdminOperationSectionScreen(
-    section: AdminOperationSection,
+private fun AdminOperationUniverseScreen(
+    universe: AdminOperationUniverse,
     orders: List<AdminOrderSummary>,
-    onEntry: (AdminEntry) -> Unit,
+    onView: (AdminOperationView) -> Unit,
 ) {
-    val scopedSignals = orders.map { it to AdminOperationOrderSignals.from(it) }
-    val totalInSection = when (section.title) {
-        "Pedidos del día" -> scopedSignals.count { (_, s) -> AdminOperationOrderClassification.todayBucket(s) != null }
-        "Pedidos activos" -> scopedSignals.count { (_, s) -> AdminOperationOrderClassification.activeBucket(s) != null }
-        "Pedidos con problemas" -> scopedSignals.count { (_, s) -> AdminOperationOrderClassification.problemBucket(s) != null }
-        else -> 0
-    }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -926,30 +857,121 @@ private fun AdminOperationSectionScreen(
     ) {
         item {
             AdminHeader(
-                title = section.title,
+                title = universe.title,
                 eyebrow = "Operación",
-                summary = section.summary,
+                summary = universe.summary,
                 onSignOut = {},
                 showSignOut = false,
             )
         }
         item {
-            AdminInfoPanel(title = section.contextTitle, text = section.contextText)
+            AdminInfoPanel(title = universe.contextTitle, text = universe.contextText)
+        }
+        items(universe.views) { view ->
+            AdminOperationLiveCardView(
+                card = AdminOperationalLiveCard(
+                    icon = operationIconFor(view.title),
+                    title = view.title,
+                    countLabel = operationViewCountLabel(view, orders),
+                    detail = view.summary,
+                    priority = "Vista dinámica",
+                    tension = "Abrir listados filtrados",
+                ),
+                onClick = { onView(view) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun AdminOperationViewScreen(
+    universe: AdminOperationUniverse,
+    view: AdminOperationView,
+    orders: List<AdminOrderSummary>,
+    onList: (AdminOperationList) -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = adminBottomBarReservedPadding),
+        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            AdminHeader(
+                title = view.title,
+                eyebrow = universe.title,
+                summary = view.summary,
+                onSignOut = {},
+                showSignOut = false,
+            )
+        }
+        item {
+            AdminInfoPanel(title = view.contextTitle, text = view.contextText)
+        }
+        items(view.lists) { list ->
+            AdminOperationLiveCardView(
+                card = AdminOperationalLiveCard(
+                    icon = operationIconFor(list.title),
+                    title = list.title,
+                    countLabel = operationListCountLabel(list, orders),
+                    detail = operationListDetailLabel(list, orders),
+                    priority = "Listado filtrado",
+                    tension = operationListTensionLabel(list, orders),
+                ),
+                onClick = { onList(list) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun AdminOperationListScreen(
+    universe: AdminOperationUniverse,
+    view: AdminOperationView,
+    list: AdminOperationList,
+    orders: List<AdminOrderSummary>,
+    onOrderDetail: (AdminOrderDetailEntry) -> Unit,
+) {
+    val scopedOrders = orders.forOperationList(list.kind)
+    val orderEntries = orderDetailEntriesFor(list.kind, scopedOrders)
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = adminBottomBarReservedPadding),
+        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            AdminHeader(
+                title = list.title,
+                eyebrow = view.title,
+                summary = list.summary,
+                onSignOut = {},
+                showSignOut = false,
+            )
         }
         item {
             AdminInfoPanel(
-                title = "Estado del grupo",
-                text = if (totalInSection == 0) "No hay pedidos para mostrar en este grupo ahora." else "$totalInSection pedidos en este grupo operativo.",
+                title = universe.title,
+                text = if (orderEntries.isEmpty()) list.emptyText else "Pedidos detectados en este listado: ${orderEntries.size}.",
             )
         }
-        items(section.entries) { entry ->
+        items(orderEntries) { entry ->
             AdminOperationLiveCardView(
-                card = operationLiveCardFor(entry).copy(
-                    countLabel = operationCountLabel(section.title, entry.title, orders),
-                    detail = operationDetailLabel(section.title, entry.title, orders, entry.note),
-                    tension = operationTensionLabel(section.title, entry.title, orders),
+                card = AdminOperationalLiveCard(
+                    icon = "Ord",
+                    title = entry.label,
+                    countLabel = "Pedido read-only",
+                    detail = entry.note,
+                    priority = "Entidad central",
+                    tension = "Abrir Pedido #____",
                 ),
-                onClick = { onEntry(entry) },
+                onClick = { onOrderDetail(entry) },
             )
         }
     }
@@ -961,26 +983,9 @@ private fun AdminOperationDeskScreen(
     activeOrders: Int,
     problemOrders: Int,
     delayedOrders: Int,
-    onOpenSection: (String) -> Unit,
-    onOpenMetric: (AdminOperationHomeMetric) -> Unit,
+    onOpenUniverse: (AdminOperationUniverseKey) -> Unit,
     onSignOut: () -> Unit,
 ) {
-    val orderMetrics = listOf(
-        AdminOperationHomeMetric("Pedidos del día", "Total recibido hoy", totalOrdersToday.toOperationalCount("pedidos"), AdminOperationMetricTone.Neutral, "Pedidos del día"),
-        AdminOperationHomeMetric("Pedidos activos", "Pedidos en curso", activeOrders.toOperationalCount("pedidos"), AdminOperationMetricTone.Healthy, "Pedidos activos"),
-        AdminOperationHomeMetric("Pedidos con problemas", "Requieren atención", problemOrders.toOperationalCount("casos"), if (problemOrders > 0) AdminOperationMetricTone.Danger else AdminOperationMetricTone.Neutral, "Pedidos con problemas"),
-    )
-    val driverMetrics = listOf(
-        AdminOperationHomeMetric("En servicio", "Repartidores conectados", "Dato pendiente", AdminOperationMetricTone.Neutral, "Repartidores activos"),
-        AdminOperationHomeMetric("Disponibles", "Listos para tomar pedidos", "Dato pendiente", AdminOperationMetricTone.Healthy, "Repartidores activos", "Libres"),
-        AdminOperationHomeMetric("Con incidencias", "Requieren revisión", "Dato pendiente", AdminOperationMetricTone.Danger, "Repartidores activos", "Con incidencia"),
-    )
-    val storeMetrics = listOf(
-        AdminOperationHomeMetric("Operando", "Locales recibiendo pedidos", "Dato pendiente", AdminOperationMetricTone.Healthy, "Locales activos", "Vendiendo ahora"),
-        AdminOperationHomeMetric("Pausados", "Operación detenida", "Dato pendiente", AdminOperationMetricTone.Warning, "Locales activos", "Pausados"),
-        AdminOperationHomeMetric("Con demoras", "Ritmo afectado", delayedOrders.toOperationalCount("casos"), if (delayedOrders > 0) AdminOperationMetricTone.Warning else AdminOperationMetricTone.Neutral, "Pedidos del día", "Demorados"),
-    )
-
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1004,17 +1009,35 @@ private fun AdminOperationDeskScreen(
                 title = "Pedidos del día",
                 subtitle = "Resumen operativo de hoy",
                 count = totalOrdersToday,
-                onClick = { onOpenSection("Pedidos del día") },
+                onClick = { onOpenUniverse(AdminOperationUniverseKey.Orders) },
             )
         }
         item {
-            AdminOperationUniverseCard("Universo de pedidos", orderMetrics, onOpenMetric)
+            AdminOperationUniverseCard(
+                title = "Universo de pedidos",
+                note = "Pedidos activos, del día y con problemas",
+                value = activeOrders.toOperationalCount("pedidos en curso"),
+                tone = AdminOperationMetricTone.Healthy,
+                onClick = { onOpenUniverse(AdminOperationUniverseKey.Orders) },
+            )
         }
         item {
-            AdminOperationUniverseCard("Repartidores", driverMetrics, onOpenMetric)
+            AdminOperationUniverseCard(
+                title = "Repartidores",
+                note = "En servicio, disponibles y con incidencias",
+                value = "Dato pendiente",
+                tone = AdminOperationMetricTone.Neutral,
+                onClick = { onOpenUniverse(AdminOperationUniverseKey.Drivers) },
+            )
         }
         item {
-            AdminOperationUniverseCard("Locales activos", storeMetrics, onOpenMetric)
+            AdminOperationUniverseCard(
+                title = "Locales activos",
+                note = "Operando, pausados y con demoras",
+                value = delayedOrders.toOperationalCount("casos"),
+                tone = if (delayedOrders > 0) AdminOperationMetricTone.Warning else AdminOperationMetricTone.Neutral,
+                onClick = { onOpenUniverse(AdminOperationUniverseKey.Stores) },
+            )
         }
     }
 }
@@ -1066,8 +1089,10 @@ private fun AdminTodaySummaryCard(
 @Composable
 private fun AdminOperationUniverseCard(
     title: String,
-    metrics: List<AdminOperationHomeMetric>,
-    onMetric: (AdminOperationHomeMetric) -> Unit,
+    note: String,
+    value: String,
+    tone: AdminOperationMetricTone,
+    onClick: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -1075,13 +1100,13 @@ private fun AdminOperationUniverseCard(
             .clip(RoundedCornerShape(18.dp))
             .background(PediloCardBrush, RoundedCornerShape(18.dp))
             .border(1.dp, PediloLine.copy(alpha = 0.62f), RoundedCornerShape(18.dp))
+            .clickable(role = Role.Button, onClick = onClick)
             .padding(15.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text(title, color = PediloText, fontSize = 19.sp, lineHeight = 23.sp, fontWeight = FontWeight.ExtraBold)
-        metrics.forEach { metric ->
-            AdminOperationMetricRow(metric = metric, onClick = { onMetric(metric) })
-        }
+        Text(note, color = PediloMuted, fontSize = 13.sp, lineHeight = 18.sp)
+        AdminStatusPill(value, tone)
     }
 }
 
@@ -1164,77 +1189,52 @@ private fun AdminOrderDetail?.adminPersonName(): String =
 private fun Long?.adminMillisValue(): String =
     this?.let { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("es", "AR")).format(Date(it)) } ?: "Aún no registrado"
 
-private fun operationCountLabel(sectionTitle: String, entryTitle: String, orders: List<AdminOrderSummary>): String {
-    val count = when (sectionTitle) {
-        "Pedidos activos", "Pedidos con problemas" -> orders.forOperationSubsection(sectionTitle, entryTitle).size
-        "Pedidos del día" -> orders.forTodaySubsection(entryTitle, entryTitle).size
-        else -> 0
+private fun operationIconFor(title: String): String =
+    when (title) {
+        "Pedidos del día" -> "Hoy"
+        "Pedidos activos", "Activos" -> "Run"
+        "Pedidos con problemas", "Con problemas", "Con incidencias" -> "!"
+        "Finalizados" -> "Ok"
+        "Cancelados" -> "X"
+        "Demorados", "Con demoras" -> "R"
+        "Repartidores" -> "Drv"
+        "Locales activos" -> "Loc"
+        else -> "•"
     }
+
+private fun operationViewCountLabel(view: AdminOperationView, orders: List<AdminOrderSummary>): String {
+    if (view.lists.none { it.kind.isOrderList() }) return "Dato pendiente"
+    val count = view.lists.sumOf { orders.forOperationList(it.kind).size }
     return if (count == 0) "Sin pedidos ahora" else "$count pedidos"
 }
 
-private fun operationDetailLabel(
-    sectionTitle: String,
-    entryTitle: String,
-    orders: List<AdminOrderSummary>,
-    fallback: String,
-): String {
-    val first = when (sectionTitle) {
-        "Pedidos activos", "Pedidos con problemas" -> orders.forOperationSubsection(sectionTitle, entryTitle).firstOrNull()
-        "Pedidos del día" -> orders.forTodaySubsection(entryTitle, entryTitle).firstOrNull()
-        else -> null
-    }
-    if (first == null) return "No hay pedidos para mostrar en esta sección."
+private fun operationListCountLabel(list: AdminOperationList, orders: List<AdminOrderSummary>): String {
+    val count = orders.forOperationList(list.kind).size
+    if (!list.kind.isOrderList()) return "Dato pendiente"
+    return if (count == 0) "Sin pedidos ahora" else "$count pedidos"
+}
+
+private fun operationListDetailLabel(list: AdminOperationList, orders: List<AdminOrderSummary>): String {
+    if (!list.kind.isOrderList()) return list.emptyText
+    val first = orders.forOperationList(list.kind).firstOrNull() ?: return list.emptyText
     val source = AdminOperationOrderClassification.sourceLabel(first.source, first.requestType)
     val store = first.storeName.ifBlank { "Local sin dato disponible" }
     return "$store · ${first.publicStatus.ifBlank { "Estado sin dato disponible" }} · $source"
 }
 
-private fun operationTensionLabel(sectionTitle: String, entryTitle: String, orders: List<AdminOrderSummary>): String {
-    val count = when (sectionTitle) {
-        "Pedidos activos", "Pedidos con problemas" -> orders.forOperationSubsection(sectionTitle, entryTitle).size
-        "Pedidos del día" -> orders.forTodaySubsection(entryTitle, entryTitle).size
-        else -> 0
-    }
+private fun operationListTensionLabel(list: AdminOperationList, orders: List<AdminOrderSummary>): String {
+    val count = orders.forOperationList(list.kind).size
     return when {
+        !list.kind.isOrderList() -> "Estado neutro"
         count == 0 -> "Sin tensión operativa"
-        entryTitle in listOf("Con problemas", "Demorados", "Local no responde", "Reclamo del cliente") -> "Prioridad alta"
+        list.kind in setOf(
+            AdminOperationListKind.TodayWithProblems,
+            AdminOperationListKind.ProblemStoreNotResponding,
+            AdminOperationListKind.ProblemUserClaim,
+            AdminOperationListKind.ProblemDelayed,
+            AdminOperationListKind.ProblemWithoutResponsible,
+        ) -> "Prioridad alta"
         else -> "Seguimiento activo"
-    }
-}
-
-@Composable
-private fun AdminTodayOrdersCategoryScreen(
-    category: AdminTodayOrdersCategory,
-    onEntry: (AdminEntry) -> Unit,
-) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp)
-            .padding(bottom = adminBottomBarReservedPadding),
-        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            AdminHeader(
-                title = category.title,
-                eyebrow = "Pedidos del día",
-                summary = category.summary,
-                onSignOut = {},
-                showSignOut = false,
-            )
-        }
-        item {
-            AdminInfoPanel(title = category.title, text = category.contextText)
-        }
-        items(category.entries) { entry ->
-            AdminOperationLiveCardView(
-                card = operationLiveCardFor(entry),
-                onClick = { onEntry(entry) },
-            )
-        }
     }
 }
 
@@ -1991,8 +1991,9 @@ private fun AdminRoute.root(): AdminRoot = when (this) {
     AdminRoute.Operation -> AdminRoot.Operation
     AdminRoute.Configuration -> AdminRoot.Configuration
     AdminRoute.RoleAccess -> AdminRoot.RoleAccess
-    is AdminRoute.OperationSection -> AdminRoot.Operation
-    is AdminRoute.OperationSubsection -> AdminRoot.Operation
+    is AdminRoute.OperationUniverse -> AdminRoot.Operation
+    is AdminRoute.OperationView -> AdminRoot.Operation
+    is AdminRoute.OperationList -> AdminRoot.Operation
     is AdminRoute.OperationOrderDetail -> AdminRoot.Operation
     is AdminRoute.OperationOrderSolve -> AdminRoot.Operation
     is AdminRoute.OperationOperationalProfile -> AdminRoot.Operation
@@ -2002,8 +2003,6 @@ private fun AdminRoute.root(): AdminRoot = when (this) {
     is AdminRoute.RoleAccessSection -> AdminRoot.RoleAccess
     is AdminRoute.RoleAccessSubsection -> AdminRoot.RoleAccess
     is AdminRoute.RoleAccessConvergence -> AdminRoot.RoleAccess
-    is AdminRoute.TodayOrdersCategory -> AdminRoot.Operation
-    is AdminRoute.TodayOrdersSubsection -> AdminRoot.Operation
     is AdminRoute.Section -> root
 }
 
@@ -2034,59 +2033,61 @@ private fun List<AdminOrderSummary>.problemOrders(): Map<AdminProblemOrdersBucke
         .groupBy({ it.first }, { it.second })
 }
 
-private fun List<AdminOrderSummary>.forOperationSubsection(
-    sectionTitle: String,
-    subsectionTitle: String,
-): List<AdminOrderSummary> {
+private fun List<AdminOrderSummary>.forOperationList(kind: AdminOperationListKind): List<AdminOrderSummary> {
     val signals = this.map { it to AdminOperationOrderSignals.from(it) }
-    return when (sectionTitle) {
-        "Pedidos activos" -> signals.filter { (_, s) ->
-            when (subsectionTitle) {
-                "Esperando local" -> AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.WAITING_STORE
-                "Preparando" -> AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.PREPARING
-                "Esperando repartidor" -> AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.WAITING_DRIVER
-                "En entrega" -> AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.IN_DELIVERY
-                else -> false
-            }
+    return when (kind) {
+        AdminOperationListKind.TodayActive -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.todayBucket(s) == AdminTodayOrdersBucket.ACTIVE
         }.map { it.first }
-        "Pedidos con problemas" -> signals.filter { (_, s) ->
-            when (subsectionTitle) {
-                "Local no responde" -> AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.STORE_NOT_RESPONDING
-                "Reclamo del cliente" -> AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.CUSTOMER_CLAIM
-                else -> false
-            }
+        AdminOperationListKind.TodayFinished -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.todayBucket(s) == AdminTodayOrdersBucket.FINISHED
+        }.map { it.first }
+        AdminOperationListKind.TodayCancelled -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.todayBucket(s) == AdminTodayOrdersBucket.CANCELLED
+        }.map { it.first }
+        AdminOperationListKind.TodayWithProblems -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.todayBucket(s) == AdminTodayOrdersBucket.WITH_PROBLEMS
+        }.map { it.first }
+        AdminOperationListKind.ActiveWaitingStore -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.WAITING_STORE
+        }.map { it.first }
+        AdminOperationListKind.ActivePreparing -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.PREPARING
+        }.map { it.first }
+        AdminOperationListKind.ActiveWaitingDriver -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.WAITING_DRIVER
+        }.map { it.first }
+        AdminOperationListKind.ActiveInDelivery -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.IN_DELIVERY
+        }.map { it.first }
+        AdminOperationListKind.ProblemStoreNotResponding -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.STORE_NOT_RESPONDING
+        }.map { it.first }
+        AdminOperationListKind.ProblemUserClaim -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.CUSTOMER_CLAIM
+        }.map { it.first }
+        AdminOperationListKind.ProblemDelayed -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.DELAYED
+        }.map { it.first }
+        AdminOperationListKind.ProblemWithoutResponsible -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.WITHOUT_RESPONSIBLE
         }.map { it.first }
         else -> emptyList()
     }
 }
 
-private fun List<AdminOrderSummary>.forTodaySubsection(
-    categoryTitle: String,
-    subsectionTitle: String,
-): List<AdminOrderSummary> {
-    val signals = this.map { it to AdminOperationOrderSignals.from(it) }
-    return when (categoryTitle) {
-        "Activos" -> signals.filter { (_, s) ->
-            AdminOperationOrderClassification.todayBucket(s) == AdminTodayOrdersBucket.ACTIVE &&
-                subsectionTitle == "Esperando local" &&
-                AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.WAITING_STORE
-        }.map { it.first }
-        "Finalizados" -> signals.filter { (_, s) ->
-            AdminOperationOrderClassification.todayBucket(s) == AdminTodayOrdersBucket.FINISHED
-        }.map { it.first }
-        "Cancelados" -> signals.filter { (_, s) ->
-            AdminOperationOrderClassification.todayBucket(s) == AdminTodayOrdersBucket.CANCELLED
-        }.map { it.first }
-        "Demorados" -> signals.filter { (_, s) ->
-            AdminOperationOrderClassification.todayBucket(s) == AdminTodayOrdersBucket.DELAYED
-        }.map { it.first }
-        "Con problemas" -> signals.filter { (_, s) ->
-            when (subsectionTitle) {
-                "Local no responde" -> AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.STORE_NOT_RESPONDING
-                "Reclamo del cliente" -> AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.CUSTOMER_CLAIM
-                else -> false
-            }
-        }.map { it.first }
-        else -> emptyList()
-    }
-}
+private fun AdminOperationListKind.isOrderList(): Boolean =
+    this in setOf(
+        AdminOperationListKind.TodayActive,
+        AdminOperationListKind.TodayFinished,
+        AdminOperationListKind.TodayCancelled,
+        AdminOperationListKind.TodayWithProblems,
+        AdminOperationListKind.ActiveWaitingStore,
+        AdminOperationListKind.ActivePreparing,
+        AdminOperationListKind.ActiveWaitingDriver,
+        AdminOperationListKind.ActiveInDelivery,
+        AdminOperationListKind.ProblemStoreNotResponding,
+        AdminOperationListKind.ProblemUserClaim,
+        AdminOperationListKind.ProblemDelayed,
+        AdminOperationListKind.ProblemWithoutResponsible,
+    )

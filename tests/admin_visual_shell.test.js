@@ -47,28 +47,31 @@ test("admin operation root exposes visual operation cards only", () => {
 
   [
     "Pedidos del día",
-    "Pedidos activos",
-    "Pedidos con problemas",
-    "Locales activos",
     "Universo de pedidos",
     "Repartidores",
-    "En servicio",
-    "Disponibles",
-    "Con incidencias",
-    "Operando",
-    "Pausados",
-    "Con demoras",
+    "Locales activos",
   ].forEach((label) => assert.match(source, new RegExp(label)));
   assert.match(source, /Resumen operativo de hoy/);
   assert.match(source, /En vivo/);
-  assert.match(source, /Total recibido hoy/);
-  assert.match(source, /Pedidos en curso/);
-  assert.match(source, /Requieren atención/);
+  assert.match(source, /AdminOperationUniverseCard/);
+  assert.match(source, /onOpenUniverse/);
   assert.match(source, /Dato pendiente/);
   assert.match(source, /AdminTodaySummaryCard/);
-  assert.match(source, /AdminOperationUniverseCard/);
-  assert.doesNotMatch(source, /Mesa Operativa Viva|Necesitan atención|Sin responsable|Finalizados recientes|Capas de lectura/);
+  assert.doesNotMatch(source, /Mesa Operativa Viva|Necesitan atención|Finalizados recientes|Capas de lectura/);
   assert.match(source, /AdminBottomItem\("Moto", "Operación"/);
+});
+
+test("admin operation routes expose explicit hierarchy levels", () => {
+  const source = readAdminSourceTree();
+
+  assert.match(source, /data object Operation : AdminRoute/);
+  assert.match(source, /data class OperationUniverse/);
+  assert.match(source, /data class OperationView/);
+  assert.match(source, /data class OperationList/);
+  assert.match(source, /data class OperationOrderDetail/);
+  assert.match(source, /AdminOperationUniverseScreen/);
+  assert.match(source, /AdminOperationViewScreen/);
+  assert.match(source, /AdminOperationListScreen/);
 });
 
 test("admin operation internal screens expose planned operation subworlds", () => {
@@ -78,23 +81,21 @@ test("admin operation internal screens expose planned operation subworlds", () =
     "Activos",
     "Finalizados",
     "Cancelados",
-    "Demorados",
     "Con problemas",
     "Esperando local",
     "Preparando",
     "Esperando repartidor",
     "En entrega",
     "Local no responde",
-    "Reclamo del cliente",
-    "Libres",
-    "Ocupados",
-    "Pendientes de respuesta",
-    "Con incidencia",
-    "Vendiendo ahora",
-    "Sin respuesta",
+    "Reclamo de la persona usuaria",
+    "Demorados",
+    "Sin responsable",
+    "En servicio",
+    "Disponibles",
+    "Con incidencias",
+    "Operando",
     "Pausados",
-    "Con configuración pendiente",
-    "Sin productos vendibles",
+    "Con demoras",
   ].forEach((label) => assert.match(source, new RegExp(label)));
 });
 
@@ -102,42 +103,31 @@ test("admin remaining operation roots use safe visual copy", () => {
   const source = readAdminSourceTree();
 
   [
-    "Pedidos esperando respuesta del local",
-    "Pedidos en preparación",
-    "Pedidos listos para asignación",
-    "Pedidos en camino",
+    "Pedidos esperando respuesta del local.",
+    "Pedidos en preparación.",
+    "Pedidos listos para reparto.",
+    "Pedidos en camino.",
     "Pedidos detenidos por falta de respuesta",
-    "Casos iniciados por aviso del cliente",
-    "Repartidores disponibles",
-    "Repartidores con pedido asignado",
-    "Casos esperando confirmación",
-    "Situaciones que requieren revisión",
-    "Locales disponibles para recibir pedidos",
-    "Locales que no respondieron a tiempo",
-    "Locales temporalmente detenidos",
-    "Locales con datos por revisar",
-    "Locales sin oferta disponible",
+    "Casos iniciados por aviso de la persona usuaria",
+    "Repartidores conectados.",
+    "Repartidores listos para tomar pedidos.",
+    "Repartidores con señal de revisión.",
+    "Locales recibiendo pedidos.",
+    "Locales con operación detenida.",
+    "Locales con ritmo afectado.",
   ].forEach((label) => assert.match(source, new RegExp(label)));
 });
 
-test("admin today orders flow exposes category screens and subworlds", () => {
+test("admin order universe exposes dynamic views and filtered lists", () => {
   const source = readAdminSourceTree();
 
-  assert.match(source, /TodayOrdersCategory/);
-  assert.match(source, /TodayOrdersSubsection/);
-  [
-    "Pedidos del día que siguen en curso",
-    "Pedidos del día cerrados correctamente",
-    "Pedidos del día cerrados sin completar",
-    "Pedidos del día con tiempo excedido",
-    "Pedidos del día marcados con incidencia",
-    "Entregados",
-    "Retirados",
-    "Enviados",
-    "Cancelados por cliente",
-    "Cancelados por local",
-    "Cancelados por operación",
-  ].forEach((label) => assert.match(source, new RegExp(label)));
+  assert.match(source, /AdminOperationUniverseKey\.Orders/);
+  assert.match(source, /AdminOperationListKind\.TodayActive/);
+  assert.match(source, /AdminOperationListKind\.ActiveWaitingStore/);
+  assert.match(source, /AdminOperationListKind\.ProblemWithoutResponsible/);
+  assert.match(source, /forOperationList/);
+  assert.match(source, /returnRoute = AdminRoute\.OperationList/);
+  assert.doesNotMatch(source, /TodayOrdersCategory|TodayOrdersSubsection/);
 });
 
 test("admin shell reserves safe area for system navigation", () => {
@@ -155,6 +145,10 @@ test("admin relies on native back and only shows sign out on operation root", ()
   const forbiddenReturnLabels = [`Volv${"er"}`, `Atr${"ás"}`];
 
   assert.match(source, /BackHandler\(enabled = route !is AdminRoute\.Operation/);
+  assert.match(source, /is AdminRoute\.OperationOrderDetail -> current\.returnRoute/);
+  assert.match(source, /is AdminRoute\.OperationList -> AdminRoute\.OperationView/);
+  assert.match(source, /is AdminRoute\.OperationView -> AdminRoute\.OperationUniverse/);
+  assert.match(source, /is AdminRoute\.OperationUniverse -> AdminRoute\.Operation/);
   forbiddenReturnLabels.forEach((label) => assert.doesNotMatch(source, new RegExp(`"${label}"`)));
   assert.match(source, /showSignOut = true/);
   assert.match(source, /showSignOut = false/);
@@ -390,10 +384,11 @@ test("admin order detail keeps shell rules and visual entry paths", () => {
   const forbiddenReturnLabels = [`Volv${"er"}`, `Atr${"ás"}`];
 
   assert.match(source, /orderDetailEntriesFor/);
-  assert.match(source, /sectionTitle == "Pedidos con problemas" && subsectionTitle == "Local no responde"/);
-  assert.match(source, /sectionTitle == "Pedidos activos" && subsectionTitle == "Esperando repartidor"/);
+  assert.match(source, /AdminOperationListKind\.ProblemStoreNotResponding/);
+  assert.match(source, /AdminOperationListKind\.ActiveWaitingDriver/);
+  assert.match(source, /AdminOperationOrderClassification\.problemBucket/);
+  assert.match(source, /AdminOperationOrderClassification\.activeBucket/);
   assert.match(source, /is AdminRoute\.OperationOrderDetail -> current\.returnRoute/);
-  assert.match(source, /is AdminRoute\.OperationOrderSolve -> when \(current\.stage\)/);
   assert.match(source, /is AdminRoute\.OperationOrderDetail -> AdminOrderDetailScreen/);
   assert.match(source, /adminOrderVisibleNumber/);
   assert.match(source, /adminDisplayValue/);

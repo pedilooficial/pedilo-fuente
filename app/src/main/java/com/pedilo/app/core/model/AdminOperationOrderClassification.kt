@@ -22,11 +22,17 @@ enum class AdminActiveOrdersBucket {
 enum class AdminProblemOrdersBucket {
     STORE_NOT_RESPONDING,
     CUSTOMER_CLAIM,
+    DELAYED,
+    WITHOUT_RESPONSIBLE,
 }
 
 data class AdminOperationOrderSignals(
     val status: String,
     val publicStatus: String,
+    val operationalStatus: String,
+    val responsibleRole: String,
+    val needsAttention: Boolean,
+    val activeIncident: Boolean,
     val source: String,
     val requestType: String,
 ) {
@@ -35,6 +41,10 @@ data class AdminOperationOrderSignals(
             AdminOperationOrderSignals(
                 status = summary.status,
                 publicStatus = summary.publicStatus,
+                operationalStatus = summary.operationalStatus,
+                responsibleRole = summary.responsibleRole,
+                needsAttention = summary.needsAttention,
+                activeIncident = summary.activeIncident,
                 source = summary.source,
                 requestType = summary.requestType,
             )
@@ -73,6 +83,8 @@ object AdminOperationOrderClassification {
     fun problemBucket(signals: AdminOperationOrderSignals): AdminProblemOrdersBucket? {
         if (hasRealStoreNotRespondingSignal(signals)) return AdminProblemOrdersBucket.STORE_NOT_RESPONDING
         if (hasRealCustomerClaimSignal(signals)) return AdminProblemOrdersBucket.CUSTOMER_CLAIM
+        if (hasRealDelaySignal(signals)) return AdminProblemOrdersBucket.DELAYED
+        if (hasRealWithoutResponsibleSignal(signals)) return AdminProblemOrdersBucket.WITHOUT_RESPONSIBLE
         return null
     }
 
@@ -95,10 +107,19 @@ object AdminOperationOrderClassification {
     fun hasRealFinishedSignal(signals: AdminOperationOrderSignals): Boolean =
         normalizedStatus(signals.status) in setOf("delivered", "closed", "archived")
 
-    fun hasRealDelaySignal(signals: AdminOperationOrderSignals): Boolean = false
+    fun hasRealDelaySignal(signals: AdminOperationOrderSignals): Boolean =
+        signals.publicStatus.contains("demora", ignoreCase = true) ||
+            signals.publicStatus.contains("retras", ignoreCase = true) ||
+            signals.operationalStatus.contains("demora", ignoreCase = true) ||
+            signals.operationalStatus.contains("retras", ignoreCase = true)
 
     fun hasRealProblemSignal(signals: AdminOperationOrderSignals): Boolean =
-        hasRealStoreNotRespondingSignal(signals) || hasRealCustomerClaimSignal(signals)
+        signals.activeIncident ||
+            signals.needsAttention ||
+            hasRealStoreNotRespondingSignal(signals) ||
+            hasRealCustomerClaimSignal(signals) ||
+            hasRealDelaySignal(signals) ||
+            hasRealWithoutResponsibleSignal(signals)
 
     fun hasRealWaitingStoreSignal(signals: AdminOperationOrderSignals): Boolean =
         hasRealActiveSignal(signals)
@@ -109,11 +130,17 @@ object AdminOperationOrderClassification {
 
     fun hasRealInDeliverySignal(signals: AdminOperationOrderSignals): Boolean = false
 
-    fun hasRealStoreNotRespondingSignal(signals: AdminOperationOrderSignals): Boolean = false
+    fun hasRealStoreNotRespondingSignal(signals: AdminOperationOrderSignals): Boolean =
+        signals.publicStatus.contains("local no responde", ignoreCase = true) ||
+            signals.operationalStatus.contains("local no responde", ignoreCase = true) ||
+            signals.operationalStatus.contains("sin respuesta", ignoreCase = true)
 
     fun hasRealCustomerClaimSignal(signals: AdminOperationOrderSignals): Boolean =
         signals.publicStatus.contains("reclamo", ignoreCase = true) ||
             signals.publicStatus.contains("problema", ignoreCase = true)
+
+    fun hasRealWithoutResponsibleSignal(signals: AdminOperationOrderSignals): Boolean =
+        hasRealActiveSignal(signals) && signals.responsibleRole.isBlank()
 
     private fun normalizedStatus(status: String): String = status.trim().lowercase()
 }
