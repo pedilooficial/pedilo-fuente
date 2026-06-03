@@ -59,6 +59,7 @@ import com.pedilo.app.ui.admin.components.AdminInfoPanel
 import com.pedilo.app.ui.components.PediloTextField
 import com.pedilo.app.ui.publicuser.PediloBg
 import com.pedilo.app.ui.publicuser.PediloCardBrush
+import com.pedilo.app.ui.publicuser.PediloGreen
 import com.pedilo.app.ui.publicuser.PediloLine
 import com.pedilo.app.ui.publicuser.PediloMuted
 import com.pedilo.app.ui.publicuser.PediloOrange
@@ -66,6 +67,7 @@ import com.pedilo.app.ui.publicuser.PediloPanel
 import com.pedilo.app.ui.publicuser.PediloPanelSoft
 import com.pedilo.app.ui.publicuser.PediloPrimaryBrush
 import com.pedilo.app.ui.publicuser.PediloText
+import com.pedilo.app.ui.publicuser.PediloWarning
 import com.pedilo.app.ui.publicuser.pediloCardDepth
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -1132,9 +1134,9 @@ private fun Int.toOperationalCount(unit: String): String =
 private fun AdminOperationMetricTone.operationToneColor(): Color =
     when (this) {
         AdminOperationMetricTone.Neutral -> PediloOrange
-        AdminOperationMetricTone.Healthy -> Color(0xFF57D98D)
-        AdminOperationMetricTone.Warning -> Color(0xFFFFB24A)
-        AdminOperationMetricTone.Danger -> Color(0xFFFF5A63)
+        AdminOperationMetricTone.Healthy -> PediloGreen
+        AdminOperationMetricTone.Warning -> PediloWarning
+        AdminOperationMetricTone.Danger -> PediloOrange
     }
 
 private fun adminOrderVisibleNumber(
@@ -1155,6 +1157,9 @@ private fun String?.adminDisplayValue(fallback: String = "Sin dato disponible"):
 
 private fun List<String>?.adminItemsSummary(): String =
     this?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }?.joinToString(separator = "\n") ?: "Sin dato disponible"
+
+private fun AdminOrderDetail?.adminPersonName(): String =
+    this?.component14().adminDisplayValue()
 
 private fun Long?.adminMillisValue(): String =
     this?.let { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("es", "AR")).format(Date(it)) } ?: "Aún no registrado"
@@ -1729,7 +1734,7 @@ private fun AdminOrderDetailScreen(
         item {
             AdminOrderFactPanel(
                 facts = listOf(
-                    "Cliente" to detail?.customerName.adminDisplayValue(),
+                    "Persona usuaria" to detail.adminPersonName(),
                     "Teléfono/contacto" to "Sin dato disponible",
                     "Dirección" to "Sin dato disponible",
                 ),

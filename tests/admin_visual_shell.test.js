@@ -367,7 +367,7 @@ test("admin order detail exposes Pedido #____ read-only ficha with real-data fal
     "ID interno",
     "Estado actual",
     "Estado público",
-    "Cliente",
+    "Persona usuaria",
     "Teléfono/contacto",
     "Dirección",
     "Resumen",
