@@ -107,9 +107,11 @@ test("admin operation internal screens expose planned operation subworlds", () =
     "En servicio",
     "Disponibles",
     "Con incidencias",
+    "Incidencias",
     "Operando",
     "Pausados",
     "Con demoras",
+    "Demoras",
   ].forEach((label) => assert.match(source, new RegExp(label)));
 });
 
@@ -420,7 +422,8 @@ test("admin order detail exposes Pedido #____ read-only ficha with real-data fal
     "Sin acciones disponibles por ahora",
     "Aún no hay información real",
     "Aún no registrado",
-    "Historial operativo aún no disponible",
+    "Sin dato",
+    "—",
   ].forEach((label) => assert.match(source, new RegExp(label)));
   forbiddenTitles.forEach((title) => assert.doesNotMatch(source, new RegExp(`"${title}"`)));
 });
