@@ -65,14 +65,20 @@ test("admin adapter observes orders and calls backend for mutations only", () =>
   assert.doesNotMatch(source, /\.set\(|\.update\(|\.delete\(|writeBatch|runTransaction/);
 });
 
-test("admin UI shows contextual real actions without direct order writes", () => {
+test("admin UI keeps order detail read-only without direct order writes", () => {
   const source = read(adminUiPath);
+  const detailScreen = source.slice(
+    source.indexOf("private fun AdminOrderDetailScreen"),
+    source.indexOf("private fun AdminOrderStatusPanel"),
+  );
 
-  assert.match(source, /nextAllowedActions/);
   assert.match(source, /AdminOrderActionRequest/);
   assert.match(source, /action\.impact/);
   assert.match(source, /Motivo operativo/);
   assert.match(source, /adminOrders\.execute/);
+  assert.match(detailScreen, /Ficha operativa read-only del pedido/);
+  assert.match(detailScreen, /Historial operativo aún no disponible/);
+  assert.doesNotMatch(detailScreen, /AdminActionCard|onAction\(|Acciones disponibles|action\.label|action\.impact/);
   assert.doesNotMatch(source, /collection\("orders"\)|\.set\(|\.add\(|\.update\(|\.delete\(|runTransaction|writeBatch/);
 });
 

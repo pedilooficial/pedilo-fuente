@@ -67,6 +67,9 @@ import com.pedilo.app.ui.publicuser.PediloPanelSoft
 import com.pedilo.app.ui.publicuser.PediloPrimaryBrush
 import com.pedilo.app.ui.publicuser.PediloText
 import com.pedilo.app.ui.publicuser.pediloCardDepth
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.launch
 
 enum class AdminRoot(val label: String) {
@@ -1134,6 +1137,28 @@ private fun AdminOperationMetricTone.operationToneColor(): Color =
         AdminOperationMetricTone.Danger -> Color(0xFFFF5A63)
     }
 
+private fun adminOrderVisibleNumber(
+    summary: AdminOrderSummary?,
+    detail: AdminOrderDetail?,
+    orderId: String?,
+): String =
+    listOf(
+        detail?.trackingNumber,
+        summary?.trackingNumber,
+        detail?.publicOrderNumber,
+        summary?.publicOrderNumber,
+        orderId?.take(8),
+    ).firstOrNull { !it.isNullOrBlank() }?.let { "#$it" } ?: "#____"
+
+private fun String?.adminDisplayValue(fallback: String = "Sin dato disponible"): String =
+    this?.trim()?.takeIf { it.isNotBlank() } ?: fallback
+
+private fun List<String>?.adminItemsSummary(): String =
+    this?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }?.joinToString(separator = "\n") ?: "Sin dato disponible"
+
+private fun Long?.adminMillisValue(): String =
+    this?.let { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("es", "AR")).format(Date(it)) } ?: "Aún no registrado"
+
 private fun operationCountLabel(sectionTitle: String, entryTitle: String, orders: List<AdminOrderSummary>): String {
     val count = when (sectionTitle) {
         "Pedidos activos", "Pedidos con problemas" -> orders.forOperationSubsection(sectionTitle, entryTitle).size
@@ -1625,12 +1650,22 @@ private fun AdminOrderDetailScreen(
     onAction: (String, AdminOrderAction) -> Unit,
 ) {
     orderId?.let { LaunchedEffect(it) { onLoadDetail(it) } }
-    val actions = detail?.nextAllowedActions ?: summary?.nextAllowedActions ?: emptyList()
+    val visibleNumber = adminOrderVisibleNumber(summary, detail, orderId)
+    val source = detail?.source ?: summary?.source.orEmpty()
+    val requestType = detail?.requestType ?: summary?.requestType.orEmpty()
+    val status = detail?.status ?: summary?.status.orEmpty()
+    val publicStatus = detail?.publicStatus ?: summary?.publicStatus.orEmpty()
     val responsible = detail?.responsibleRole ?: summary?.responsibleRole.orEmpty()
     val priority = detail?.priority ?: summary?.priority.orEmpty()
     val operationalStatus = detail?.operationalStatus ?: summary?.operationalStatus.orEmpty()
     val needsAttention = detail?.needsAttention ?: summary?.needsAttention ?: false
     val activeIncident = detail?.activeIncident ?: summary?.activeIncident ?: false
+    val createdAt = detail?.createdAtMillis ?: summary?.createdAtMillis
+    val total = detail?.total ?: summary?.total.orEmpty()
+    val storeName = detail?.storeName ?: summary?.storeName.orEmpty()
+    val trackingNumber = detail?.trackingNumber ?: summary?.trackingNumber.orEmpty()
+    val publicOrderNumber = detail?.publicOrderNumber ?: summary?.publicOrderNumber.orEmpty()
+    val delaySignal = variant == OperationOrderVariant.NeedsAttention || variant == OperationOrderVariant.WithProblem
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1642,9 +1677,9 @@ private fun AdminOrderDetailScreen(
     ) {
         item {
             AdminHeader(
-                title = detail?.trackingNumber?.ifBlank { summary?.trackingNumber.orEmpty().ifBlank { "Pedido #____" } } ?: summary?.trackingNumber.orEmpty().ifBlank { "Pedido #____" },
+                title = "Pedido $visibleNumber",
                 eyebrow = "Operación",
-                summary = detail?.publicStatus?.ifBlank { summary?.publicStatus.orEmpty().ifBlank { "Seguimiento del pedido." } } ?: summary?.publicStatus.orEmpty().ifBlank { "Qué está pasando con este pedido ahora." },
+                summary = "Ficha operativa read-only del pedido.",
                 onSignOut = {},
                 showSignOut = false,
             )
@@ -1665,120 +1700,92 @@ private fun AdminOrderDetailScreen(
         if (operationError.isNotBlank()) {
             item { AdminInfoPanel(title = "Error operativo", text = operationError) }
         }
-        when (variant) {
-            OperationOrderVariant.Normal -> {
-                item {
-                    AdminInfoPanel(
-                        title = "Contexto",
-                        text = "Persona esperando entrega · Local confirmó preparación · Reparto en curso.",
-                    )
-                }
-                item {
-                    AdminInfoPanel(
-                        title = "Datos del pedido",
-                        text = buildString {
-                            appendLine("Estado: ${detail?.status.orEmpty().ifBlank { "Sin dato" }}")
-                            appendLine("Estado operativo: ${operationalStatus.ifBlank { "Sin dato" }}")
-                            appendLine("Responsable: ${responsible.ifBlank { "Sin asignar" }}")
-                            appendLine("Prioridad: ${priority.ifBlank { "normal" }}")
-                            appendLine("Origen: ${detail?.source.orEmpty().ifBlank { "Sin dato" }}")
-                            appendLine("Tipo: ${detail?.requestType.orEmpty().ifBlank { "Sin dato" }}")
-                            append("Local: ${detail?.storeName.orEmpty().ifBlank { "Sin dato" }}")
-                        },
-                    )
-                }
-            }
-            OperationOrderVariant.NeedsAttention -> {
-                item {
-                    AdminInfoPanel(
-                        title = "Atención requerida",
-                        text = "El local aún no confirmó este pedido.",
-                    )
-                }
-                item {
-                    AdminOrderFactPanel(
-                        facts = listOf(
-                            "Qué necesita" to "Confirmación del local",
-                            "Quién debería actuar" to "Equipo de operación",
-                            "Desde cuándo" to "Hace unos minutos",
-                            "Impacto" to "El cliente sigue esperando respuesta",
-                        ),
-                    )
-                }
-                item {
-                    AdminDisabledActionCard(
-                        title = "Revisión pendiente",
-                        note = "Usá las acciones reales disponibles para este pedido.",
-                    )
-                }
-            }
-            OperationOrderVariant.WithProblem -> {
-                item {
-                    AdminOrderFactPanel(
-                        facts = listOf(
-                            "Problema" to "El local no responde",
-                            "Qué se esperaba" to "Aceptación del pedido",
-                            "Qué no ocurrió" to "Sin confirmación del local",
-                            "Responsable actual" to "Local asignado",
-                            "Tiempo detenido" to "Desde hace unos minutos",
-                            "Impacto" to "Pedido detenido sin avanzar",
-                        ),
-                    )
-                }
-                item {
-                    AdminEntryCard(
-                        entry = AdminEntry("Local relacionado", "Ver estado operativo del local"),
-                        onClick = onOpenStore,
-                    )
-                }
-            }
-            OperationOrderVariant.ActionUnavailable -> {
-                item {
-                    AdminInfoPanel(
-                        title = "Motivo",
-                        text = "Este pedido no admite cambios desde aquí en este momento.",
-                    )
-                }
-                item {
-                    AdminInfoPanel(
-                        title = "Qué podés hacer ahora",
-                        text = "Revisá el estado y volvé cuando haya una acción habilitada.",
-                    )
-                }
-                item {
-                    AdminEntryCard(
-                        entry = AdminEntry("Repartidor relacionado", "Ver estado operativo del repartidor"),
-                        onClick = onOpenDriver,
-                    )
-                }
-            }
+        item {
+            AdminOrderFactPanel(
+                facts = listOf(
+                    "Número visible" to visibleNumber,
+                    "Tracking" to trackingNumber.adminDisplayValue(),
+                    "ID público" to publicOrderNumber.adminDisplayValue(),
+                    "ID interno" to orderId.adminDisplayValue(),
+                    "Origen" to AdminOperationOrderClassification.sourceLabel(source, requestType),
+                    "Tipo de pedido" to requestType.adminDisplayValue(),
+                ),
+            )
         }
-        if (detail?.lastEventSummary.orEmpty().isNotBlank()) {
-            item {
-                AdminInfoPanel(
-                    title = "Último evento",
-                    text = detail?.lastEventSummary.orEmpty(),
-                )
-            }
+        item {
+            AdminOrderFactPanel(
+                facts = listOf(
+                    "Estado actual" to status.adminDisplayValue(),
+                    "Estado público" to publicStatus.adminDisplayValue(),
+                    "Estado operativo" to operationalStatus.adminDisplayValue(),
+                    "Activo" to if (status.lowercase() in listOf("done", "completed", "cancelled", "canceled")) "No" else "Sí",
+                    "Demorado" to if (delaySignal) "Con señal operativa" else "Sin demora registrada",
+                    "Problema" to if (activeIncident || needsAttention) "Con señal operativa" else "Sin problemas registrados",
+                    "Prioridad" to priority.adminDisplayValue("Normal"),
+                    "Responsable" to responsible.adminDisplayValue("Sin asignar"),
+                ),
+            )
+        }
+        item {
+            AdminOrderFactPanel(
+                facts = listOf(
+                    "Cliente" to detail?.customerName.adminDisplayValue(),
+                    "Teléfono/contacto" to "Sin dato disponible",
+                    "Dirección" to "Sin dato disponible",
+                ),
+            )
+        }
+        item {
+            AdminOrderFactPanel(
+                facts = listOf(
+                    "Resumen" to detail?.itemsSummary.adminItemsSummary(),
+                    "Observaciones" to "Sin dato disponible",
+                    "Operación" to requestType.adminDisplayValue(),
+                ),
+            )
+        }
+        item {
+            AdminOrderFactPanel(
+                facts = listOf(
+                    "Local / origen" to storeName.adminDisplayValue(),
+                    "Fuente" to source.adminDisplayValue(),
+                ),
+            )
+        }
+        item {
+            AdminOrderFactPanel(
+                facts = listOf(
+                    "Total" to total.adminDisplayValue(),
+                    "Forma de pago" to "Sin dato disponible",
+                    "Estado de pago" to "Sin dato disponible",
+                ),
+            )
+        }
+        item {
+            AdminOrderFactPanel(
+                facts = listOf(
+                    "Creado" to createdAt.adminMillisValue(),
+                    "Última actualización" to detail?.updatedAtMillis.adminMillisValue(),
+                    "Referencia temporal" to if (createdAt == null && detail?.updatedAtMillis == null) "Aún no registrado" else "Registrada",
+                ),
+            )
         }
         item {
             AdminInfoPanel(
-                title = "Acciones disponibles",
-                text = if (actions.isEmpty()) {
-                    "No hay acciones operativas habilitadas para el estado actual."
-                } else {
-                    "El backend volverá a validar estado, rol Admin e impacto al confirmar."
+                title = "Problemas / demoras",
+                text = when {
+                    activeIncident -> "Incidencia operativa registrada."
+                    needsAttention -> "El pedido requiere atención operativa."
+                    delaySignal -> "Con señal de demora en el grupo operativo actual."
+                    else -> "Sin problemas registrados."
                 },
             )
         }
-        items(actions) { action ->
-            if (orderId != null) {
-                AdminActionCard(
-                    title = action.label,
-                    note = action.impact,
-                    onClick = { onAction(orderId, action) },
-                )
-            }
+        item {
+            AdminInfoPanel(
+                title = "Historial operativo",
+                text = detail?.lastEventSummary.adminDisplayValue("Historial operativo aún no disponible"),
+            )
         }
     }
 }
@@ -1796,10 +1803,9 @@ private fun AdminOrderStatusPanel(
         activeIncident -> "Con incidencia" to "Hay una incidencia operativa activa."
         needsAttention -> "Necesita atención" to "El pedido requiere seguimiento operativo."
         else -> when (variant) {
-        OperationOrderVariant.Normal -> "Estado normal" to "El pedido avanza dentro de lo previsto."
-        OperationOrderVariant.NeedsAttention -> "Necesita atención" to "Hay un punto que requiere seguimiento operativo."
-        OperationOrderVariant.WithProblem -> "Con problema" to "El pedido quedó detenido por una incidencia."
-        OperationOrderVariant.ActionUnavailable -> "Acción no disponible" to "No hay gestiones habilitadas en este momento."
+            OperationOrderVariant.WithProblem -> "Con señal operativa" to "El grupo actual indica revisión operativa."
+            OperationOrderVariant.NeedsAttention -> "Con señal operativa" to "El grupo actual indica seguimiento operativo."
+            else -> "Lectura operativa" to "Estado leído desde los datos disponibles."
         }
     }
     Column(

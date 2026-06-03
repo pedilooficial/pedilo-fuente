@@ -351,7 +351,7 @@ test("admin role access convergence flow is available and restricted to visual m
   assert.doesNotMatch(source, /supervisor|soporte|cajero|operador|owner|manager/);
 });
 
-test("admin order detail convergence exposes Pedido #____ variants and solve flow without real data", () => {
+test("admin order detail exposes Pedido #____ read-only ficha with real-data fallbacks", () => {
   const source = readAdminSourceTree();
   const forbiddenTitles = ["Pedido vivo", "Detalle del pedido", "Resolución del pedido"];
 
@@ -360,21 +360,29 @@ test("admin order detail convergence exposes Pedido #____ variants and solve flo
   assert.match(source, /"Pedido #____"/);
   assert.match(source, /AdminOrderDetailScreen/);
   [
-    "Estado normal",
-    "Necesita atención",
-    "Con problema",
-    "Acción no disponible",
+    "Ficha operativa read-only del pedido",
+    "Número visible",
+    "Tracking",
+    "ID público",
+    "ID interno",
+    "Estado actual",
+    "Estado público",
+    "Cliente",
+    "Teléfono/contacto",
+    "Dirección",
+    "Resumen",
+    "Local / origen",
+    "Total",
+    "Forma de pago",
+    "Creado",
+    "Última actualización",
+    "Problemas / demoras",
+    "Historial operativo",
+    "Sin dato disponible",
+    "Aún no registrado",
+    "Historial operativo aún no disponible",
   ].forEach((label) => assert.match(source, new RegExp(label)));
   forbiddenTitles.forEach((title) => assert.doesNotMatch(source, new RegExp(`"${title}"`)));
-  assert.match(source, /OperationOrderSolve/);
-  assert.match(source, /OperationSolveStage/);
-  assert.match(source, /AdminOrderSolveScreen/);
-  [
-    "Solucionar",
-    "Opciones",
-    "Acción sensible",
-    "Resultado",
-  ].forEach((label) => assert.match(source, new RegExp(label)));
 });
 
 test("admin order detail keeps shell rules and visual entry paths", () => {
@@ -387,10 +395,11 @@ test("admin order detail keeps shell rules and visual entry paths", () => {
   assert.match(source, /is AdminRoute\.OperationOrderDetail -> current\.returnRoute/);
   assert.match(source, /is AdminRoute\.OperationOrderSolve -> when \(current\.stage\)/);
   assert.match(source, /is AdminRoute\.OperationOrderDetail -> AdminOrderDetailScreen/);
-  assert.match(source, /AdminActionCard/);
-  assert.match(source, /Acciones disponibles/);
-  assert.match(source, /Local operativo/);
-  assert.match(source, /Repartidor operativo/);
+  assert.match(source, /adminOrderVisibleNumber/);
+  assert.match(source, /adminDisplayValue/);
+  assert.match(source, /adminItemsSummary/);
+  assert.match(source, /adminMillisValue/);
+  assert.doesNotMatch(source, /Acciones disponibles/);
   forbiddenReturnLabels.forEach((label) => assert.doesNotMatch(source, new RegExp(`"${label}"`)));
   assert.match(source, /private fun AdminOrderDetailScreen[\s\S]*showSignOut = false/);
 });
