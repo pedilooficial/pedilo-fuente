@@ -49,19 +49,26 @@ test("admin operation root exposes visual operation cards only", () => {
     "Pedidos del día",
     "Pedidos activos",
     "Pedidos con problemas",
-    "Repartidores activos",
     "Locales activos",
+    "Universo de pedidos",
+    "Repartidores",
+    "En servicio",
+    "Disponibles",
+    "Con incidencias",
+    "Operando",
+    "Pausados",
+    "Con demoras",
   ].forEach((label) => assert.match(source, new RegExp(label)));
-  assert.match(source, /Mesa Operativa Viva/);
-  assert.match(source, /Necesitan atención/);
-  assert.match(source, /Demorados/);
-  assert.match(source, /Sin responsable/);
-  assert.match(source, /En curso normal/);
-  assert.match(source, /En entrega/);
-  assert.match(source, /Finalizados recientes/);
-  assert.match(source, /Prioridad alta/);
-  assert.match(source, /Prioridad media/);
-  assert.match(source, /Prioridad operativa/);
+  assert.match(source, /Resumen operativo de hoy/);
+  assert.match(source, /En vivo/);
+  assert.match(source, /Total recibido hoy/);
+  assert.match(source, /Pedidos en curso/);
+  assert.match(source, /Requieren atención/);
+  assert.match(source, /Dato pendiente/);
+  assert.match(source, /AdminTodaySummaryCard/);
+  assert.match(source, /AdminOperationUniverseCard/);
+  assert.doesNotMatch(source, /Mesa Operativa Viva|Necesitan atención|Sin responsable|Finalizados recientes|Capas de lectura/);
+  assert.match(source, /AdminBottomItem\("Moto", "Operación"/);
 });
 
 test("admin operation internal screens expose planned operation subworlds", () => {

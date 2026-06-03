@@ -152,15 +152,21 @@ data class AdminEntry(
     val note: String,
 )
 
-private data class AdminPriorityCard(
-    val icon: String,
+private data class AdminOperationHomeMetric(
     val title: String,
-    val count: Int,
     val note: String,
-    val priority: String,
-    val tension: String,
+    val value: String,
+    val tone: AdminOperationMetricTone,
     val targetSection: String? = null,
+    val targetSubsection: String? = null,
 )
+
+private enum class AdminOperationMetricTone {
+    Neutral,
+    Healthy,
+    Warning,
+    Danger,
+}
 
 private data class AdminOperationalLiveCard(
     val icon: String,
@@ -492,67 +498,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
     val todayCount = readOnlyOrders.todayOrders().values.sumOf { it.size }
     val activeCount = readOnlyOrders.activeOrders().values.sumOf { it.size }
     val problemCount = readOnlyOrders.problemOrders().values.sumOf { it.size }
-    val inDeliveryCount = readOnlyOrders.activeOrders()[AdminActiveOrdersBucket.IN_DELIVERY]?.size ?: 0
-    val waitingDriverCount = readOnlyOrders.activeOrders()[AdminActiveOrdersBucket.WAITING_DRIVER]?.size ?: 0
-    val finishedRecentCount = readOnlyOrders.todayOrders()[AdminTodayOrdersBucket.FINISHED]?.size ?: 0
     val delayedCount = readOnlyOrders.todayOrders()[AdminTodayOrdersBucket.DELAYED]?.size ?: 0
-
-    val operationDeskCards = listOf(
-        AdminPriorityCard(
-            icon = "!",
-            title = "Necesitan atención",
-            count = problemCount,
-            note = if (problemCount == 0) "No hay pedidos con revisión urgente." else "Pedidos que requieren revisión operativa.",
-            priority = "Prioridad alta",
-            tension = "Casos sensibles",
-            targetSection = "Pedidos con problemas",
-        ),
-        AdminPriorityCard(
-            icon = "R",
-            title = "Demorados",
-            count = delayedCount,
-            note = if (delayedCount == 0) "No hay pedidos demorados ahora." else "Pedidos con tiempo excedido o espera prolongada.",
-            priority = "Prioridad media",
-            tension = "Ritmo afectado",
-            targetSection = "Pedidos del día",
-        ),
-        AdminPriorityCard(
-            icon = "?",
-            title = "Sin responsable",
-            count = waitingDriverCount,
-            note = if (waitingDriverCount == 0) "No hay pedidos en espera de responsable por ahora." else "Pedidos a la espera de responsable de reparto.",
-            priority = "Prioridad operativa",
-            tension = if (waitingDriverCount == 0) "Cobertura estable" else "Cobertura pendiente",
-            targetSection = "Pedidos activos",
-        ),
-        AdminPriorityCard(
-            icon = "OK",
-            title = "En curso normal",
-            count = activeCount,
-            note = if (activeCount == 0) "No hay pedidos activos ahora." else "Pedidos avanzando sin alertas visibles.",
-            priority = "Seguimiento",
-            tension = "Sin alertas",
-            targetSection = "Pedidos activos",
-        ),
-        AdminPriorityCard(
-            icon = ">",
-            title = "En entrega",
-            count = inDeliveryCount,
-            note = if (inDeliveryCount == 0) "No hay pedidos en entrega ahora." else "Pedidos actualmente en etapa de entrega.",
-            priority = "Seguimiento",
-            tension = "Tránsito activo",
-            targetSection = "Pedidos activos",
-        ),
-        AdminPriorityCard(
-            icon = "✓",
-            title = "Finalizados recientes",
-            count = finishedRecentCount,
-            note = if (finishedRecentCount == 0) "No hay cierres recientes para mostrar." else "Pedidos cerrados recientemente.",
-            priority = "Cierre del ciclo",
-            tension = "Cierre estable",
-            targetSection = "Pedidos del día",
-        ),
-    )
 
     BackHandler(enabled = route !is AdminRoute.Operation && route !is AdminRoute.Configuration && route !is AdminRoute.RoleAccess) {
         route = when (val current = route) {
@@ -617,11 +563,21 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
     ) {
         when (val current = route) {
             AdminRoute.Operation -> AdminOperationDeskScreen(
-                deskCards = operationDeskCards,
                 totalOrdersToday = todayCount,
+                activeOrders = activeCount,
+                problemOrders = problemCount,
+                delayedOrders = delayedCount,
                 onOpenSection = { title ->
                     operationSections.firstOrNull { it.title == title }?.let {
                         route = AdminRoute.OperationSection(it)
+                    }
+                },
+                onOpenMetric = { metric ->
+                    val section = operationSections.firstOrNull { it.title == metric.targetSection }
+                    if (section != null && metric.targetSubsection != null) {
+                        route = AdminRoute.OperationSubsection(section, metric.targetSubsection)
+                    } else if (section != null) {
+                        route = AdminRoute.OperationSection(section)
                     }
                 },
                 onSignOut = { showSignOut = true },
@@ -996,11 +952,30 @@ private fun AdminOperationSectionScreen(
 
 @Composable
 private fun AdminOperationDeskScreen(
-    deskCards: List<AdminPriorityCard>,
     totalOrdersToday: Int,
+    activeOrders: Int,
+    problemOrders: Int,
+    delayedOrders: Int,
     onOpenSection: (String) -> Unit,
+    onOpenMetric: (AdminOperationHomeMetric) -> Unit,
     onSignOut: () -> Unit,
 ) {
+    val orderMetrics = listOf(
+        AdminOperationHomeMetric("Pedidos del día", "Total recibido hoy", totalOrdersToday.toOperationalCount("pedidos"), AdminOperationMetricTone.Neutral, "Pedidos del día"),
+        AdminOperationHomeMetric("Pedidos activos", "Pedidos en curso", activeOrders.toOperationalCount("pedidos"), AdminOperationMetricTone.Healthy, "Pedidos activos"),
+        AdminOperationHomeMetric("Pedidos con problemas", "Requieren atención", problemOrders.toOperationalCount("casos"), if (problemOrders > 0) AdminOperationMetricTone.Danger else AdminOperationMetricTone.Neutral, "Pedidos con problemas"),
+    )
+    val driverMetrics = listOf(
+        AdminOperationHomeMetric("En servicio", "Repartidores conectados", "Dato pendiente", AdminOperationMetricTone.Neutral, "Repartidores activos"),
+        AdminOperationHomeMetric("Disponibles", "Listos para tomar pedidos", "Dato pendiente", AdminOperationMetricTone.Healthy, "Repartidores activos", "Libres"),
+        AdminOperationHomeMetric("Con incidencias", "Requieren revisión", "Dato pendiente", AdminOperationMetricTone.Danger, "Repartidores activos", "Con incidencia"),
+    )
+    val storeMetrics = listOf(
+        AdminOperationHomeMetric("Operando", "Locales recibiendo pedidos", "Dato pendiente", AdminOperationMetricTone.Healthy, "Locales activos", "Vendiendo ahora"),
+        AdminOperationHomeMetric("Pausados", "Operación detenida", "Dato pendiente", AdminOperationMetricTone.Warning, "Locales activos", "Pausados"),
+        AdminOperationHomeMetric("Con demoras", "Ritmo afectado", delayedOrders.toOperationalCount("casos"), if (delayedOrders > 0) AdminOperationMetricTone.Warning else AdminOperationMetricTone.Neutral, "Pedidos del día", "Demorados"),
+    )
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1013,123 +988,151 @@ private fun AdminOperationDeskScreen(
         item {
             AdminHeader(
                 title = "Pédilo Admin",
-                eyebrow = "Mesa Operativa Viva",
-                summary = "Lectura operativa en tiempo real.",
+                eyebrow = "Operación",
+                summary = "Home operativo para leer el día, pedidos, repartidores y locales.",
                 onSignOut = onSignOut,
                 showSignOut = true,
             )
         }
         item {
-            AdminInfoPanel(
-                title = "Resumen operativo",
-                text = if (totalOrdersToday == 0) {
-                    "No hay pedidos para mostrar en esta sección."
-                } else {
-                    "Pedidos del día registrados: $totalOrdersToday"
-                },
-            )
-        }
-        items(deskCards) { card ->
-            AdminPriorityCardView(
-                card = card,
-                onClick = { card.targetSection?.let(onOpenSection) },
+            AdminTodaySummaryCard(
+                title = "Pedidos del día",
+                subtitle = "Resumen operativo de hoy",
+                count = totalOrdersToday,
+                onClick = { onOpenSection("Pedidos del día") },
             )
         }
         item {
-            AdminInfoPanel(
-                title = "Capas de lectura",
-                text = "Entrá por prioridad para abrir detalle por estado y después cada pedido.",
-            )
+            AdminOperationUniverseCard("Universo de pedidos", orderMetrics, onOpenMetric)
+        }
+        item {
+            AdminOperationUniverseCard("Repartidores", driverMetrics, onOpenMetric)
+        }
+        item {
+            AdminOperationUniverseCard("Locales activos", storeMetrics, onOpenMetric)
         }
     }
 }
 
 @Composable
-private fun AdminPriorityCardView(
-    card: AdminPriorityCard,
+private fun AdminTodaySummaryCard(
+    title: String,
+    subtitle: String,
+    count: Int,
     onClick: () -> Unit,
 ) {
-    val cardBorderAlpha = if (card.count == 0) 0.28f else 0.55f
-    val cardBackgroundAlpha = if (card.count == 0) 0.72f else 0.9f
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                Brush.verticalGradient(
-                    listOf(PediloPanel, PediloPanel.copy(alpha = cardBackgroundAlpha)),
-                ),
-                RoundedCornerShape(16.dp),
-            )
-            .border(1.dp, PediloLine.copy(alpha = cardBorderAlpha), RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .background(Brush.verticalGradient(listOf(PediloPanel, PediloPanel.copy(alpha = 0.9f))), RoundedCornerShape(18.dp))
+            .border(1.dp, PediloOrange.copy(alpha = 0.42f), RoundedCornerShape(18.dp))
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(17.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(PediloOrange.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
-                        .border(1.dp, PediloOrange.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                ) {
-                    Text(card.icon, color = PediloOrange, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
-                }
-                Text(
-                    text = card.title,
-                    style = TextStyle(
-                        color = PediloText,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 0.sp,
-                    ),
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, color = PediloText, fontSize = 20.sp, lineHeight = 24.sp, fontWeight = FontWeight.ExtraBold)
+                Text(subtitle, color = PediloMuted, fontSize = 13.sp, lineHeight = 18.sp)
             }
-            Text(
-                text = card.priority,
-                style = TextStyle(
-                    color = PediloOrange,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.sp,
-                ),
-            )
+            AdminStatusPill("En vivo", AdminOperationMetricTone.Healthy)
         }
         Text(
-            text = if (card.count == 0) "Sin pedidos ahora" else "${card.count} pedidos",
-            style = TextStyle(
-                color = PediloText,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 0.sp,
-            ),
+            text = if (count == 0) "Sin pedidos ahora" else "$count pedidos",
+            color = PediloText,
+            fontSize = 30.sp,
+            lineHeight = 34.sp,
+            fontWeight = FontWeight.Black,
         )
         Text(
-            text = card.note,
-            style = TextStyle(
-                color = PediloMuted,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                letterSpacing = 0.sp,
-            ),
-        )
-        Text(
-            text = card.tension,
-            style = TextStyle(
-                color = PediloOrange.copy(alpha = 0.9f),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.sp,
-            ),
+            text = "Lectura preparada para datos operativos reales.",
+            color = PediloMuted,
+            fontSize = 12.sp,
+            lineHeight = 17.sp,
         )
     }
 }
+
+@Composable
+private fun AdminOperationUniverseCard(
+    title: String,
+    metrics: List<AdminOperationHomeMetric>,
+    onMetric: (AdminOperationHomeMetric) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(PediloCardBrush, RoundedCornerShape(18.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.62f), RoundedCornerShape(18.dp))
+            .padding(15.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(title, color = PediloText, fontSize = 19.sp, lineHeight = 23.sp, fontWeight = FontWeight.ExtraBold)
+        metrics.forEach { metric ->
+            AdminOperationMetricRow(metric = metric, onClick = { onMetric(metric) })
+        }
+    }
+}
+
+@Composable
+private fun AdminOperationMetricRow(
+    metric: AdminOperationHomeMetric,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(PediloPanelSoft.copy(alpha = 0.82f), RoundedCornerShape(14.dp))
+            .border(1.dp, metric.tone.operationToneColor().copy(alpha = 0.34f), RoundedCornerShape(14.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 13.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Text(metric.title, color = PediloText, fontSize = 15.sp, lineHeight = 19.sp, fontWeight = FontWeight.ExtraBold)
+            Text(metric.note, color = PediloMuted, fontSize = 12.sp, lineHeight = 16.sp)
+        }
+        AdminStatusPill(metric.value, metric.tone)
+    }
+}
+
+@Composable
+private fun AdminStatusPill(text: String, tone: AdminOperationMetricTone) {
+    Text(
+        text = text,
+        color = tone.operationToneColor(),
+        fontSize = 11.sp,
+        lineHeight = 14.sp,
+        fontWeight = FontWeight.ExtraBold,
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(tone.operationToneColor().copy(alpha = 0.13f), RoundedCornerShape(999.dp))
+            .border(1.dp, tone.operationToneColor().copy(alpha = 0.36f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 9.dp, vertical = 5.dp),
+    )
+}
+
+private fun Int.toOperationalCount(unit: String): String =
+    if (this == 0) "Sin $unit" else "$this $unit"
+
+private fun AdminOperationMetricTone.operationToneColor(): Color =
+    when (this) {
+        AdminOperationMetricTone.Neutral -> PediloOrange
+        AdminOperationMetricTone.Healthy -> Color(0xFF57D98D)
+        AdminOperationMetricTone.Warning -> Color(0xFFFFB24A)
+        AdminOperationMetricTone.Danger -> Color(0xFFFF5A63)
+    }
 
 private fun operationCountLabel(sectionTitle: String, entryTitle: String, orders: List<AdminOrderSummary>): String {
     val count = when (sectionTitle) {
