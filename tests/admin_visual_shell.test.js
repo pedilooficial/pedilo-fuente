@@ -62,7 +62,10 @@ test("admin operation root exposes visual operation cards only", () => {
   assert.match(source, /Pedidos con problemas/);
   assert.match(source, /En servicio/);
   assert.match(source, /Operando/);
-  assert.match(source, /AdminOperationUniverseCard/);
+  assert.match(source, /AdminOperationMotherCard/);
+  assert.match(source, /AdminOperationSubcardView/);
+  assert.match(source, /AdminOperationOrderCard/);
+  assert.doesNotMatch(source, /AdminOperationUniverseCard|AdminStatusPill|AdminOperationLiveCardView/);
   assert.match(source, /onOpenView/);
   assert.match(source, /onOpenList/);
   assert.match(source, /Aún no hay información real/);
@@ -79,6 +82,7 @@ test("admin operation routes expose explicit hierarchy levels", () => {
   assert.match(source, /data class OperationView/);
   assert.match(source, /data class OperationList/);
   assert.match(source, /data class OperationOrderDetail/);
+  assert.doesNotMatch(source, /OperationOrderSolve|OperationOperationalProfile|AdminOperationalProfileScreen|AdminOrderSolveScreen/);
   assert.match(source, /AdminOperationUniverseScreen/);
   assert.match(source, /AdminOperationViewScreen/);
   assert.match(source, /AdminOperationListScreen/);
@@ -162,8 +166,12 @@ test("admin operation visible strings avoid internal architecture copy", () => {
     "Dato pendiente",
     "No hay núcleo real conectado",
     "Abrir pedido",
+    "Ver estado",
     "Actualizado hace 1 min",
     "Pedido Vivo Universal",
+    "Pedido read-only",
+    "Seguimiento activo",
+    "Prioridad alta",
   ].forEach((text) => assert.doesNotMatch(visible, new RegExp(text)));
 
   assert.doesNotMatch(visible, /\bmock\b|\bdemo\b|\bsample\b|\bplaceholder\b/i);

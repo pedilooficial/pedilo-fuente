@@ -31,10 +31,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,7 +63,6 @@ import com.pedilo.app.ui.publicuser.PediloMuted
 import com.pedilo.app.ui.publicuser.PediloOrange
 import com.pedilo.app.ui.publicuser.PediloPanel
 import com.pedilo.app.ui.publicuser.PediloPanelSoft
-import com.pedilo.app.ui.publicuser.PediloPrimaryBrush
 import com.pedilo.app.ui.publicuser.PediloText
 import com.pedilo.app.ui.publicuser.PediloWarning
 import com.pedilo.app.ui.publicuser.pediloCardDepth
@@ -87,13 +84,6 @@ internal enum class OperationOrderVariant {
     ActionUnavailable,
 }
 
-private enum class OperationSolveStage {
-    Start,
-    Options,
-    SensitiveAction,
-    Result,
-}
-
 private sealed interface AdminRoute {
     data object Operation : AdminRoute
     data object Configuration : AdminRoute
@@ -110,8 +100,6 @@ private sealed interface AdminRoute {
         val variant: OperationOrderVariant,
         val realOrderId: String? = null,
     ) : AdminRoute
-    data class OperationOrderSolve(val returnRoute: AdminRoute, val stage: OperationSolveStage) : AdminRoute
-    data class OperationOperationalProfile(val kind: AdminOperationalProfileKind, val state: String) : AdminRoute
     data class Section(val root: AdminRoot, val title: String) : AdminRoute
     data class ConfigurationSection(val section: AdminConfigurationSection) : AdminRoute
     data class ConfigurationSubsection(val section: AdminConfigurationSection, val title: String) : AdminRoute
@@ -148,11 +136,6 @@ private enum class AdminRoleAccessConvergenceStep {
     Impact,
     SensitiveConfirmation,
     Result,
-}
-
-private enum class AdminOperationalProfileKind {
-    Store,
-    Driver,
 }
 
 data class AdminEntry(
@@ -474,13 +457,6 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
 
     BackHandler(enabled = route !is AdminRoute.Operation && route !is AdminRoute.Configuration && route !is AdminRoute.RoleAccess) {
         route = when (val current = route) {
-            is AdminRoute.OperationOrderSolve -> when (current.stage) {
-                OperationSolveStage.Start -> current.returnRoute
-                OperationSolveStage.Options -> AdminRoute.OperationOrderSolve(current.returnRoute, OperationSolveStage.Start)
-                OperationSolveStage.SensitiveAction -> AdminRoute.OperationOrderSolve(current.returnRoute, OperationSolveStage.Options)
-                OperationSolveStage.Result -> AdminRoute.OperationOrderSolve(current.returnRoute, OperationSolveStage.SensitiveAction)
-            }
-            is AdminRoute.OperationOperationalProfile -> AdminRoute.Operation
             is AdminRoute.ConfigurationConvergence -> when (current.step) {
                 AdminConfigurationConvergenceStep.Entity -> AdminRoute.ConfigurationSubsection(
                     section = configurationSections.first { it.title == current.section },
@@ -612,18 +588,6 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 detail = current.realOrderId?.let { readOnlyOrderDetails[it] },
                 operationMessage = operationMessage,
                 operationError = operationError,
-                onOpenStore = {
-                    route = AdminRoute.OperationOperationalProfile(
-                        kind = AdminOperationalProfileKind.Store,
-                        state = "Necesita atención",
-                    )
-                },
-                onOpenDriver = {
-                    route = AdminRoute.OperationOperationalProfile(
-                        kind = AdminOperationalProfileKind.Driver,
-                        state = "En seguimiento",
-                    )
-                },
                 onLoadDetail = { orderId ->
                     if (readOnlyOrderDetails.containsKey(orderId)) return@AdminOrderDetailScreen
                     scope.launch {
@@ -639,16 +603,6 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                     pendingReason = ""
                     pendingAction = orderId to action
                 },
-            )
-            is AdminRoute.OperationOrderSolve -> AdminOrderSolveScreen(
-                stage = current.stage,
-                onNext = { next ->
-                    route = AdminRoute.OperationOrderSolve(current.returnRoute, next)
-                },
-            )
-            is AdminRoute.OperationOperationalProfile -> AdminOperationalProfileScreen(
-                kind = current.kind,
-                state = current.state,
             )
             is AdminRoute.ConfigurationSection -> AdminConfigurationSectionScreen(
                 section = current.section,
@@ -956,7 +910,7 @@ private fun AdminOperationListScreen(
         items(orderEntries) { entry ->
             AdminOperationOrderCard(
                 card = AdminOperationalLiveCard(
-                    icon = "Ord",
+                    icon = "#",
                     title = entry.label,
                     countLabel = entry.note.substringBefore(" · "),
                     detail = entry.note,
@@ -1130,46 +1084,6 @@ private fun AdminOperationSubcardView(subcard: AdminOperationSubcard) {
     }
 }
 
-@Composable
-private fun AdminOperationUniverseCard(
-    title: String,
-    note: String,
-    value: String,
-    tone: AdminOperationMetricTone,
-    onClick: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(PediloCardBrush, RoundedCornerShape(18.dp))
-            .border(1.dp, PediloLine.copy(alpha = 0.62f), RoundedCornerShape(18.dp))
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(15.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(title, color = PediloText, fontSize = 19.sp, lineHeight = 23.sp, fontWeight = FontWeight.ExtraBold)
-        Text(note, color = PediloMuted, fontSize = 13.sp, lineHeight = 18.sp)
-        AdminStatusPill(value, tone)
-    }
-}
-
-@Composable
-private fun AdminStatusPill(text: String, tone: AdminOperationMetricTone) {
-    Text(
-        text = text,
-        color = tone.operationToneColor(),
-        fontSize = 11.sp,
-        lineHeight = 14.sp,
-        fontWeight = FontWeight.ExtraBold,
-        modifier = Modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(tone.operationToneColor().copy(alpha = 0.13f), RoundedCornerShape(999.dp))
-            .border(1.dp, tone.operationToneColor().copy(alpha = 0.36f), RoundedCornerShape(999.dp))
-            .padding(horizontal = 9.dp, vertical = 5.dp),
-    )
-}
-
 private fun AdminOperationMetricTone.operationToneColor(): Color =
     when (this) {
         AdminOperationMetricTone.Neutral -> PediloOrange
@@ -1205,23 +1119,21 @@ private fun Long?.adminMillisValue(): String =
 
 private fun operationIconFor(title: String): String =
     when (title) {
-        "Pedidos del día" -> "Hoy"
-        "Pedidos activos", "Activos" -> "Run"
+        "Pedidos del día" -> "#"
+        "Pedidos activos", "Activos" -> ">"
         "Pedidos con problemas", "Con problemas", "Con incidencias" -> "!"
-        "Finalizados" -> "Ok"
-        "Cancelados" -> "X"
-        "Demorados", "Con demoras" -> "R"
-        "Esperando local" -> "Loc"
-        "Preparando" -> "Prep"
-        "Esperando repartidor", "En servicio", "Disponibles" -> "Rep"
-        "En entrega" -> "Ent"
-        "Local no responde" -> "Loc"
-        "Reclamo de cliente" -> "Cli"
-        "Sin responsable" -> "Resp"
-        "Operando" -> "On"
-        "Pausados" -> "Off"
-        "Repartidores" -> "Rep"
-        "Locales" -> "Loc"
+        "Finalizados" -> "+"
+        "Cancelados" -> "x"
+        "Demorados", "Con demoras" -> "!"
+        "Esperando local" -> "L"
+        "Preparando" -> "P"
+        "Esperando repartidor", "En servicio", "Disponibles", "Repartidores" -> "R"
+        "En entrega" -> ">"
+        "Local no responde", "Locales" -> "L"
+        "Reclamo de cliente" -> "C"
+        "Sin responsable" -> "?"
+        "Operando" -> "+"
+        "Pausados" -> "x"
         else -> "•"
     }
 
@@ -1247,7 +1159,7 @@ private fun operationViewStateLabel(view: AdminOperationView, orders: List<Admin
         count == 0 -> "Sin pedidos por ahora"
         view.title == "Pedidos con problemas" -> "Prioridad"
         view.title == "Pedidos activos" -> "En curso"
-        else -> "Hoy"
+        else -> "Del día"
     }
 }
 
@@ -1263,14 +1175,6 @@ private fun operationListCountLabel(list: AdminOperationList, orders: List<Admin
     return if (count == 0) "0" else count.toString()
 }
 
-private fun operationListDetailLabel(list: AdminOperationList, orders: List<AdminOrderSummary>): String {
-    if (!list.kind.isOrderList()) return list.emptyText
-    val first = orders.forOperationList(list.kind).firstOrNull() ?: return list.emptyText
-    val source = AdminOperationOrderClassification.sourceLabel(first.source, first.requestType)
-    val store = first.storeName.ifBlank { source }
-    return "$store · ${first.publicStatus.ifBlank { "Estado actual disponible" }}"
-}
-
 private fun operationListTensionLabel(list: AdminOperationList, orders: List<AdminOrderSummary>): String {
     val count = orders.forOperationList(list.kind).size
     return when {
@@ -1282,8 +1186,8 @@ private fun operationListTensionLabel(list: AdminOperationList, orders: List<Adm
             AdminOperationListKind.ProblemUserClaim,
             AdminOperationListKind.ProblemDelayed,
             AdminOperationListKind.ProblemWithoutResponsible,
-        ) -> "Prioridad alta"
-        else -> "Seguimiento activo"
+        ) -> "Con casos"
+        else -> "En curso"
     }
 }
 
@@ -1350,49 +1254,6 @@ private fun AdminOperationOrderCard(
         }
         Text(card.countLabel, color = PediloText, fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold)
         Text(card.detail, color = PediloMuted, fontSize = 12.sp, lineHeight = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-@Composable
-private fun AdminOperationLiveCardView(
-    card: AdminOperationalLiveCard,
-    onClick: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                Brush.verticalGradient(listOf(PediloPanel, PediloPanel.copy(alpha = 0.86f))),
-                RoundedCornerShape(16.dp),
-            )
-            .border(1.dp, PediloLine.copy(alpha = 0.55f), RoundedCornerShape(16.dp))
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(15.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(PediloOrange.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
-                        .border(1.dp, PediloOrange.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                ) {
-                    Text(card.icon, color = PediloOrange, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
-                }
-                Text(card.title, color = PediloText, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
-            }
-            Text(card.priority, color = PediloOrange, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-        }
-        Text(card.countLabel, color = PediloText, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-        Text(card.detail, color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp)
-        Text(card.tension, color = PediloOrange.copy(alpha = 0.88f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -1467,28 +1328,9 @@ private fun AdminSectionScreen(
     summary: String,
     panelTitle: String,
     panelText: String,
-    orderDetailEntries: List<AdminOrderDetailEntry> = emptyList(),
-    onOrderDetail: (AdminOrderDetailEntry) -> Unit = {},
-    onOperationalProfile: (AdminOperationalProfileKind) -> Unit = {},
     onConfigurationConvergence: () -> Unit = {},
     onRoleAccessConvergence: (AdminRoleAccessConvergenceStep) -> Unit = {},
 ) {
-    val allowStoreProfile = title in listOf(
-        "Vendiendo ahora",
-        "Sin respuesta",
-        "Pausados",
-        "Con configuración pendiente",
-        "Sin productos vendibles",
-        "Local no responde",
-    )
-    val allowDriverProfile = title in listOf(
-        "Libres",
-        "Ocupados",
-        "Pendientes de respuesta",
-        "Con incidencia",
-        "Esperando repartidor",
-        "En entrega",
-    )
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1512,49 +1354,6 @@ private fun AdminSectionScreen(
                 title = panelTitle,
                 text = panelText,
             )
-        }
-        items(orderDetailEntries) { entry ->
-            AdminOperationLiveCardView(
-                card = AdminOperationalLiveCard(
-                    icon = "Ord",
-                    title = entry.label,
-                    countLabel = "Pedido detectado",
-                    detail = entry.note,
-                    priority = "Prioridad operativa",
-                    tension = "Abrir lectura completa",
-                ),
-                onClick = { onOrderDetail(entry) },
-            )
-        }
-        if (allowStoreProfile) {
-            item {
-                AdminOperationLiveCardView(
-                    card = AdminOperationalLiveCard(
-                        icon = "Loc",
-                        title = "Local operativo",
-                        countLabel = "Lectura de local",
-                        detail = "Estado operativo del local relacionado",
-                        priority = "Prioridad media",
-                        tension = "Contexto comercial",
-                    ),
-                    onClick = { onOperationalProfile(AdminOperationalProfileKind.Store) },
-                )
-            }
-        }
-        if (allowDriverProfile) {
-            item {
-                AdminOperationLiveCardView(
-                    card = AdminOperationalLiveCard(
-                        icon = "Drv",
-                        title = "Repartidor operativo",
-                        countLabel = "Lectura de repartidor",
-                        detail = "Estado operativo del repartidor relacionado",
-                        priority = "Prioridad media",
-                        tension = "Contexto de entrega",
-                    ),
-                    onClick = { onOperationalProfile(AdminOperationalProfileKind.Driver) },
-                )
-            }
         }
         if (root == AdminRoot.Configuration) {
             item {
@@ -1764,8 +1563,6 @@ private fun AdminOrderDetailScreen(
     detail: AdminOrderDetail?,
     operationMessage: String,
     operationError: String,
-    onOpenStore: () -> Unit,
-    onOpenDriver: () -> Unit,
     onLoadDetail: (String) -> Unit,
     onAction: (String, AdminOrderAction) -> Unit,
 ) {
@@ -1988,108 +1785,6 @@ private fun AdminActionCard(title: String, note: String, onClick: () -> Unit) {
     }
 }
 
-@Composable
-private fun AdminOrderSolveScreen(stage: OperationSolveStage, onNext: (OperationSolveStage) -> Unit) {
-    val content = when (stage) {
-        OperationSolveStage.Start -> SolveStageContent(
-            title = "Solucionar",
-            summary = "Inicio de revisión para este pedido.",
-            panelTitle = "Contexto",
-            panelText = "El pedido requiere intervención y revisión de impacto antes de cualquier acción operativa.",
-            actionTitle = "Ver opciones",
-            actionNote = "Abrí las alternativas de resolución disponibles en esta etapa.",
-            next = OperationSolveStage.Options,
-        )
-        OperationSolveStage.Options -> SolveStageContent(
-            title = "Opciones",
-            summary = "Elegí una línea de trabajo para este caso.",
-            panelTitle = "Opciones de resolución",
-            panelText = "Acción recomendada: Revisar respuesta pendiente. Acciones secundarias: Marcar para seguimiento. Excepción Admin: Intervención excepcional.",
-            actionTitle = "Continuar",
-            actionNote = "Revisá la acción sensible antes del resultado.",
-            next = OperationSolveStage.SensitiveAction,
-        )
-        OperationSolveStage.SensitiveAction -> SolveStageContent(
-            title = "Acción sensible",
-            summary = "Revisión previa de impacto.",
-            panelTitle = "Impacto",
-            panelText = "Esta representación muestra qué cambiaría en operación y qué quedaría sin cambios. No ejecuta modificaciones reales.",
-            actionTitle = "Confirmar visualmente",
-            actionNote = "Pasá al resultado representado.",
-            next = OperationSolveStage.Result,
-        )
-        OperationSolveStage.Result -> SolveStageContent(
-            title = "Resultado",
-            summary = "Cierre de la secuencia guiada.",
-            panelTitle = "Resultado preparado",
-            panelText = "La revisión quedó lista para volver al pedido y continuar el seguimiento operativo.",
-            actionTitle = "Reiniciar recorrido",
-            actionNote = "Revisar nuevamente el flujo de solución.",
-            next = OperationSolveStage.Start,
-        )
-    }
-
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp)
-            .padding(bottom = adminBottomBarReservedPadding),
-        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            AdminHeader(title = content.title, eyebrow = "Operación", summary = content.summary, onSignOut = {}, showSignOut = false)
-        }
-        item {
-            AdminInfoPanel(title = content.panelTitle, text = content.panelText)
-        }
-        item {
-            AdminActionCard(title = content.actionTitle, note = content.actionNote, onClick = { onNext(content.next) })
-        }
-    }
-}
-private data class SolveStageContent(
-    val title: String,
-    val summary: String,
-    val panelTitle: String,
-    val panelText: String,
-    val actionTitle: String,
-    val actionNote: String,
-    val next: OperationSolveStage,
-)
-
-@Composable
-private fun AdminOperationalProfileScreen(kind: AdminOperationalProfileKind, state: String) {
-    val title = if (kind == AdminOperationalProfileKind.Store) "Local operativo" else "Repartidor operativo"
-    val context = if (kind == AdminOperationalProfileKind.Store) {
-        "Este estado se usa para seguimiento operativo del local sin cambiar su configuración ni productos."
-    } else {
-        "Este estado se usa para seguimiento operativo del repartidor."
-    }
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp)
-            .padding(bottom = adminBottomBarReservedPadding),
-        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            AdminHeader(title = title, eyebrow = "Operación", summary = "Seguimiento operativo concreto.", onSignOut = {}, showSignOut = false)
-        }
-        item { AdminInfoPanel(title = "Estado", text = state) }
-        item { AdminInfoPanel(title = "Contexto", text = context) }
-        item {
-            AdminDisabledActionCard(
-                title = "Acción no disponible desde esta vista",
-                note = "Esta vista es de lectura y seguimiento.",
-            )
-        }
-    }
-}
-
 private fun AdminRoute.root(): AdminRoot = when (this) {
     AdminRoute.Operation -> AdminRoot.Operation
     AdminRoute.Configuration -> AdminRoot.Configuration
@@ -2098,8 +1793,6 @@ private fun AdminRoute.root(): AdminRoot = when (this) {
     is AdminRoute.OperationView -> AdminRoot.Operation
     is AdminRoute.OperationList -> AdminRoot.Operation
     is AdminRoute.OperationOrderDetail -> AdminRoot.Operation
-    is AdminRoute.OperationOrderSolve -> AdminRoot.Operation
-    is AdminRoute.OperationOperationalProfile -> AdminRoot.Operation
     is AdminRoute.ConfigurationSection -> AdminRoot.Configuration
     is AdminRoute.ConfigurationSubsection -> AdminRoot.Configuration
     is AdminRoute.ConfigurationConvergence -> AdminRoot.Configuration
