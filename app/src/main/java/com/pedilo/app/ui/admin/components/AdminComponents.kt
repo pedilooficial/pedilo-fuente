@@ -123,15 +123,14 @@ fun AdminBottomBar(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        AdminBottomItem("Moto", "Operación", selected = current == AdminRoot.Operation, onClick = onOperation, modifier = Modifier.weight(1f))
-        AdminBottomItem("Cfg", "Configuración", selected = current == AdminRoot.Configuration, onClick = onConfiguration, modifier = Modifier.weight(1f))
-        AdminBottomItem("Rol", "Alta de roles", selected = current == AdminRoot.RoleAccess, onClick = onRoleAccess, modifier = Modifier.weight(1f))
+        AdminBottomItem("Operación", selected = current == AdminRoot.Operation, onClick = onOperation, modifier = Modifier.weight(1f))
+        AdminBottomItem("Configuración", selected = current == AdminRoot.Configuration, onClick = onConfiguration, modifier = Modifier.weight(1f))
+        AdminBottomItem("Alta de roles", selected = current == AdminRoot.RoleAccess, onClick = onRoleAccess, modifier = Modifier.weight(1f))
     }
 }
 
 @Composable
 private fun AdminBottomItem(
-    icon: String,
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
@@ -148,16 +147,6 @@ private fun AdminBottomItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
     ) {
-        Text(
-            icon,
-            color = if (selected) PediloOrange else PediloMuted,
-            fontSize = 12.sp,
-            lineHeight = 13.sp,
-            fontWeight = FontWeight.Black,
-            maxLines = 1,
-            overflow = TextOverflow.Clip,
-            textAlign = TextAlign.Center,
-        )
         Text(
             label,
             color = if (selected) PediloOrange else PediloMuted,

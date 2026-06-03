@@ -22,6 +22,12 @@ function readAdminSourceTree() {
   return files.map((file) => fs.readFileSync(file, "utf8")).join("\n");
 }
 
+function readVisibleAdminStrings() {
+  return [...readAdminSourceTree().matchAll(/"([^"\\]*(?:\\.[^"\\]*)*)"/g)]
+    .map((match) => match[1])
+    .join("\n");
+}
+
 test("admin role opens visual admin shell instead of empty placeholder", () => {
   const appSource = fs.readFileSync(app, "utf8");
   const adminSource = fs.readFileSync(admin, "utf8");
@@ -47,18 +53,19 @@ test("admin operation root exposes visual operation cards only", () => {
 
   [
     "Pedidos del día",
-    "Universo de pedidos",
+    "Pedidos",
     "Repartidores",
-    "Locales activos",
+    "Locales",
   ].forEach((label) => assert.match(source, new RegExp(label)));
-  assert.match(source, /Resumen operativo de hoy/);
+  assert.match(source, /Resumen de hoy/);
   assert.match(source, /En vivo/);
   assert.match(source, /AdminOperationUniverseCard/);
   assert.match(source, /onOpenUniverse/);
-  assert.match(source, /Dato pendiente/);
+  assert.match(source, /Aún no hay información real/);
   assert.match(source, /AdminTodaySummaryCard/);
   assert.doesNotMatch(source, /Mesa Operativa Viva|Necesitan atención|Finalizados recientes|Capas de lectura/);
-  assert.match(source, /AdminBottomItem\("Moto", "Operación"/);
+  assert.match(source, /AdminBottomItem\("Operación"/);
+  assert.doesNotMatch(source, /"Moto"|"Cfg"|"Rol"/);
 });
 
 test("admin operation routes expose explicit hierarchy levels", () => {
@@ -87,7 +94,7 @@ test("admin operation internal screens expose planned operation subworlds", () =
     "Esperando repartidor",
     "En entrega",
     "Local no responde",
-    "Reclamo de la persona usuaria",
+    "Reclamo de cliente",
     "Demorados",
     "Sin responsable",
     "En servicio",
@@ -103,18 +110,18 @@ test("admin remaining operation roots use safe visual copy", () => {
   const source = readAdminSourceTree();
 
   [
-    "Pedidos esperando respuesta del local.",
-    "Pedidos en preparación.",
-    "Pedidos listos para reparto.",
-    "Pedidos en camino.",
+    "Necesitan respuesta del local.",
+    "El local está preparando.",
+    "Listos para asignar o retirar.",
+    "Ya están camino al destino.",
     "Pedidos detenidos por falta de respuesta",
-    "Casos iniciados por aviso de la persona usuaria",
+    "Casos avisados por el cliente",
     "Repartidores conectados.",
-    "Repartidores listos para tomar pedidos.",
-    "Repartidores con señal de revisión.",
+    "Listos para tomar pedidos.",
+    "Necesitan revisión.",
     "Locales recibiendo pedidos.",
-    "Locales con operación detenida.",
-    "Locales con ritmo afectado.",
+    "Operación detenida.",
+    "Ritmo afectado.",
   ].forEach((label) => assert.match(source, new RegExp(label)));
 });
 
@@ -128,6 +135,27 @@ test("admin order universe exposes dynamic views and filtered lists", () => {
   assert.match(source, /forOperationList/);
   assert.match(source, /returnRoute = AdminRoute\.OperationList/);
   assert.doesNotMatch(source, /TodayOrdersCategory|TodayOrdersSubsection/);
+});
+
+test("admin operation visible strings avoid internal architecture copy", () => {
+  const visible = readVisibleAdminStrings();
+
+  [
+    "Vista dinámica",
+    "Listado filtrado",
+    "Entidad central",
+    "Lecturas dinámicas",
+    "El pedido no vive en una carpeta fija",
+    "Datos operativos reales",
+    "Lectura preparada para datos operativos reales",
+    "Abrir listados filtrados",
+    "Sin tensión operativa",
+    "Dato pendiente",
+    "No hay núcleo real conectado",
+    "Pedido Vivo Universal",
+  ].forEach((text) => assert.doesNotMatch(visible, new RegExp(text)));
+
+  assert.doesNotMatch(visible, /\bmock\b|\bdemo\b|\bsample\b|\bplaceholder\b/i);
 });
 
 test("admin shell reserves safe area for system navigation", () => {
@@ -354,17 +382,14 @@ test("admin order detail exposes Pedido #____ read-only ficha with real-data fal
   assert.match(source, /"Pedido #____"/);
   assert.match(source, /AdminOrderDetailScreen/);
   [
-    "Ficha operativa read-only del pedido",
-    "Número visible",
-    "Tracking",
-    "ID público",
-    "ID interno",
+    "Qué pasa con este pedido",
+    "Estado general",
     "Estado actual",
-    "Estado público",
-    "Persona usuaria",
-    "Teléfono/contacto",
+    "Situación",
+    "Persona / cliente",
+    "Teléfono",
     "Dirección",
-    "Resumen",
+    "Pedido",
     "Local / origen",
     "Total",
     "Forma de pago",
@@ -372,7 +397,9 @@ test("admin order detail exposes Pedido #____ read-only ficha with real-data fal
     "Última actualización",
     "Problemas / demoras",
     "Historial operativo",
-    "Sin dato disponible",
+    "Opciones",
+    "Sin acciones disponibles por ahora",
+    "Aún no hay información real",
     "Aún no registrado",
     "Historial operativo aún no disponible",
   ].forEach((label) => assert.match(source, new RegExp(label)));
