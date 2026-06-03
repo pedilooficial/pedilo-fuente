@@ -176,6 +176,15 @@ private data class AdminOperationalLiveCard(
     val tension: String,
 )
 
+private data class AdminOperationSubcard(
+    val icon: String,
+    val title: String,
+    val value: String,
+    val detail: String,
+    val tone: AdminOperationMetricTone,
+    val onClick: () -> Unit,
+)
+
 internal data class AdminOrderDetailEntry(
     val label: String,
     val note: String,
@@ -503,7 +512,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             is AdminRoute.ConfigurationSection -> AdminRoute.Configuration
             is AdminRoute.OperationOrderDetail -> current.returnRoute
             is AdminRoute.OperationList -> AdminRoute.OperationView(current.universe, current.view)
-            is AdminRoute.OperationView -> AdminRoute.OperationUniverse(current.universe)
+            is AdminRoute.OperationView -> AdminRoute.Operation
             is AdminRoute.OperationUniverse -> AdminRoute.Operation
             is AdminRoute.Section -> when (current.root) {
                 AdminRoot.Operation -> AdminRoute.Operation
@@ -847,17 +856,20 @@ private fun AdminOperationUniverseScreen(
         item {
             AdminInfoPanel(title = universe.contextTitle, text = universe.contextText)
         }
-        items(universe.views) { view ->
-            AdminOperationLiveCardView(
-                card = AdminOperationalLiveCard(
-                    icon = operationIconFor(view.title),
-                    title = view.title,
-                    countLabel = operationViewCountLabel(view, orders),
-                    detail = view.summary,
-                    priority = "Abrir",
-                    tension = view.lists.joinToString(" · ") { it.title },
-                ),
-                onClick = { onView(view) },
+        item {
+            AdminOperationMotherCard(
+                title = universe.title,
+                summary = operationUniverseSummary(universe, orders),
+                subcards = universe.views.map { view ->
+                    AdminOperationSubcard(
+                        icon = operationIconFor(view.title),
+                        title = view.title,
+                        value = operationViewCountLabel(view, orders),
+                        detail = operationViewStateLabel(view, orders),
+                        tone = operationToneFor(view, orders),
+                        onClick = { onView(view) },
+                    )
+                },
             )
         }
     }
@@ -889,19 +901,19 @@ private fun AdminOperationViewScreen(
             )
         }
         item {
-            AdminInfoPanel(title = view.contextTitle, text = view.contextText)
-        }
-        items(view.lists) { list ->
-            AdminOperationLiveCardView(
-                card = AdminOperationalLiveCard(
-                    icon = operationIconFor(list.title),
-                    title = list.title,
-                    countLabel = operationListCountLabel(list, orders),
-                    detail = operationListDetailLabel(list, orders),
-                    priority = "Revisar",
-                    tension = operationListTensionLabel(list, orders),
-                ),
-                onClick = { onList(list) },
+            AdminOperationMotherCard(
+                title = view.contextTitle,
+                summary = operationViewSummary(view, orders),
+                subcards = view.lists.map { list ->
+                    AdminOperationSubcard(
+                        icon = operationIconFor(list.title),
+                        title = list.title,
+                        value = operationListCountLabel(list, orders),
+                        detail = operationListTensionLabel(list, orders),
+                        tone = operationToneFor(list, orders),
+                        onClick = { onList(list) },
+                    )
+                },
             )
         }
     }
@@ -942,14 +954,14 @@ private fun AdminOperationListScreen(
             )
         }
         items(orderEntries) { entry ->
-            AdminOperationLiveCardView(
+            AdminOperationOrderCard(
                 card = AdminOperationalLiveCard(
                     icon = "Ord",
                     title = entry.label,
-                    countLabel = "Ver estado",
+                    countLabel = entry.note.substringBefore(" · "),
                     detail = entry.note,
-                    priority = "Pedido",
-                    tension = "Ver estado",
+                    priority = "",
+                    tension = "",
                 ),
                 onClick = { onOrderDetail(entry) },
             )
@@ -990,64 +1002,131 @@ private fun AdminOperationDeskScreen(
             )
         }
         item {
-            AdminOperationHomeBlock(title = "Pedidos") {
-                orderViews.forEach { view ->
-                    AdminOperationUniverseCard(
+            AdminOperationMotherCard(
+                title = "Pedidos",
+                summary = operationUniverseSummary(orderUniverse, orders),
+                subcards = orderViews.map { view ->
+                    AdminOperationSubcard(
+                        icon = operationIconFor(view.title),
                         title = view.title,
-                        note = view.summary,
                         value = operationViewCountLabel(view, orders),
+                        detail = operationViewStateLabel(view, orders),
                         tone = operationToneFor(view, orders),
                         onClick = { onOpenView(view.title) },
                     )
-                }
-            }
+                },
+            )
         }
         item {
-            AdminOperationHomeBlock(title = "Repartidores") {
-                driverView.lists.forEach { list ->
-                    AdminOperationUniverseCard(
+            AdminOperationMotherCard(
+                title = "Repartidores",
+                summary = "Aún no hay información real",
+                subcards = driverView.lists.map { list ->
+                    AdminOperationSubcard(
+                        icon = operationIconFor(list.title),
                         title = list.title,
-                        note = list.summary,
                         value = operationListCountLabel(list, orders),
+                        detail = list.emptyText,
                         tone = AdminOperationMetricTone.Neutral,
                         onClick = { onOpenList(AdminOperationUniverseKey.Drivers, driverView.title, list.title) },
                     )
-                }
-            }
+                },
+            )
         }
         item {
-            AdminOperationHomeBlock(title = "Locales") {
-                storeView.lists.forEach { list ->
-                    AdminOperationUniverseCard(
+            AdminOperationMotherCard(
+                title = "Locales",
+                summary = "Aún no hay información real",
+                subcards = storeView.lists.map { list ->
+                    AdminOperationSubcard(
+                        icon = operationIconFor(list.title),
                         title = list.title,
-                        note = list.summary,
                         value = operationListCountLabel(list, orders),
+                        detail = list.emptyText,
                         tone = AdminOperationMetricTone.Neutral,
                         onClick = { onOpenList(AdminOperationUniverseKey.Stores, storeView.title, list.title) },
                     )
-                }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun AdminOperationMotherCard(
+    title: String,
+    summary: String,
+    subcards: List<AdminOperationSubcard>,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .pediloCardDepth(RoundedCornerShape(16.dp))
+            .background(PediloCardBrush, RoundedCornerShape(16.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.62f), RoundedCornerShape(16.dp))
+            .padding(13.dp),
+        verticalArrangement = Arrangement.spacedBy(11.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(title, color = PediloText, fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.ExtraBold)
+            Text(summary, color = PediloMuted, fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Bold)
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            subcards.forEach { subcard ->
+                AdminOperationSubcardView(subcard)
             }
         }
     }
 }
 
 @Composable
-private fun AdminOperationHomeBlock(
-    title: String,
-    content: @Composable () -> Unit,
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+private fun AdminOperationSubcardView(subcard: AdminOperationSubcard) {
+    val toneColor = subcard.tone.operationToneColor()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(PediloPanel.copy(alpha = 0.88f), RoundedCornerShape(12.dp))
+            .border(1.dp, toneColor.copy(alpha = 0.34f), RoundedCornerShape(12.dp))
+            .clickable(role = Role.Button, onClick = subcard.onClick)
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(9.dp))
+                .background(toneColor.copy(alpha = 0.16f), RoundedCornerShape(9.dp))
+                .border(1.dp, toneColor.copy(alpha = 0.38f), RoundedCornerShape(9.dp))
+                .padding(horizontal = 8.dp, vertical = 5.dp),
+        ) {
+            Text(subcard.icon, color = toneColor, fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.ExtraBold)
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(subcard.title, color = PediloText, fontSize = 14.sp, lineHeight = 17.sp, fontWeight = FontWeight.ExtraBold)
+            Text(
+                subcard.detail,
+                color = PediloMuted,
+                fontSize = 11.sp,
+                lineHeight = 14.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         Text(
-            text = title,
-            color = PediloText,
-            fontSize = 18.sp,
-            lineHeight = 22.sp,
+            subcard.value,
+            color = toneColor,
+            fontSize = 11.sp,
+            lineHeight = 14.sp,
             fontWeight = FontWeight.ExtraBold,
+            textAlign = TextAlign.End,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
-        content()
     }
 }
 
@@ -1096,7 +1175,7 @@ private fun AdminOperationMetricTone.operationToneColor(): Color =
         AdminOperationMetricTone.Neutral -> PediloOrange
         AdminOperationMetricTone.Healthy -> PediloGreen
         AdminOperationMetricTone.Warning -> PediloWarning
-        AdminOperationMetricTone.Danger -> PediloOrange
+        AdminOperationMetricTone.Danger -> PediloWarning
     }
 
 private fun adminOrderVisibleNumber(
@@ -1132,21 +1211,56 @@ private fun operationIconFor(title: String): String =
         "Finalizados" -> "Ok"
         "Cancelados" -> "X"
         "Demorados", "Con demoras" -> "R"
-        "Repartidores" -> "Drv"
+        "Esperando local" -> "Loc"
+        "Preparando" -> "Prep"
+        "Esperando repartidor", "En servicio", "Disponibles" -> "Rep"
+        "En entrega" -> "Ent"
+        "Local no responde" -> "Loc"
+        "Reclamo de cliente" -> "Cli"
+        "Sin responsable" -> "Resp"
+        "Operando" -> "On"
+        "Pausados" -> "Off"
+        "Repartidores" -> "Rep"
         "Locales" -> "Loc"
         else -> "•"
     }
 
+private fun operationUniverseSummary(universe: AdminOperationUniverse, orders: List<AdminOrderSummary>): String {
+    val count = universe.views.flatMap { it.lists }.sumOf { orders.forOperationList(it.kind).size }
+    if (universe.key != AdminOperationUniverseKey.Orders) return "Aún no hay información real"
+    return if (count == 0) "Sin pedidos por ahora" else "$count pedidos"
+}
+
+private fun operationViewSummary(view: AdminOperationView, orders: List<AdminOrderSummary>): String {
+    val count = view.lists.sumOf { orders.forOperationList(it.kind).size }
+    return if (count == 0) {
+        if (view.title == "Pedidos con problemas") "Sin casos por ahora" else "Sin pedidos por ahora"
+    } else {
+        "$count pedidos"
+    }
+}
+
+private fun operationViewStateLabel(view: AdminOperationView, orders: List<AdminOrderSummary>): String {
+    val count = view.lists.sumOf { orders.forOperationList(it.kind).size }
+    return when {
+        count == 0 && view.title == "Pedidos con problemas" -> "Sin casos por ahora"
+        count == 0 -> "Sin pedidos por ahora"
+        view.title == "Pedidos con problemas" -> "Prioridad"
+        view.title == "Pedidos activos" -> "En curso"
+        else -> "Hoy"
+    }
+}
+
 private fun operationViewCountLabel(view: AdminOperationView, orders: List<AdminOrderSummary>): String {
     if (view.lists.none { it.kind.isOrderList() }) return "Aún no hay información real"
     val count = view.lists.sumOf { orders.forOperationList(it.kind).size }
-    return if (count == 0) "Sin pedidos por ahora" else "$count pedidos"
+    return if (count == 0) "0" else count.toString()
 }
 
 private fun operationListCountLabel(list: AdminOperationList, orders: List<AdminOrderSummary>): String {
     val count = orders.forOperationList(list.kind).size
     if (!list.kind.isOrderList()) return "Aún no hay información real"
-    return if (count == 0) list.emptyText else "$count pedidos"
+    return if (count == 0) "0" else count.toString()
 }
 
 private fun operationListDetailLabel(list: AdminOperationList, orders: List<AdminOrderSummary>): String {
@@ -1180,6 +1294,62 @@ private fun operationToneFor(view: AdminOperationView, orders: List<AdminOrderSu
         view.title == "Pedidos con problemas" -> AdminOperationMetricTone.Danger
         view.title == "Pedidos activos" -> AdminOperationMetricTone.Healthy
         else -> AdminOperationMetricTone.Neutral
+    }
+}
+
+private fun operationToneFor(list: AdminOperationList, orders: List<AdminOrderSummary>): AdminOperationMetricTone {
+    val count = orders.forOperationList(list.kind).size
+    return when {
+        count == 0 -> AdminOperationMetricTone.Neutral
+        list.kind in setOf(
+            AdminOperationListKind.TodayWithProblems,
+            AdminOperationListKind.ProblemStoreNotResponding,
+            AdminOperationListKind.ProblemUserClaim,
+            AdminOperationListKind.ProblemDelayed,
+            AdminOperationListKind.ProblemWithoutResponsible,
+        ) -> AdminOperationMetricTone.Danger
+        list.kind in setOf(
+            AdminOperationListKind.TodayFinished,
+            AdminOperationListKind.StoreOperating,
+            AdminOperationListKind.DriverAvailable,
+        ) -> AdminOperationMetricTone.Healthy
+        list.kind in setOf(
+            AdminOperationListKind.TodayCancelled,
+            AdminOperationListKind.ActiveWaitingStore,
+            AdminOperationListKind.ActiveWaitingDriver,
+            AdminOperationListKind.StorePaused,
+            AdminOperationListKind.StoreDelayed,
+            AdminOperationListKind.DriverWithIncidents,
+        ) -> AdminOperationMetricTone.Warning
+        else -> AdminOperationMetricTone.Neutral
+    }
+}
+
+@Composable
+private fun AdminOperationOrderCard(
+    card: AdminOperationalLiveCard,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(PediloPanel, RoundedCornerShape(14.dp))
+            .border(1.dp, PediloLine.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(13.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(card.title, color = PediloText, fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.ExtraBold)
+            Text(card.icon, color = PediloOrange, fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.ExtraBold)
+        }
+        Text(card.countLabel, color = PediloText, fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold)
+        Text(card.detail, color = PediloMuted, fontSize = 12.sp, lineHeight = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 

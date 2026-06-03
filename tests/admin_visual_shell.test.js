@@ -186,7 +186,7 @@ test("admin relies on native back and only shows sign out on operation root", ()
   assert.match(source, /BackHandler\(enabled = route !is AdminRoute\.Operation/);
   assert.match(source, /is AdminRoute\.OperationOrderDetail -> current\.returnRoute/);
   assert.match(source, /is AdminRoute\.OperationList -> AdminRoute\.OperationView/);
-  assert.match(source, /is AdminRoute\.OperationView -> AdminRoute\.OperationUniverse/);
+  assert.match(source, /is AdminRoute\.OperationView -> AdminRoute\.Operation/);
   assert.match(source, /is AdminRoute\.OperationUniverse -> AdminRoute\.Operation/);
   forbiddenReturnLabels.forEach((label) => assert.doesNotMatch(source, new RegExp(`"${label}"`)));
   assert.match(source, /showSignOut = true/);
