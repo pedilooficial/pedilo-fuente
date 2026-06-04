@@ -395,28 +395,47 @@ test("admin role access convergence flow is available and restricted to visual m
 });
 
 test("admin order detail exposes Pedido #____ read-only ficha with real-data fallbacks", () => {
-  const source = readAdminSourceTree();
+  const source =
+    readAdminSourceTree() +
+    fs.readFileSync("app/src/main/java/com/pedilo/app/core/model/AdminOperationOrderClassification.kt", "utf8");
+  const adminSource = fs.readFileSync(admin, "utf8");
+  const detailScreen = adminSource.slice(
+    adminSource.indexOf("private fun AdminOrderDetailScreen"),
+    adminSource.indexOf("private fun AdminOrderMomentPanel"),
+  );
   const forbiddenTitles = ["Pedido vivo", "Detalle del pedido", "Resolución del pedido"];
+  const forbiddenOrderCopy = [
+    "Qué pasa con este pedido",
+    "Estado general",
+    "Estado actual",
+    "Situación",
+    "Local / origen",
+    "Origen técnico",
+    "Pedido de local",
+    "Retirar en local",
+    "Qué hay que hacer",
+    "Qué necesita este pedido",
+  ];
 
   assert.match(source, /OperationOrderDetail/);
   assert.match(source, /OperationOrderVariant/);
   assert.match(source, /"Pedido #____"/);
   assert.match(source, /AdminOrderDetailScreen/);
   [
-    "Qué pasa con este pedido",
-    "Estado general",
-    "Estado actual",
-    "Situación",
-    "Persona / cliente",
-    "Teléfono",
-    "Dirección",
+    "Compra solicitada",
+    "Retiro solicitado",
+    "Retiro de local",
+    "Comprar y entregar",
+    "Retirar y entregar",
+    "Persona",
     "Pedido",
-    "Local / origen",
+    "Local",
+    "Retiro",
+    "Entrega",
     "Total",
-    "Forma de pago",
-    "Creado",
-    "Última actualización",
-    "Problemas / demoras",
+    "Pago",
+    "Tiempos",
+    "Problemas",
     "Historial operativo",
     "Opciones",
     "Sin acciones disponibles por ahora",
@@ -425,6 +444,7 @@ test("admin order detail exposes Pedido #____ read-only ficha with real-data fal
     "Sin dato",
     "—",
   ].forEach((label) => assert.match(source, new RegExp(label)));
+  forbiddenOrderCopy.forEach((label) => assert.doesNotMatch(detailScreen, new RegExp(label)));
   forbiddenTitles.forEach((title) => assert.doesNotMatch(source, new RegExp(`"${title}"`)));
 });
 

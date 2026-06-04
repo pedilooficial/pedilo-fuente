@@ -62,6 +62,15 @@ object AdminOperationOrderClassification {
     const val SOURCE_PUBLIC_PLUS_PICKUP_SHIPPING = "public_plus_pickup_shipping"
     const val SOURCE_PUBLIC_APP = "public_app"
 
+    const val IDENTITY_PLUS_BUY = "Compra solicitada"
+    const val IDENTITY_PLUS_PICKUP = "Retiro solicitado"
+    const val IDENTITY_LOCAL_PICKUP = "Retiro de local"
+    const val IDENTITY_OPERATIONAL_ORDER = "Pedido operativo"
+
+    const val FUNCTION_BUY_AND_DELIVER = "Comprar y entregar"
+    const val FUNCTION_PICKUP_AND_DELIVER = "Retirar y entregar"
+    const val FUNCTION_REVIEW_ORDER = "Revisar pedido"
+
     fun todayBucket(signals: AdminOperationOrderSignals): AdminTodayOrdersBucket? {
         if (hasRealCancellationSignal(signals)) return AdminTodayOrdersBucket.CANCELLED
         if (hasRealFinishedSignal(signals)) return AdminTodayOrdersBucket.FINISHED
@@ -88,13 +97,21 @@ object AdminOperationOrderClassification {
         return null
     }
 
-    fun sourceLabel(source: String, requestType: String = ""): String =
-        when (source.trim()) {
-            SOURCE_PUBLIC_LOCAL -> "Pedido de local"
-            SOURCE_PUBLIC_PLUS_BUY -> "Botón + Comprar"
-            SOURCE_PUBLIC_PLUS_PICKUP_SHIPPING -> "Botón + Retiro / Envío"
-            SOURCE_PUBLIC_APP -> "App pública (legado)"
-            else -> if (source.isBlank()) "Origen no informado" else source
+    fun operationalIdentity(source: String, requestType: String = ""): String =
+        when {
+            source.trim() == SOURCE_PUBLIC_LOCAL -> IDENTITY_LOCAL_PICKUP
+            source.trim() == SOURCE_PUBLIC_PLUS_BUY || requestType.trim() == "buy" -> IDENTITY_PLUS_BUY
+            source.trim() == SOURCE_PUBLIC_PLUS_PICKUP_SHIPPING ||
+                requestType.trim() == "pickup_shipping" -> IDENTITY_PLUS_PICKUP
+            else -> IDENTITY_OPERATIONAL_ORDER
+        }
+
+    fun operationalFunction(source: String, requestType: String = ""): String =
+        when (operationalIdentity(source, requestType)) {
+            IDENTITY_PLUS_BUY -> FUNCTION_BUY_AND_DELIVER
+            IDENTITY_PLUS_PICKUP,
+            IDENTITY_LOCAL_PICKUP -> FUNCTION_PICKUP_AND_DELIVER
+            else -> FUNCTION_REVIEW_ORDER
         }
 
     fun hasRealActiveSignal(signals: AdminOperationOrderSignals): Boolean =

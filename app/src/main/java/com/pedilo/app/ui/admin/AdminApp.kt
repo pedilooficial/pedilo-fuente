@@ -42,8 +42,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pedilo.app.core.model.AdminActiveOrdersBucket
-import com.pedilo.app.core.model.AdminOrderAction
-import com.pedilo.app.core.model.AdminOrderActionRequest
 import com.pedilo.app.core.model.AdminOperationOrderClassification
 import com.pedilo.app.core.model.AdminOperationOrderSignals
 import com.pedilo.app.core.model.AdminOrderDetail
@@ -51,13 +49,11 @@ import com.pedilo.app.core.model.AdminOrderSummary
 import com.pedilo.app.core.model.AdminProblemOrdersBucket
 import com.pedilo.app.core.model.AdminTodayOrdersBucket
 import com.pedilo.app.core.result.CoreResult
-import com.pedilo.app.core.result.CoreError
 import com.pedilo.app.core.runtime.adminOrdersUseCase
 import com.pedilo.app.ui.admin.components.AdminBottomBar
 import com.pedilo.app.ui.admin.components.AdminEntryCard
 import com.pedilo.app.ui.admin.components.AdminHeader
 import com.pedilo.app.ui.admin.components.AdminInfoPanel
-import com.pedilo.app.ui.components.PediloTextField
 import com.pedilo.app.ui.publicuser.PediloBg
 import com.pedilo.app.ui.publicuser.PediloCardBrush
 import com.pedilo.app.ui.publicuser.PediloGreen
@@ -442,8 +438,6 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
     var showSignOut by remember { mutableStateOf(false) }
     var readOnlyOrders by remember { mutableStateOf<List<AdminOrderSummary>>(emptyList()) }
     var readOnlyOrderDetails by remember { mutableStateOf<Map<String, AdminOrderDetail>>(emptyMap()) }
-    var pendingAction by remember { mutableStateOf<Pair<String, AdminOrderAction>?>(null) }
-    var pendingReason by remember { mutableStateOf("") }
     var operationMessage by remember { mutableStateOf("") }
     var operationError by remember { mutableStateOf("") }
     val adminOrders = remember { adminOrdersUseCase() }
@@ -600,12 +594,6 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                         }
                     }
                 },
-                onAction = { orderId, action ->
-                    operationMessage = ""
-                    operationError = ""
-                    pendingReason = ""
-                    pendingAction = orderId to action
-                },
             )
             is AdminRoute.ConfigurationSection -> AdminConfigurationSectionScreen(
                 section = current.section,
@@ -692,64 +680,6 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
         )
     }
 
-    pendingAction?.let { (orderId, action) ->
-        AlertDialog(
-            onDismissRequest = { pendingAction = null },
-            title = { Text(action.label) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(action.impact)
-                    if (action.requiresReason) {
-                        PediloTextField(
-                            value = pendingReason,
-                            onValueChange = { pendingReason = it },
-                            label = "Motivo operativo",
-                            singleLine = false,
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val reason = pendingReason
-                        pendingAction = null
-                        scope.launch {
-                            val request = AdminOrderActionRequest(
-                                orderId = orderId,
-                                action = action,
-                                reason = reason,
-                                forcedStatus = "under_review",
-                                responsibleRole = "admin",
-                            )
-                            when (val result = adminOrders.execute(request)) {
-                                is CoreResult.Success -> {
-                                    operationMessage = result.value.humanMessage.ifBlank { result.value.eventSummary }
-                                    operationError = ""
-                                    when (val detail = adminOrders.getDetail(orderId)) {
-                                        is CoreResult.Success -> readOnlyOrderDetails = readOnlyOrderDetails + (orderId to detail.value)
-                                        is CoreResult.Failure -> Unit
-                                    }
-                                }
-                                is CoreResult.Failure -> {
-                                    operationMessage = ""
-                                    operationError = (result.error as? CoreError.Operational)?.humanMessage
-                                        ?: "No pudimos ejecutar la acción."
-                                }
-                            }
-                        }
-                    },
-                ) {
-                    Text("Confirmar")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingAction = null }) {
-                    Text("Cancelar")
-                }
-            },
-        )
-    }
 }
 
 @Composable
@@ -1152,6 +1082,76 @@ private fun AdminOrderDetail?.adminPersonName(): String =
 
 private fun Long?.adminMillisValue(): String =
     this?.let { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("es", "AR")).format(Date(it)) } ?: "Aún no registrado"
+
+private fun adminOrderProblemFocus(
+    variant: OperationOrderVariant,
+    publicStatus: String,
+    operationalStatus: String,
+    needsAttention: Boolean,
+    activeIncident: Boolean,
+): Pair<String, String>? {
+    val statusText = "$publicStatus $operationalStatus"
+    return when {
+        statusText.contains("local no responde", ignoreCase = true) ||
+            statusText.contains("sin respuesta", ignoreCase = true) -> "Local sin respuesta" to "Requiere revisión"
+        statusText.contains("demora", ignoreCase = true) ||
+            statusText.contains("retras", ignoreCase = true) -> "Demorado" to "Requiere revisión"
+        activeIncident -> "Incidencia registrada" to "Requiere revisión"
+        needsAttention || variant == OperationOrderVariant.WithProblem -> "Requiere revisión" to "Necesita atención operativa"
+        variant == OperationOrderVariant.NeedsAttention -> "Esperando respuesta" to "Requiere seguimiento"
+        else -> null
+    }
+}
+
+private fun adminOrderDetailSections(
+    identity: String,
+    detail: AdminOrderDetail?,
+    storeName: String,
+    total: String,
+    createdAt: Long?,
+): List<Pair<String, List<Pair<String, String>>>> {
+    val person = listOf("Persona" to detail.adminPersonName())
+    val order = listOf("Detalle" to detail?.itemsSummary.adminItemsSummary())
+    val pickup = listOf("Lugar de retiro" to storeName.adminDisplayValue("Aún no registrado"))
+    val store = listOf("Local" to storeName.adminDisplayValue("Aún no registrado"))
+    val delivery = listOf("Entrega" to "Aún no registrado")
+    val payment = listOf("Total" to total.adminDisplayValue("Aún no registrado"))
+    val times = listOf(
+        "Creado" to createdAt.adminMillisValue(),
+        "Última actualización" to detail?.updatedAtMillis.adminMillisValue(),
+    )
+    return when (identity) {
+        AdminOperationOrderClassification.IDENTITY_PLUS_BUY -> listOf(
+            "Pedido" to order,
+            "Persona" to person,
+            "Entrega" to delivery,
+            "Pago" to payment,
+            "Tiempos" to times,
+        )
+        AdminOperationOrderClassification.IDENTITY_PLUS_PICKUP -> listOf(
+            "Retiro" to pickup,
+            "Persona" to person,
+            "Entrega" to delivery,
+            "Pago" to payment,
+            "Tiempos" to times,
+        )
+        AdminOperationOrderClassification.IDENTITY_LOCAL_PICKUP -> listOf(
+            "Local" to store,
+            "Persona" to person,
+            "Pedido" to order,
+            "Entrega" to delivery,
+            "Pago" to payment,
+            "Tiempos" to times,
+        )
+        else -> listOf(
+            "Pedido" to order,
+            "Persona" to person,
+            "Entrega" to delivery,
+            "Pago" to payment,
+            "Tiempos" to times,
+        )
+    }
+}
 
 private fun operationIconFor(title: String): String =
     when (title) {
@@ -1610,7 +1610,6 @@ private fun AdminOrderDetailScreen(
     operationMessage: String,
     operationError: String,
     onLoadDetail: (String) -> Unit,
-    onAction: (String, AdminOrderAction) -> Unit,
 ) {
     orderId?.let { LaunchedEffect(it) { onLoadDetail(it) } }
     val visibleNumber = adminOrderVisibleNumber(summary, detail, orderId)
@@ -1618,20 +1617,22 @@ private fun AdminOrderDetailScreen(
     val requestType = detail?.requestType ?: summary?.requestType.orEmpty()
     val status = detail?.status ?: summary?.status.orEmpty()
     val publicStatus = detail?.publicStatus ?: summary?.publicStatus.orEmpty()
-    val responsible = detail?.responsibleRole ?: summary?.responsibleRole.orEmpty()
-    val priority = detail?.priority ?: summary?.priority.orEmpty()
     val operationalStatus = detail?.operationalStatus ?: summary?.operationalStatus.orEmpty()
     val needsAttention = detail?.needsAttention ?: summary?.needsAttention ?: false
     val activeIncident = detail?.activeIncident ?: summary?.activeIncident ?: false
     val createdAt = detail?.createdAtMillis ?: summary?.createdAtMillis
     val total = detail?.total ?: summary?.total.orEmpty()
     val storeName = detail?.storeName ?: summary?.storeName.orEmpty()
-    val trackingNumber = detail?.trackingNumber ?: summary?.trackingNumber.orEmpty()
-    val publicOrderNumber = detail?.publicOrderNumber ?: summary?.publicOrderNumber.orEmpty()
-    val statusDisplay = publicStatus.ifBlank { status.adminHumanStatusValue() }
-    val situationDisplay = operationalStatus.adminHumanStatusValue("Esperando respuesta del local")
-    val priorityDisplay = priority.adminPriorityValue()
-    val delaySignal = variant == OperationOrderVariant.NeedsAttention || variant == OperationOrderVariant.WithProblem
+    val identity = AdminOperationOrderClassification.operationalIdentity(source, requestType)
+    val operationFunction = AdminOperationOrderClassification.operationalFunction(source, requestType)
+    val problemFocus = adminOrderProblemFocus(
+        variant = variant,
+        publicStatus = publicStatus,
+        operationalStatus = operationalStatus,
+        needsAttention = needsAttention,
+        activeIncident = activeIncident,
+    )
+    val problemText = problemFocus?.let { "${it.first}\n${it.second}" } ?: "Sin problemas registrados."
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1645,19 +1646,16 @@ private fun AdminOrderDetailScreen(
             AdminHeader(
                 title = "Pedido $visibleNumber",
                 eyebrow = "Operación",
-                summary = "Qué pasa con este pedido.",
+                summary = identity,
                 onSignOut = {},
                 showSignOut = false,
             )
         }
         item {
-            AdminOrderStatusPanel(
-                variant = variant,
-                operationalStatus = operationalStatus,
-                responsibleRole = responsible,
-                priority = priority,
-                needsAttention = needsAttention,
-                activeIncident = activeIncident,
+            AdminOrderMomentPanel(
+                title = problemFocus?.first ?: identity,
+                detail = problemFocus?.second ?: operationFunction,
+                highlighted = problemFocus != null,
             )
         }
         if (operationMessage.isNotBlank()) {
@@ -1666,67 +1664,19 @@ private fun AdminOrderDetailScreen(
         if (operationError.isNotBlank()) {
             item { AdminInfoPanel(title = "Error operativo", text = operationError) }
         }
-        item {
-            AdminOrderFactPanel(
-                facts = listOf(
-                    "Estado actual" to statusDisplay,
-                    "Situación" to situationDisplay,
-                    "Responsable" to responsible.adminDisplayValue("Sin responsable"),
-                    "Prioridad" to priorityDisplay,
-                ),
-            )
-        }
-        item {
-            AdminOrderFactPanel(
-                facts = listOf(
-                    "Persona / cliente" to detail.adminPersonName(),
-                    "Teléfono" to "—",
-                    "Dirección" to "—",
-                ),
-            )
-        }
-        item {
-            AdminOrderFactPanel(
-                facts = listOf(
-                    "Pedido" to detail?.itemsSummary.adminItemsSummary(),
-                    "Observaciones" to "—",
-                ),
-            )
-        }
-        item {
-            AdminOrderFactPanel(
-                facts = listOf(
-                    "Local / origen" to storeName.adminDisplayValue(),
-                    "Origen" to AdminOperationOrderClassification.sourceLabel(source, requestType),
-                ),
-            )
-        }
-        item {
-            AdminOrderFactPanel(
-                facts = listOf(
-                    "Total" to total.adminDisplayValue(),
-                    "Forma de pago" to "—",
-                    "Estado de pago" to "—",
-                ),
-            )
-        }
-        item {
-            AdminOrderFactPanel(
-                facts = listOf(
-                    "Creado" to createdAt.adminMillisValue(),
-                    "Última actualización" to detail?.updatedAtMillis.adminMillisValue(),
-                ),
-            )
+        adminOrderDetailSections(
+            identity = identity,
+            detail = detail,
+            storeName = storeName,
+            total = total,
+            createdAt = createdAt,
+        ).forEach { section ->
+            item { AdminOrderFactPanel(title = section.first, facts = section.second) }
         }
         item {
             AdminInfoPanel(
-                title = "Problemas / demoras",
-                text = when {
-                    activeIncident -> "Incidencia operativa registrada."
-                    needsAttention -> "El pedido requiere atención operativa."
-                    delaySignal -> "Requiere revisión."
-                    else -> "Sin problemas registrados."
-                },
+                title = "Problemas",
+                text = problemText,
             )
         }
         item {
@@ -1745,25 +1695,11 @@ private fun AdminOrderDetailScreen(
 }
 
 @Composable
-private fun AdminOrderStatusPanel(
-    variant: OperationOrderVariant,
-    operationalStatus: String,
-    responsibleRole: String,
-    priority: String,
-    needsAttention: Boolean,
-    activeIncident: Boolean,
+private fun AdminOrderMomentPanel(
+    title: String,
+    detail: String,
+    highlighted: Boolean,
 ) {
-    val situation = operationalStatus.adminHumanStatusValue()
-    val priorityText = priority.adminPriorityValue()
-    val (status, detail) = when {
-        activeIncident -> "Con incidencia" to "Hay una incidencia operativa activa."
-        needsAttention -> "Necesita atención" to "El pedido requiere seguimiento operativo."
-        else -> when (variant) {
-            OperationOrderVariant.WithProblem -> "Requiere revisión" to "Este pedido necesita atención."
-            OperationOrderVariant.NeedsAttention -> "Esperando respuesta" to "Hace falta respuesta para seguir."
-            else -> "En curso" to "Estado disponible para revisar."
-        }
-    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1772,21 +1708,13 @@ private fun AdminOrderStatusPanel(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Estado general", color = PediloMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        Text(status, color = PediloOrange, fontSize = 22.sp, lineHeight = 26.sp, fontWeight = FontWeight.ExtraBold)
+        Text(title, color = if (highlighted) PediloOrange else PediloText, fontSize = 22.sp, lineHeight = 26.sp, fontWeight = FontWeight.ExtraBold)
         Text(detail, color = PediloText, fontSize = 14.sp, lineHeight = 20.sp)
-        Text(
-            "Situación: $situation · Responsable: ${responsibleRole.ifBlank { "Sin responsable" }} · Prioridad: $priorityText",
-            color = PediloMuted,
-            fontSize = 12.sp,
-            lineHeight = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
     }
 }
 
 @Composable
-private fun AdminOrderFactPanel(facts: List<Pair<String, String>>) {
+private fun AdminOrderFactPanel(title: String, facts: List<Pair<String, String>>) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1795,6 +1723,7 @@ private fun AdminOrderFactPanel(facts: List<Pair<String, String>>) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        Text(title, color = PediloText, fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.ExtraBold)
         facts.forEach { (label, value) ->
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(label, color = PediloMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)

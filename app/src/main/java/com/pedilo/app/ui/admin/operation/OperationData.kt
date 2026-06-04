@@ -114,12 +114,14 @@ internal fun orderDetailEntriesFor(
         else -> OperationOrderVariant.Normal
     }
     return orders.map {
-        val sourceLabel = AdminOperationOrderClassification.sourceLabel(it.source, it.requestType)
-        val status = it.publicStatus.ifBlank { "Pedido recibido" }
-        val origin = it.storeName.ifBlank { sourceLabel }
+        val identity = AdminOperationOrderClassification.operationalIdentity(it.source, it.requestType)
+        val function = AdminOperationOrderClassification.operationalFunction(it.source, it.requestType)
+        val secondary = it.storeName.ifBlank { function }
         AdminOrderDetailEntry(
             label = if (it.trackingNumber.isNotBlank()) "Pedido #${it.trackingNumber}" else "Pedido #____",
-            note = "$status · $origin",
+            note = listOf(identity, function, secondary)
+                .distinct()
+                .joinToString(" · "),
             variant = variant,
             realOrderId = it.id,
         )

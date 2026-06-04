@@ -64,18 +64,26 @@ function activeBucket(s) {
   return "WAITING_STORE";
 }
 
-function sourceLabel(source) {
-  switch (String(source || "").trim()) {
-    case "public_local":
-      return "Pedido de local";
-    case "public_plus_buy":
-      return "Botón + Comprar";
-    case "public_plus_pickup_shipping":
-      return "Botón + Retiro / Envío";
-    case "public_app":
-      return "App pública (legado)";
+function operationalIdentity(source, requestType = "") {
+  const cleanSource = String(source || "").trim();
+  const cleanRequest = String(requestType || "").trim();
+  if (cleanSource === "public_local") return "Retiro de local";
+  if (cleanSource === "public_plus_buy" || cleanRequest === "buy") return "Compra solicitada";
+  if (cleanSource === "public_plus_pickup_shipping" || cleanRequest === "pickup_shipping") {
+    return "Retiro solicitado";
+  }
+  return "Pedido operativo";
+}
+
+function operationalFunction(source, requestType = "") {
+  switch (operationalIdentity(source, requestType)) {
+    case "Compra solicitada":
+      return "Comprar y entregar";
+    case "Retiro solicitado":
+    case "Retiro de local":
+      return "Retirar y entregar";
     default:
-      return source ? source : "Origen no informado";
+      return "Revisar pedido";
   }
 }
 
@@ -137,10 +145,18 @@ test("without problem signal does not map to Con problemas", () => {
   assert.equal(hasRealProblemSignal(s), false);
 });
 
-test("source labels identify public flows", () => {
-  assert.equal(sourceLabel("public_local"), "Pedido de local");
-  assert.equal(sourceLabel("public_plus_buy"), "Botón + Comprar");
-  assert.equal(sourceLabel("public_plus_pickup_shipping"), "Botón + Retiro / Envío");
+test("operational labels translate public flows into human identities", () => {
+  const source = read(classifierPath);
+
+  assert.match(source, /operationalIdentity/);
+  assert.match(source, /operationalFunction/);
+  assert.equal(operationalIdentity("public_local"), "Retiro de local");
+  assert.equal(operationalIdentity("public_plus_buy"), "Compra solicitada");
+  assert.equal(operationalIdentity("public_plus_pickup_shipping"), "Retiro solicitado");
+  assert.equal(operationalFunction("public_plus_buy"), "Comprar y entregar");
+  assert.equal(operationalFunction("public_plus_pickup_shipping"), "Retirar y entregar");
+  assert.equal(operationalFunction("public_local"), "Retirar y entregar");
+  assert.doesNotMatch(source, /Pedido de local|Botón \+ Comprar|Botón \+ Retiro|Origen técnico/);
 });
 
 test("legacy created without publicStatus stays unmapped conservatively", () => {
