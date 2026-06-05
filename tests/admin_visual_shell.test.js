@@ -192,7 +192,7 @@ test("admin shell reserves safe area for system navigation", () => {
   const source = readAdminSourceTree();
 
   assert.match(source, /navigationBarsPadding\(\)/);
-  assert.match(source, /adminBottomBarReservedPadding = 112\.dp/);
+  assert.match(source, /adminBottomBarReservedPadding = 128\.dp/);
   assert.match(source, /adminContentBottomPadding = 24\.dp/);
   assert.match(source, /padding\(bottom = adminBottomBarReservedPadding\)/);
   assert.match(source, /contentPadding = PaddingValues\(top = 18\.dp, bottom = adminContentBottomPadding\)/);
@@ -215,9 +215,10 @@ test("admin relies on native back and only shows sign out on operation root", ()
 
 test("admin configuration and role access roots expose their planned entries", () => {
   const source = readAdminSourceTree();
-  const configuration = fs.readFileSync(
-    "app/src/main/java/com/pedilo/app/ui/admin/configuration/ConfigurationData.kt",
-    "utf8",
+  const adminSource = fs.readFileSync(admin, "utf8");
+  const configuration = adminSource.slice(
+    adminSource.indexOf("private val configurationSections"),
+    adminSource.indexOf("private val roleAccessSections"),
   );
 
   [
@@ -253,9 +254,11 @@ test("admin configuration and role access roots expose their planned entries", (
   ].forEach((label) => assert.doesNotMatch(configuration, new RegExp(`"${label}"`)));
 
   assert.deepEqual(
-    [...configuration.matchAll(/^    "([^"]+)",$/gm)].map((match) => match[1]),
+    [...configuration.matchAll(/configurationSection\(\s*\n\s*"([^"]+)"/g)].map((match) => match[1]),
     ["Público", "Locales", "Reparto", "Marketplace", "Pedidos", "Precios", "Cobros", "Mensajes", "Reglas", "Notificaciones", "Métricas", "Auditoría", "Emergencias", "General"],
   );
+  assert.match(adminSource, /private val configurationEntries = configurationSections\.map/);
+  assert.match(adminSource, /AdminRoute\.ConfigurationSection\(configurationSections\.first \{ it\.title == entry\.title \}\)/);
 });
 
 test("admin configuration exposes internal visual sections without operational mixing", () => {
@@ -336,20 +339,54 @@ test("admin configuration exposes internal visual sections without operational m
 
 test("admin configuration convergence flow is available and remains visual only", () => {
   const source = fs.readFileSync(admin, "utf8");
+  const configurationFlow = source.slice(
+    source.indexOf("private fun AdminConfigurationConvergenceScreen"),
+    source.indexOf("private fun AdminOrderDetailScreen"),
+  );
   [
-    "Entidad configurable",
-    "Editor",
-    "Preview y revisión",
+    "Detalle de configuración",
+    "Preparar cambio",
+    "Previsualización",
     "Impacto",
     "Confirmación sensible",
     "Resultado",
     "Auditoría visual",
-    "No se aplicaron cambios reales",
+    "El cambio permanece sin confirmar",
   ].forEach((label) => assert.match(source, new RegExp(label)));
 
   assert.match(source, /AdminConfigurationConvergenceScreen/);
   assert.match(source, /AdminConfigurationConvergenceStep/);
   assert.match(source, /onConfigurationConvergence/);
+  assert.match(source, /current\.section\.title == "Auditoría"[\s\S]*AdminConfigurationConvergenceStep\.Audit/);
+  assert.match(configurationFlow, /AdminConfigurationConvergenceStep\.Audit -> "Consulta de trazabilidad sin edición\."/);
+  assert.doesNotMatch(configurationFlow, /No se aplicaron cambios reales|Entidad configurable|Preview y revisión/);
+});
+
+test("admin configuration keeps specialized roots within their final responsibilities", () => {
+  const source = fs.readFileSync(admin, "utf8");
+  const configuration = source.slice(
+    source.indexOf("private val configurationSections"),
+    source.indexOf("private val roleAccessSections"),
+  );
+  const block = (title, nextTitle) => configuration.slice(
+    configuration.indexOf(`"${title}"`),
+    configuration.indexOf(`"${nextTitle}"`),
+  );
+  const locales = block("Locales", "Reparto");
+  const metrics = block("Métricas", "Auditoría");
+  const audit = block("Auditoría", "Emergencias");
+  const emergencies = block("Emergencias", "General");
+  const general = configuration.slice(configuration.indexOf('"General"'));
+
+  assert.match(locales, /Catálogo del local/);
+  assert.match(locales, /Productos y variantes/);
+  assert.match(metrics, /Criterios de lectura, ranking y visibilidad/);
+  assert.doesNotMatch(metrics, /inventar|editar resultado|cargar resultado/i);
+  assert.match(audit, /consulta|trazabilidad/i);
+  assert.match(audit, /no se edita ni se borra/i);
+  assert.match(emergencies, /Contingencias controladas y auditables/);
+  assert.match(emergencies, /Registro posterior/);
+  assert.doesNotMatch(general, /Catálogo del local|Precios comerciales|Formas de pago|Mensajes por estado|Eventos notificables|Registro de cambios|Modo seguro/);
 });
 
 test("admin role access exposes internal visual sections without touching real users", () => {

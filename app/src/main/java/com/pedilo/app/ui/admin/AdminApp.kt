@@ -248,7 +248,7 @@ private data class AdminRoleAccessSection(
     val entries: List<AdminEntry>,
 )
 
-private val adminBottomBarReservedPadding = 112.dp
+private val adminBottomBarReservedPadding = 128.dp
 private val adminContentBottomPadding = 24.dp
 
 private fun configurationSection(
@@ -351,6 +351,10 @@ private val configurationSections = listOf(
         "Pendientes globales" to "Revisión transversal", "Derivación al bloque dueño" to "Ruta responsable",
     ),
 )
+
+private val configurationEntries = configurationSections.map {
+    AdminEntry(it.title, "Abrir tablero")
+}
 
 private val roleAccessSections = listOf(
     AdminRoleAccessSection(
@@ -545,9 +549,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             AdminRoute.Configuration -> AdminConfigurationHomeScreen(
                 entries = configurationEntries,
                 onEntry = { entry ->
-                    configurationSections.firstOrNull { it.title == entry.title }?.let {
-                        route = AdminRoute.ConfigurationSection(it)
-                    }
+                    route = AdminRoute.ConfigurationSection(configurationSections.first { it.title == entry.title })
                 },
             )
             AdminRoute.RoleAccess -> AdminRootScreen(
@@ -625,9 +627,9 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             is AdminRoute.ConfigurationSubsection -> AdminSectionScreen(
                 root = AdminRoot.Configuration,
                 title = current.title,
-                summary = "Subsección lista para revisión administrativa.",
+                summary = current.section.entries.first { it.title == current.title }.note,
                 panelTitle = current.section.title,
-                panelText = "Este espacio organiza criterios sin editar datos, publicar cambios ni ejecutar acciones reales.",
+                panelText = "Revisá el detalle, prepará cambios y evaluá su impacto antes de confirmar.",
                 onConfigurationConvergence = {
                     route = AdminRoute.ConfigurationConvergence(
                         section = current.section.title,
@@ -1537,7 +1539,7 @@ private fun AdminSectionScreen(
         if (root == AdminRoot.Configuration) {
             item {
                 AdminEntryCard(
-                    entry = AdminEntry("Entidad configurable", "Abrir flujo de revisión del cambio"),
+                    entry = AdminEntry("Abrir revisión", "Ver detalle y preparar el cambio"),
                     onClick = onConfigurationConvergence,
                 )
             }
@@ -1657,9 +1659,9 @@ private fun AdminConfigurationConvergenceScreen(
     onNext: (AdminConfigurationConvergenceStep) -> Unit,
 ) {
     val title = when (step) {
-        AdminConfigurationConvergenceStep.Entity -> "Entidad configurable"
-        AdminConfigurationConvergenceStep.Editor -> "Editor"
-        AdminConfigurationConvergenceStep.Preview -> "Preview y revisión"
+        AdminConfigurationConvergenceStep.Entity -> "Detalle de configuración"
+        AdminConfigurationConvergenceStep.Editor -> "Preparar cambio"
+        AdminConfigurationConvergenceStep.Preview -> "Previsualización"
         AdminConfigurationConvergenceStep.Impact -> "Impacto"
         AdminConfigurationConvergenceStep.SensitiveConfirmation -> "Confirmación sensible"
         AdminConfigurationConvergenceStep.Result -> "Resultado"
@@ -1680,7 +1682,7 @@ private fun AdminConfigurationConvergenceScreen(
         AdminConfigurationConvergenceStep.Preview -> "Comparación conceptual del cambio.\nTodavía no está aplicado en la app real."
         AdminConfigurationConvergenceStep.Impact -> "Qué cambia, qué afecta y qué no cambia.\nSolo lectura de impacto, sin aplicación."
         AdminConfigurationConvergenceStep.SensitiveConfirmation -> "Confirmación humana del alcance y advertencias.\nEl botón de confirmar es solo visual en este bloque."
-        AdminConfigurationConvergenceStep.Result -> "La revisión quedó preparada para una etapa posterior.\nNo se aplicaron cambios reales."
+        AdminConfigurationConvergenceStep.Result -> "La revisión quedó preparada.\nEl cambio permanece sin confirmar."
         AdminConfigurationConvergenceStep.Audit -> "Registro preparado para buscar, filtrar y consultar.\nNo se edita ni se borra."
     }
     val action = when (step) {
