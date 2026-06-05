@@ -495,10 +495,25 @@ test("admin orders board removes repeated summaries and exposes useful hierarchy
   assert.match(source, /prominentValue = orders\.size\.toString\(\)/);
   assert.match(source, /summary = "Movimiento operativo"/);
   assert.match(source, /preview = orderDetailEntriesFor/);
+  assert.match(source, /operationViewOrders\(view, orders\)\.size/);
+  assert.match(source, /\.distinctBy \{ it\.id \}/);
+  assert.match(source, /createdAtMillis\.isAdminToday\(\)/);
+  assert.match(source, /val todaySignals = signals\.filter/);
   assert.doesNotMatch(viewScreen, /AdminOperationMotherCard/);
   assert.doesNotMatch(listScreen, /AdminInfoPanel/);
   assert.match(listScreen, /operationCompactTitle\(list\.title\)/);
   assert.match(listScreen, /entry\.note\.substringAfter/);
+});
+
+test("admin operation universe avoids explanatory mockup panels", () => {
+  const source = fs.readFileSync(admin, "utf8");
+  const universeScreen = source.slice(
+    source.indexOf("private fun AdminOperationUniverseScreen"),
+    source.indexOf("private fun AdminOperationViewScreen"),
+  );
+
+  assert.doesNotMatch(universeScreen, /AdminInfoPanel/);
+  assert.doesNotMatch(source, /Elegí qué parte de los pedidos/);
 });
 
 test("admin visual shell keeps non-operational actions and avoids writes", () => {

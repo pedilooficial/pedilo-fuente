@@ -8,7 +8,6 @@ enum class AdminTodayOrdersBucket {
     ACTIVE,
     FINISHED,
     CANCELLED,
-    DELAYED,
     WITH_PROBLEMS,
 }
 
@@ -72,16 +71,15 @@ object AdminOperationOrderClassification {
     const val FUNCTION_REVIEW_ORDER = "Revisar pedido"
 
     fun todayBucket(signals: AdminOperationOrderSignals): AdminTodayOrdersBucket? {
+        if (hasRealProblemSignal(signals)) return AdminTodayOrdersBucket.WITH_PROBLEMS
         if (hasRealCancellationSignal(signals)) return AdminTodayOrdersBucket.CANCELLED
         if (hasRealFinishedSignal(signals)) return AdminTodayOrdersBucket.FINISHED
-        if (hasRealDelaySignal(signals)) return AdminTodayOrdersBucket.DELAYED
-        if (hasRealProblemSignal(signals)) return AdminTodayOrdersBucket.WITH_PROBLEMS
-        if (hasRealActiveSignal(signals)) return AdminTodayOrdersBucket.ACTIVE
+        if (hasNormalActiveSignal(signals)) return AdminTodayOrdersBucket.ACTIVE
         return null
     }
 
     fun activeBucket(signals: AdminOperationOrderSignals): AdminActiveOrdersBucket? {
-        if (!hasRealActiveSignal(signals)) return null
+        if (!hasNormalActiveSignal(signals)) return null
         if (hasRealPreparingSignal(signals)) return AdminActiveOrdersBucket.PREPARING
         if (hasRealWaitingDriverSignal(signals)) return AdminActiveOrdersBucket.WAITING_DRIVER
         if (hasRealInDeliverySignal(signals)) return AdminActiveOrdersBucket.IN_DELIVERY
@@ -138,14 +136,27 @@ object AdminOperationOrderClassification {
             hasRealDelaySignal(signals) ||
             hasRealWithoutResponsibleSignal(signals)
 
+    fun hasNormalActiveSignal(signals: AdminOperationOrderSignals): Boolean =
+        hasRealActiveSignal(signals) && !hasRealProblemSignal(signals)
+
     fun hasRealWaitingStoreSignal(signals: AdminOperationOrderSignals): Boolean =
-        hasRealActiveSignal(signals)
+        signals.operationalStatus.contains("esperando local", ignoreCase = true) ||
+            signals.operationalStatus.contains("waiting_store", ignoreCase = true)
 
-    fun hasRealPreparingSignal(signals: AdminOperationOrderSignals): Boolean = false
+    fun hasRealPreparingSignal(signals: AdminOperationOrderSignals): Boolean =
+        signals.publicStatus.contains("preparando", ignoreCase = true) ||
+            signals.operationalStatus.contains("preparando", ignoreCase = true) ||
+            signals.operationalStatus.contains("preparing", ignoreCase = true)
 
-    fun hasRealWaitingDriverSignal(signals: AdminOperationOrderSignals): Boolean = false
+    fun hasRealWaitingDriverSignal(signals: AdminOperationOrderSignals): Boolean =
+        signals.publicStatus.contains("esperando repartidor", ignoreCase = true) ||
+            signals.operationalStatus.contains("esperando repartidor", ignoreCase = true) ||
+            signals.operationalStatus.contains("waiting_driver", ignoreCase = true)
 
-    fun hasRealInDeliverySignal(signals: AdminOperationOrderSignals): Boolean = false
+    fun hasRealInDeliverySignal(signals: AdminOperationOrderSignals): Boolean =
+        signals.publicStatus.contains("en entrega", ignoreCase = true) ||
+            signals.operationalStatus.contains("en entrega", ignoreCase = true) ||
+            signals.operationalStatus.contains("in_delivery", ignoreCase = true)
 
     fun hasRealStoreNotRespondingSignal(signals: AdminOperationOrderSignals): Boolean =
         signals.publicStatus.contains("local no responde", ignoreCase = true) ||

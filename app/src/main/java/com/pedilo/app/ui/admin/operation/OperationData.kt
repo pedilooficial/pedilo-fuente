@@ -14,9 +14,9 @@ internal val operationUniverses = listOf(
     AdminOperationUniverse(
         key = AdminOperationUniverseKey.Orders,
         title = "Pedidos",
-        summary = "Revisá el movimiento y los casos que necesitan atención.",
+        summary = "Movimiento operativo.",
         contextTitle = "Pedidos",
-        contextText = "Elegí qué parte de los pedidos querés revisar.",
+        contextText = "Estado actual de pedidos.",
         views = listOf(
             AdminOperationView(
                 title = "Pedidos del día",
@@ -67,11 +67,11 @@ internal val operationUniverses = listOf(
                 title = "Repartidores",
                 summary = "Estado del equipo de reparto.",
                 contextTitle = "Estado de reparto",
-                contextText = "Aún no hay información real.",
+                contextText = "Sin datos.",
                 lists = listOf(
-                    AdminOperationList("En servicio", "Repartidores conectados.", "Aún no hay información real.", AdminOperationListKind.DriverInService),
-                    AdminOperationList("Disponibles", "Listos para tomar pedidos.", "Aún no hay información real.", AdminOperationListKind.DriverAvailable),
-                    AdminOperationList("Con incidencias", "Necesitan revisión.", "Aún no hay información real.", AdminOperationListKind.DriverWithIncidents),
+                    AdminOperationList("En servicio", "Repartidores conectados.", "Sin datos.", AdminOperationListKind.DriverInService),
+                    AdminOperationList("Disponibles", "Listos para tomar pedidos.", "Sin datos.", AdminOperationListKind.DriverAvailable),
+                    AdminOperationList("Con incidencias", "Necesitan revisión.", "Sin datos.", AdminOperationListKind.DriverWithIncidents),
                 ),
             ),
         ),
@@ -87,11 +87,11 @@ internal val operationUniverses = listOf(
                 title = "Locales",
                 summary = "Estado de los locales activos.",
                 contextTitle = "Estado de locales",
-                contextText = "Aún no hay información real.",
+                contextText = "Sin datos.",
                 lists = listOf(
-                    AdminOperationList("Operando", "Locales recibiendo pedidos.", "Aún no hay información real.", AdminOperationListKind.StoreOperating),
-                    AdminOperationList("Pausados", "Operación detenida.", "Aún no hay información real.", AdminOperationListKind.StorePaused),
-                    AdminOperationList("Con demoras", "Ritmo afectado.", "Aún no hay información real.", AdminOperationListKind.StoreDelayed),
+                    AdminOperationList("Operando", "Locales recibiendo pedidos.", "Sin datos.", AdminOperationListKind.StoreOperating),
+                    AdminOperationList("Pausados", "Operación detenida.", "Sin datos.", AdminOperationListKind.StorePaused),
+                    AdminOperationList("Con demoras", "Ritmo afectado.", "Sin datos.", AdminOperationListKind.StoreDelayed),
                 ),
             ),
         ),

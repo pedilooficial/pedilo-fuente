@@ -65,6 +65,7 @@ import com.pedilo.app.ui.publicuser.PediloPanelSoft
 import com.pedilo.app.ui.publicuser.PediloText
 import com.pedilo.app.ui.publicuser.PediloWarning
 import com.pedilo.app.ui.publicuser.pediloCardDepth
+import java.util.Calendar
 import kotlinx.coroutines.launch
 
 enum class AdminRoot(val label: String) {
@@ -770,9 +771,6 @@ private fun AdminOperationUniverseScreen(
             )
         }
         item {
-            AdminInfoPanel(title = universe.contextTitle, text = universe.contextText)
-        }
-        item {
             AdminOperationMotherCard(
                 title = universe.title,
                 summary = operationUniverseSummary(universe, orders),
@@ -1165,7 +1163,12 @@ private fun operationUniverseSummary(universe: AdminOperationUniverse, orders: L
 }
 
 private fun operationViewOrderCount(view: AdminOperationView, orders: List<AdminOrderSummary>): Int =
-    view.lists.sumOf { orders.forOperationList(it.kind).size }
+    operationViewOrders(view, orders).size
+
+private fun operationViewOrders(view: AdminOperationView, orders: List<AdminOrderSummary>): List<AdminOrderSummary> =
+    view.lists
+        .flatMap { orders.forOperationList(it.kind) }
+        .distinctBy { it.id }
 
 private fun operationViewStateLabel(view: AdminOperationView, orders: List<AdminOrderSummary>): String {
     val count = operationViewOrderCount(view, orders)
@@ -1179,7 +1182,7 @@ private fun operationViewStateLabel(view: AdminOperationView, orders: List<Admin
 }
 
 private fun operationViewCountLabel(view: AdminOperationView, orders: List<AdminOrderSummary>): String {
-    if (view.lists.none { it.kind.isOrderList() }) return "Aún no hay información real"
+    if (view.lists.none { it.kind.isOrderList() }) return "—"
     val count = operationViewOrderCount(view, orders)
     return if (count == 0) "0" else count.toString()
 }
@@ -1207,7 +1210,7 @@ private fun operationListTensionLabel(list: AdminOperationList, orders: List<Adm
 }
 
 private fun operationToneFor(view: AdminOperationView, orders: List<AdminOrderSummary>): AdminOperationMetricTone {
-    val count = view.lists.sumOf { orders.forOperationList(it.kind).size }
+    val count = operationViewOrderCount(view, orders)
     return when {
         count == 0 -> AdminOperationMetricTone.Neutral
         view.title == "Pedidos con problemas" -> AdminOperationMetricTone.Danger
@@ -1840,7 +1843,8 @@ private fun AdminRoute.root(): AdminRoot = when (this) {
 }
 
 private fun List<AdminOrderSummary>.todayOrders(): Map<AdminTodayOrdersBucket, List<AdminOrderSummary>> {
-    val ordersWithSignals = map { order -> order to AdminOperationOrderSignals.from(order) }
+    val ordersWithSignals = filter { it.createdAtMillis.isAdminToday() }
+        .map { order -> order to AdminOperationOrderSignals.from(order) }
     return ordersWithSignals
         .mapNotNull { (order, signals) ->
             AdminOperationOrderClassification.todayBucket(signals)?.let { it to order }
@@ -1868,17 +1872,18 @@ private fun List<AdminOrderSummary>.problemOrders(): Map<AdminProblemOrdersBucke
 
 private fun List<AdminOrderSummary>.forOperationList(kind: AdminOperationListKind): List<AdminOrderSummary> {
     val signals = this.map { it to AdminOperationOrderSignals.from(it) }
+    val todaySignals = signals.filter { (order, _) -> order.createdAtMillis.isAdminToday() }
     return when (kind) {
-        AdminOperationListKind.TodayActive -> signals.filter { (_, s) ->
+        AdminOperationListKind.TodayActive -> todaySignals.filter { (_, s) ->
             AdminOperationOrderClassification.todayBucket(s) == AdminTodayOrdersBucket.ACTIVE
         }.map { it.first }
-        AdminOperationListKind.TodayFinished -> signals.filter { (_, s) ->
+        AdminOperationListKind.TodayFinished -> todaySignals.filter { (_, s) ->
             AdminOperationOrderClassification.todayBucket(s) == AdminTodayOrdersBucket.FINISHED
         }.map { it.first }
-        AdminOperationListKind.TodayCancelled -> signals.filter { (_, s) ->
+        AdminOperationListKind.TodayCancelled -> todaySignals.filter { (_, s) ->
             AdminOperationOrderClassification.todayBucket(s) == AdminTodayOrdersBucket.CANCELLED
         }.map { it.first }
-        AdminOperationListKind.TodayWithProblems -> signals.filter { (_, s) ->
+        AdminOperationListKind.TodayWithProblems -> todaySignals.filter { (_, s) ->
             AdminOperationOrderClassification.todayBucket(s) == AdminTodayOrdersBucket.WITH_PROBLEMS
         }.map { it.first }
         AdminOperationListKind.ActiveWaitingStore -> signals.filter { (_, s) ->
@@ -1907,6 +1912,15 @@ private fun List<AdminOrderSummary>.forOperationList(kind: AdminOperationListKin
         }.map { it.first }
         else -> emptyList()
     }
+}
+
+private fun Long?.isAdminToday(): Boolean {
+    if (this == null) return false
+    val now = Calendar.getInstance()
+    val date = Calendar.getInstance().apply { timeInMillis = this@isAdminToday }
+    return now.get(Calendar.ERA) == date.get(Calendar.ERA) &&
+        now.get(Calendar.YEAR) == date.get(Calendar.YEAR) &&
+        now.get(Calendar.DAY_OF_YEAR) == date.get(Calendar.DAY_OF_YEAR)
 }
 
 private fun AdminOperationListKind.isOrderList(): Boolean =

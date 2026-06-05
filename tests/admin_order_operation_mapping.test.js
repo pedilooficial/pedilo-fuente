@@ -16,6 +16,10 @@ function signals(overrides = {}) {
   return {
     status: "",
     publicStatus: "",
+    operationalStatus: "",
+    responsibleRole: "admin",
+    needsAttention: false,
+    activeIncident: false,
     source: "",
     requestType: "",
     ...overrides,
@@ -41,27 +45,51 @@ function hasRealFinishedSignal(s) {
   return ["delivered", "closed", "archived"].includes(normalizedStatus(s.status));
 }
 
-function hasRealDelaySignal() {
-  return false;
+function includes(value, term) {
+  return String(value || "").toLowerCase().includes(term);
+}
+
+function hasRealDelaySignal(s) {
+  return includes(s.publicStatus, "demora") || includes(s.publicStatus, "retras") ||
+    includes(s.operationalStatus, "demora") || includes(s.operationalStatus, "retras");
 }
 
 function hasRealProblemSignal(s) {
-  const ps = String(s.publicStatus || "");
-  return ps.toLowerCase().includes("reclamo") || ps.toLowerCase().includes("problema");
+  return s.activeIncident || s.needsAttention || includes(s.publicStatus, "reclamo") ||
+    includes(s.publicStatus, "problema") || includes(s.operationalStatus, "local no responde") ||
+    includes(s.operationalStatus, "sin respuesta") || hasRealDelaySignal(s) ||
+    (hasRealActiveSignal(s) && String(s.responsibleRole || "").trim() === "");
+}
+
+function hasNormalActiveSignal(s) {
+  return hasRealActiveSignal(s) && !hasRealProblemSignal(s);
 }
 
 function todayBucket(s) {
+  if (hasRealProblemSignal(s)) return "WITH_PROBLEMS";
   if (hasRealCancellationSignal(s)) return "CANCELLED";
   if (hasRealFinishedSignal(s)) return "FINISHED";
-  if (hasRealDelaySignal(s)) return "DELAYED";
-  if (hasRealProblemSignal(s)) return "WITH_PROBLEMS";
-  if (hasRealActiveSignal(s)) return "ACTIVE";
+  if (hasNormalActiveSignal(s)) return "ACTIVE";
   return null;
 }
 
 function activeBucket(s) {
-  if (!hasRealActiveSignal(s)) return null;
-  return "WAITING_STORE";
+  if (!hasNormalActiveSignal(s)) return null;
+  if (includes(s.operationalStatus, "preparando")) return "PREPARING";
+  if (includes(s.operationalStatus, "esperando repartidor")) return "WAITING_DRIVER";
+  if (includes(s.operationalStatus, "en entrega")) return "IN_DELIVERY";
+  if (includes(s.operationalStatus, "esperando local")) return "WAITING_STORE";
+  return null;
+}
+
+function problemBucket(s) {
+  if (includes(s.operationalStatus, "local no responde") || includes(s.operationalStatus, "sin respuesta")) {
+    return "STORE_NOT_RESPONDING";
+  }
+  if (includes(s.publicStatus, "reclamo") || includes(s.publicStatus, "problema")) return "CUSTOMER_CLAIM";
+  if (hasRealDelaySignal(s)) return "DELAYED";
+  if (hasRealActiveSignal(s) && String(s.responsibleRole || "").trim() === "") return "WITHOUT_RESPONSIBLE";
+  return null;
 }
 
 function operationalIdentity(source, requestType = "") {
@@ -94,6 +122,10 @@ test("kotlin classifier exists as pure core without firebase", () => {
   assert.match(source, /enum class AdminActiveOrdersBucket/);
   assert.doesNotMatch(source, /import.*firebase|import.*Firestore|com\.google\.firebase/);
   assert.doesNotMatch(source, /\.set\(|\.update\(|\.delete\(|writeBatch|runTransaction/);
+  assert.match(source, /hasNormalActiveSignal/);
+  assert.match(source, /if \(!hasNormalActiveSignal\(signals\)\) return null/);
+  assert.match(source, /if \(hasRealProblemSignal\(signals\)\) return AdminTodayOrdersBucket\.WITH_PROBLEMS/);
+  assert.doesNotMatch(source, /hasRealWaitingStoreSignal\(signals: AdminOperationOrderSignals\): Boolean =\s*hasRealActiveSignal/);
 });
 
 test("admin orders adapter stays read-only on orders collection", () => {
@@ -102,10 +134,54 @@ test("admin orders adapter stays read-only on orders collection", () => {
   assert.doesNotMatch(source, /\.set\(|\.update\(|\.delete\(|writeBatch|runTransaction/);
 });
 
-test("created + Pedido recibido maps to Activos and Esperando local", () => {
-  const s = signals({status: "created", publicStatus: "Pedido recibido", source: "public_local"});
+test("normal active order needs an explicit stage for active sub-bucket", () => {
+  const s = signals({
+    status: "created",
+    publicStatus: "Pedido recibido",
+    operationalStatus: "Esperando local",
+    source: "public_local",
+  });
   assert.equal(todayBucket(s), "ACTIVE");
   assert.equal(activeBucket(s), "WAITING_STORE");
+});
+
+test("active order without explicit stage is not forced into Esperando local", () => {
+  const s = signals({status: "created", publicStatus: "Pedido recibido"});
+  assert.equal(todayBucket(s), "ACTIVE");
+  assert.equal(activeBucket(s), null);
+});
+
+test("problem orders leave normal active buckets", () => {
+  const withoutResponsible = signals({
+    status: "created",
+    publicStatus: "Pedido recibido",
+    operationalStatus: "Esperando local",
+    responsibleRole: "",
+  });
+  const delayed = signals({
+    status: "created",
+    publicStatus: "Pedido recibido",
+    operationalStatus: "Demorado",
+  });
+
+  assert.equal(todayBucket(withoutResponsible), "WITH_PROBLEMS");
+  assert.equal(activeBucket(withoutResponsible), null);
+  assert.equal(problemBucket(withoutResponsible), "WITHOUT_RESPONSIBLE");
+  assert.equal(todayBucket(delayed), "WITH_PROBLEMS");
+  assert.equal(activeBucket(delayed), null);
+  assert.equal(problemBucket(delayed), "DELAYED");
+});
+
+test("today and problem classifications use exclusive priority", () => {
+  const conflicted = signals({
+    status: "cancelled",
+    publicStatus: "Reclamo del cliente",
+    operationalStatus: "Local no responde y demorado",
+    responsibleRole: "",
+  });
+
+  assert.equal(todayBucket(conflicted), "WITH_PROBLEMS");
+  assert.equal(problemBucket(conflicted), "STORE_NOT_RESPONDING");
 });
 
 test("created + Pedido recibido does not map to problem or cancelled buckets", () => {
