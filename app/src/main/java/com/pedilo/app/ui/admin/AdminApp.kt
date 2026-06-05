@@ -151,6 +151,13 @@ private sealed interface AdminRoute {
     data class Section(val root: AdminRoot, val title: String) : AdminRoute
     data class ConfigurationSection(val section: AdminConfigurationSection) : AdminRoute
     data class ConfigurationSubsection(val section: AdminConfigurationSection, val title: String) : AdminRoute
+    data object ConfigurationPublicHome : AdminRoute
+    data class ConfigurationPublicHomePart(val part: String) : AdminRoute
+    data class ConfigurationPublicHomeEditor(
+        val part: String,
+        val item: String,
+        val step: AdminPublicHomeEditorStep,
+    ) : AdminRoute
     data class ConfigurationConvergence(
         val section: String,
         val subsection: String,
@@ -171,6 +178,16 @@ private enum class AdminConfigurationConvergenceStep {
     Preview,
     Impact,
     SensitiveConfirmation,
+    Result,
+    Audit,
+}
+
+private enum class AdminPublicHomeEditorStep {
+    Detail,
+    Edit,
+    Preview,
+    Impact,
+    Confirmation,
     Result,
     Audit,
 }
@@ -356,6 +373,79 @@ private val configurationEntries = configurationSections.map {
     AdminEntry(it.title, "Abrir tablero")
 }
 
+private val publicWorldEntries = listOf(
+    AdminEntry("Home público", "Contenido principal"),
+    AdminEntry("Botón +", "Opciones visibles"),
+    AdminEntry("Tienda", "Oferta pública"),
+    AdminEntry("Seguimiento / Reclamos", "Información y ayuda"),
+)
+
+private val publicHomeEntries = listOf(
+    AdminEntry("Encabezado", "Título, subtítulo e imagen"),
+    AdminEntry("Accesos rápidos", "Nombre, orden y destino"),
+    AdminEntry("Banner destacado", "Texto, imagen y botón"),
+    AdminEntry("Ver más / Convenciones", "Información ampliada"),
+    AdminEntry("Ofertas", "Orden y visibilidad"),
+    AdminEntry("Nuevos locales", "Locales publicables"),
+    AdminEntry("Buscador / tags", "Sugerencias y criterios"),
+    AdminEntry("Vista previa del Home", "Revisión visual completa"),
+)
+
+private fun publicHomePartEntries(part: String): List<AdminEntry> =
+    when (part) {
+        "Encabezado" -> listOf(
+            AdminEntry("Título", "Valor actual: Pédilo"),
+            AdminEntry("Subtítulo", "Todos tus pedidos en un solo lugar"),
+            AdminEntry("Imagen / marca", "Imagen visible y alternativa"),
+            AdminEntry("Vista previa", "Revisar encabezado"),
+        )
+        "Accesos rápidos" -> listOf("Mascotas", "Farmacia", "Bebidas", "Mercado").map {
+            AdminEntry(it, "Nombre, ícono, orden, estado y destino")
+        }
+        "Banner destacado" -> listOf(
+            AdminEntry("Texto principal", "Título visible del banner"),
+            AdminEntry("Texto secundario", "Información complementaria"),
+            AdminEntry("Imagen", "Imagen visible y alternativa"),
+            AdminEntry("Botón ver más", "Texto y destino del botón"),
+            AdminEntry("Activo / inactivo", "Visibilidad del banner"),
+            AdminEntry("Vista previa", "Revisar banner completo"),
+        )
+        "Ver más / Convenciones" -> listOf(
+            AdminEntry("Día activo", "Título, texto, imagen y estado"),
+            AdminEntry("Información del día", "Título, texto, imagen y estado"),
+            AdminEntry("Reclamos", "Contenido visible y orden"),
+            AdminEntry("Seguimiento", "Contenido visible y orden"),
+        )
+        "Ofertas" -> listOf(
+            AdminEntry("Título de sección", "Texto visible"),
+            AdminEntry("Cards visibles", "Oferta publicable"),
+            AdminEntry("Orden", "Posición en Home"),
+            AdminEntry("Activo / inactivo", "Visibilidad de la sección"),
+            AdminEntry("Destino", "Ruta pública preparada"),
+            AdminEntry("Vista previa", "Revisar ofertas"),
+        )
+        "Nuevos locales" -> listOf(
+            AdminEntry("Título de sección", "Texto visible"),
+            AdminEntry("Cards visibles", "Locales publicables"),
+            AdminEntry("Orden", "Posición en Home"),
+            AdminEntry("Activo / inactivo", "Visibilidad de la sección"),
+            AdminEntry("Destino", "Ruta pública preparada"),
+            AdminEntry("Vista previa", "Revisar nuevos locales"),
+        )
+        "Buscador / tags" -> listOf(
+            AdminEntry("Tags visibles", "Nombre y criterio"),
+            AdminEntry("Orden", "Posición de sugerencias"),
+            AdminEntry("Activo / inactivo", "Visibilidad de tags"),
+            AdminEntry("Destino / criterio", "Categoría existente"),
+            AdminEntry("Vista previa", "Revisar buscador y tags"),
+        )
+        else -> listOf(
+            AdminEntry("Vista completa", "Encabezado, accesos y banner"),
+            AdminEntry("Contenido ampliado", "Convenciones, ofertas y locales"),
+            AdminEntry("Búsqueda y tags", "Sugerencias visibles"),
+        )
+    }
+
 private val roleAccessSections = listOf(
     AdminRoleAccessSection(
         title = "Usuarios del equipo",
@@ -471,6 +561,19 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
 
     BackHandler(enabled = route !is AdminRoute.Operation && route !is AdminRoute.Configuration && route !is AdminRoute.RoleAccess) {
         route = when (val current = route) {
+            is AdminRoute.ConfigurationPublicHomeEditor -> when (current.step) {
+                AdminPublicHomeEditorStep.Detail -> AdminRoute.ConfigurationPublicHomePart(current.part)
+                AdminPublicHomeEditorStep.Edit -> current.copy(step = AdminPublicHomeEditorStep.Detail)
+                AdminPublicHomeEditorStep.Preview -> current.copy(step = AdminPublicHomeEditorStep.Edit)
+                AdminPublicHomeEditorStep.Impact -> current.copy(step = AdminPublicHomeEditorStep.Preview)
+                AdminPublicHomeEditorStep.Confirmation -> current.copy(step = AdminPublicHomeEditorStep.Impact)
+                AdminPublicHomeEditorStep.Result -> current.copy(step = AdminPublicHomeEditorStep.Confirmation)
+                AdminPublicHomeEditorStep.Audit -> current.copy(step = AdminPublicHomeEditorStep.Result)
+            }
+            is AdminRoute.ConfigurationPublicHomePart -> AdminRoute.ConfigurationPublicHome
+            AdminRoute.ConfigurationPublicHome -> AdminRoute.ConfigurationSection(
+                configurationSections.first { it.title == "Público" },
+            )
             is AdminRoute.ConfigurationConvergence -> when (current.step) {
                 AdminConfigurationConvergenceStep.Entity -> AdminRoute.ConfigurationSubsection(
                     section = configurationSections.first { it.title == current.section },
@@ -622,12 +725,41 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             )
             is AdminRoute.ConfigurationSection -> AdminConfigurationSectionScreen(
                 section = current.section,
-                onEntry = { route = AdminRoute.ConfigurationSubsection(current.section, it.title) },
+                entries = if (current.section.title == "Público") publicWorldEntries else current.section.entries,
+                useGrid = current.section.title == "Público",
+                onEntry = {
+                    route = if (current.section.title == "Público" && it.title == "Home público") {
+                        AdminRoute.ConfigurationPublicHome
+                    } else {
+                        AdminRoute.ConfigurationSubsection(current.section, it.title)
+                    }
+                },
+            )
+            AdminRoute.ConfigurationPublicHome -> AdminPublicHomeScreen(
+                onPart = { route = AdminRoute.ConfigurationPublicHomePart(it.title) },
+            )
+            is AdminRoute.ConfigurationPublicHomePart -> AdminPublicHomePartScreen(
+                part = current.part,
+                onItem = {
+                    route = AdminRoute.ConfigurationPublicHomeEditor(
+                        part = current.part,
+                        item = it.title,
+                        step = AdminPublicHomeEditorStep.Detail,
+                    )
+                },
+            )
+            is AdminRoute.ConfigurationPublicHomeEditor -> AdminPublicHomeEditorScreen(
+                part = current.part,
+                item = current.item,
+                step = current.step,
+                onNext = { route = current.copy(step = it) },
             )
             is AdminRoute.ConfigurationSubsection -> AdminSectionScreen(
                 root = AdminRoot.Configuration,
                 title = current.title,
-                summary = current.section.entries.first { it.title == current.title }.note,
+                summary = current.section.entries.firstOrNull { it.title == current.title }?.note
+                    ?: publicWorldEntries.firstOrNull { it.title == current.title }?.note
+                    ?: "Revisión visual preparada.",
                 panelTitle = current.section.title,
                 panelText = "Revisá el detalle, prepará cambios y evaluá su impacto antes de confirmar.",
                 onConfigurationConvergence = {
@@ -779,6 +911,219 @@ private fun AdminConfigurationHomeScreen(
         }
     }
 }
+
+@Composable
+private fun AdminConfigurationGridScreen(
+    title: String,
+    eyebrow: String,
+    summary: String,
+    entries: List<AdminEntry>,
+    onEntry: (AdminEntry) -> Unit,
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = adminBottomBarReservedPadding),
+        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            AdminHeader(title = title, eyebrow = eyebrow, summary = summary, onSignOut = {}, showSignOut = false)
+        }
+        gridItems(entries, key = { it.title }) { entry ->
+            AdminConfigurationRootCard(
+                entry = entry,
+                icon = publicHomeIconFor(entry.title),
+                onClick = { onEntry(entry) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun AdminPublicHomeScreen(
+    onPart: (AdminEntry) -> Unit,
+) {
+    AdminConfigurationGridScreen(
+        title = "Home público",
+        eyebrow = "Público",
+        summary = "Elegí qué parte visible querés gestionar.",
+        entries = publicHomeEntries,
+        onEntry = onPart,
+    )
+}
+
+@Composable
+private fun AdminPublicHomePartScreen(
+    part: String,
+    onItem: (AdminEntry) -> Unit,
+) {
+    AdminConfigurationGridScreen(
+        title = part,
+        eyebrow = "Home público",
+        summary = publicHomePartSummary(part),
+        entries = publicHomePartEntries(part),
+        onEntry = onItem,
+    )
+}
+
+private fun publicHomePartSummary(part: String): String =
+    when (part) {
+        "Encabezado" -> "Título, subtítulo, marca y vista previa."
+        "Accesos rápidos" -> "Elegí un acceso para revisar nombre, ícono, orden y destino."
+        "Banner destacado" -> "Gestioná el contenido y el botón visible del banner."
+        "Ver más / Convenciones" -> "Mantené alineada la información resumida y ampliada."
+        "Ofertas" -> "Prepará oferta publicable sin crear productos ni editar precios."
+        "Nuevos locales" -> "Mostrá únicamente locales completos y publicables."
+        "Buscador / tags" -> "Prepará sugerencias con destino o criterio válido."
+        else -> "Revisá cómo quedaría el Home antes de confirmar."
+    }
+
+private fun publicHomeIconFor(title: String): ImageVector =
+    when (title) {
+        "Home público", "Encabezado", "Título", "Subtítulo" -> Icons.Outlined.Language
+        "Botón +", "Accesos rápidos", "Mascotas", "Farmacia", "Bebidas", "Mercado" -> Icons.Outlined.Dashboard
+        "Tienda", "Ofertas", "Cards visibles" -> Icons.Outlined.ShoppingCart
+        "Seguimiento / Reclamos", "Reclamos", "Seguimiento" -> Icons.Outlined.Feedback
+        "Banner destacado", "Texto principal", "Texto secundario", "Botón ver más" -> Icons.Outlined.MoreHoriz
+        "Ver más / Convenciones", "Día activo", "Información del día" -> Icons.Outlined.CalendarToday
+        "Nuevos locales" -> Icons.Outlined.Storefront
+        "Buscador / tags", "Tags visibles", "Destino / criterio" -> Icons.Outlined.Search
+        "Vista previa del Home", "Vista previa", "Vista completa", "Contenido ampliado", "Búsqueda y tags" -> Icons.Outlined.CheckCircle
+        "Imagen / marca", "Imagen" -> Icons.Outlined.Restaurant
+        "Orden" -> Icons.Outlined.Tune
+        "Activo / inactivo" -> Icons.Outlined.Bolt
+        "Destino" -> Icons.Outlined.ChevronRight
+        else -> Icons.Outlined.Tune
+    }
+
+@Composable
+private fun AdminPublicHomeEditorScreen(
+    part: String,
+    item: String,
+    step: AdminPublicHomeEditorStep,
+    onNext: (AdminPublicHomeEditorStep) -> Unit,
+) {
+    val title = when (step) {
+        AdminPublicHomeEditorStep.Detail -> item
+        AdminPublicHomeEditorStep.Edit -> "Editar $item"
+        AdminPublicHomeEditorStep.Preview -> "Vista previa"
+        AdminPublicHomeEditorStep.Impact -> "Impacto"
+        AdminPublicHomeEditorStep.Confirmation -> "Confirmar cambio"
+        AdminPublicHomeEditorStep.Result -> "Resultado"
+        AdminPublicHomeEditorStep.Audit -> "Auditoría visual"
+    }
+    val action = when (step) {
+        AdminPublicHomeEditorStep.Detail -> "Editar contenido" to AdminPublicHomeEditorStep.Edit
+        AdminPublicHomeEditorStep.Edit -> "Ver vista previa" to AdminPublicHomeEditorStep.Preview
+        AdminPublicHomeEditorStep.Preview -> "Ver impacto" to AdminPublicHomeEditorStep.Impact
+        AdminPublicHomeEditorStep.Impact -> "Continuar a confirmación" to AdminPublicHomeEditorStep.Confirmation
+        AdminPublicHomeEditorStep.Confirmation -> "Confirmar visualmente" to AdminPublicHomeEditorStep.Result
+        AdminPublicHomeEditorStep.Result -> "Consultar auditoría visual" to AdminPublicHomeEditorStep.Audit
+        AdminPublicHomeEditorStep.Audit -> "Revisar registro" to AdminPublicHomeEditorStep.Audit
+    }
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = adminBottomBarReservedPadding),
+        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            AdminHeader(
+                title = title,
+                eyebrow = "$part · Home público",
+                summary = publicHomeEditorSummary(step),
+                onSignOut = {},
+                showSignOut = false,
+            )
+        }
+        item { AdminInfoPanel(title = "Valor actual", text = publicHomeCurrentValue(part, item)) }
+        if (step == AdminPublicHomeEditorStep.Edit) {
+            item { AdminInfoPanel(title = "Nuevo valor", text = publicHomeEditableFields(part, item)) }
+            item {
+                AdminActionCard(
+                    title = "Guardar borrador visual",
+                    note = "Conserva la revisión dentro de esta pantalla, sin guardar datos reales.",
+                    onClick = {},
+                )
+            }
+        }
+        if (step == AdminPublicHomeEditorStep.Preview) {
+            item { AdminInfoPanel(title = "Así quedaría en el Home", text = publicHomePreview(part, item)) }
+        }
+        if (step == AdminPublicHomeEditorStep.Impact || step == AdminPublicHomeEditorStep.Confirmation) {
+            item { AdminInfoPanel(title = "Impacto visible", text = publicHomeImpact(part, item)) }
+        }
+        if (step == AdminPublicHomeEditorStep.Result) {
+            item { AdminInfoPanel(title = "Cambio preparado", text = "La revisión visual quedó lista. El Home público real permanece sin cambios.") }
+        }
+        if (step == AdminPublicHomeEditorStep.Audit) {
+            item {
+                AdminInfoPanel(
+                    title = "Registro preparado",
+                    text = "Qué cambió · Responsable · Momento · Valor anterior · Valor nuevo · Dónde impacta · Resultado.",
+                )
+            }
+        }
+        item {
+            AdminActionCard(
+                title = action.first,
+                note = "Continuar dentro de la herramienta visual.",
+                onClick = { onNext(action.second) },
+            )
+        }
+    }
+}
+
+private fun publicHomeEditorSummary(step: AdminPublicHomeEditorStep): String =
+    when (step) {
+        AdminPublicHomeEditorStep.Detail -> "Revisá el dato visible antes de editar."
+        AdminPublicHomeEditorStep.Edit -> "Prepará un nuevo valor sin modificar el Home real."
+        AdminPublicHomeEditorStep.Preview -> "Compará cómo se vería el cambio."
+        AdminPublicHomeEditorStep.Impact -> "Revisá qué parte visible cambia y qué permanece igual."
+        AdminPublicHomeEditorStep.Confirmation -> "Confirmación visual previa al resultado."
+        AdminPublicHomeEditorStep.Result -> "Cierre visual sin publicación real."
+        AdminPublicHomeEditorStep.Audit -> "Consulta del registro visual preparado."
+    }
+
+private fun publicHomeCurrentValue(part: String, item: String): String =
+    when {
+        part == "Encabezado" && item == "Título" -> "Pédilo"
+        part == "Encabezado" && item == "Subtítulo" -> "Todos tus pedidos en un solo lugar"
+        part == "Accesos rápidos" -> "$item · Activo · Orden visible · Destino configurado"
+        part == "Banner destacado" -> "¡Envíos más rápidos! · Botón ver más"
+        item.contains("Activo") -> "Activo"
+        else -> "$item visible en $part"
+    }
+
+private fun publicHomeEditableFields(part: String, item: String): String =
+    when (part) {
+        "Accesos rápidos" -> "Nombre visible · Imagen / ícono · Orden · Activo / inactivo · Destino"
+        "Banner destacado" -> "Texto principal · Texto secundario · Imagen · Botón visible · Texto del botón · Destino · Activo / inactivo"
+        "Ver más / Convenciones" -> "Título · Texto · Imagen · Orden · Activo / inactivo"
+        "Ofertas", "Nuevos locales" -> "Título · Cards visibles · Orden · Activo / inactivo · Destino"
+        "Buscador / tags" -> "Nombre · Orden · Activo / inactivo · Destino / criterio"
+        "Vista previa del Home" -> "Encabezado · Accesos rápidos · Banner · Convenciones · Ofertas · Nuevos locales · Tags"
+        else -> "Nuevo valor · Imagen / marca · Estado visible"
+    }
+
+private fun publicHomePreview(part: String, item: String): String =
+    "$item se muestra dentro de $part junto al resto del Home, con tamaño, orden y destino preparados."
+
+private fun publicHomeImpact(part: String, item: String): String =
+    when (part) {
+        "Ofertas" -> "Cambia la presentación de ofertas publicables. No crea productos ni modifica precios."
+        "Nuevos locales" -> "Cambia la presentación de locales publicables. No crea ni habilita locales."
+        "Banner destacado" -> "Cambia el banner visible. Solo el botón ver más conserva navegación."
+        else -> "Cambia $item dentro de $part. No modifica datos reales ni pedidos vivos."
+    }
 
 @Composable
 private fun AdminConfigurationRootCard(
@@ -1441,8 +1786,20 @@ private fun AdminOperationOrderCard(
 @Composable
 private fun AdminConfigurationSectionScreen(
     section: AdminConfigurationSection,
+    entries: List<AdminEntry> = section.entries,
+    useGrid: Boolean = false,
     onEntry: (AdminEntry) -> Unit,
 ) {
+    if (useGrid) {
+        AdminConfigurationGridScreen(
+            title = section.title,
+            eyebrow = "Configuración",
+            summary = "Mundos visibles para personas usuarias.",
+            entries = entries,
+            onEntry = onEntry,
+        )
+        return
+    }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1464,7 +1821,7 @@ private fun AdminConfigurationSectionScreen(
         item {
             AdminInfoPanel(title = section.contextTitle, text = section.contextText)
         }
-        items(section.entries) {
+        items(entries) {
             AdminEntryCard(entry = it, onClick = { onEntry(it) })
         }
     }
@@ -2082,6 +2439,9 @@ private fun AdminRoute.root(): AdminRoot = when (this) {
     is AdminRoute.ConfigurationSection -> AdminRoot.Configuration
     is AdminRoute.ConfigurationSubsection -> AdminRoot.Configuration
     is AdminRoute.ConfigurationConvergence -> AdminRoot.Configuration
+    AdminRoute.ConfigurationPublicHome -> AdminRoot.Configuration
+    is AdminRoute.ConfigurationPublicHomePart -> AdminRoot.Configuration
+    is AdminRoute.ConfigurationPublicHomeEditor -> AdminRoot.Configuration
     is AdminRoute.RoleAccessSection -> AdminRoot.RoleAccess
     is AdminRoute.RoleAccessSubsection -> AdminRoot.RoleAccess
     is AdminRoute.RoleAccessConvergence -> AdminRoot.RoleAccess

@@ -40,12 +40,13 @@ test("admin role opens visual admin shell instead of empty placeholder", () => {
 
 test("admin has separated root navigation and no public bottom labels", () => {
   const source = readAdminSourceTree();
+  const bottomBar = fs.readFileSync("app/src/main/java/com/pedilo/app/ui/admin/components/AdminComponents.kt", "utf8");
 
   assert.match(source, /Operation\("Operación"\)/);
   assert.match(source, /Configuration\("Configuración"\)/);
   assert.match(source, /RoleAccess\("Alta de roles"\)/);
   assert.match(source, /AdminBottomBar/);
-  assert.doesNotMatch(source, /"Inicio"|"\\+"|"Tienda"|"Casa"|"Salir de Pedilo"/);
+  assert.doesNotMatch(bottomBar, /"Inicio"|"\\+"|"Tienda"|"Casa"|"Salir de Pedilo"/);
 });
 
 test("admin operation root exposes visual operation cards only", () => {
@@ -387,6 +388,52 @@ test("admin configuration keeps specialized roots within their final responsibil
   assert.match(emergencies, /Contingencias controladas y auditables/);
   assert.match(emergencies, /Registro posterior/);
   assert.doesNotMatch(general, /Catálogo del local|Precios comerciales|Formas de pago|Mensajes por estado|Eventos notificables|Registro de cambios|Modo seguro/);
+});
+
+test("admin public home uses specific layered cards and editor instead of generic configuration flow", () => {
+  const source = fs.readFileSync(admin, "utf8");
+  const publicHome = source.slice(
+    source.indexOf("private val publicWorldEntries"),
+    source.indexOf("private val roleAccessSections"),
+  );
+  const publicScreens = source.slice(
+    source.indexOf("private fun AdminPublicHomeScreen"),
+    source.indexOf("private fun AdminConfigurationRootCard"),
+  );
+
+  ["Home público", "Botón +", "Tienda", "Seguimiento / Reclamos"].forEach((label) => {
+    assert.match(publicHome, new RegExp(label.replace("+", "\\+")));
+  });
+  [
+    "Encabezado",
+    "Accesos rápidos",
+    "Banner destacado",
+    "Ver más / Convenciones",
+    "Ofertas",
+    "Nuevos locales",
+    "Buscador / tags",
+    "Vista previa del Home",
+  ].forEach((label) => assert.match(publicHome, new RegExp(label)));
+
+  assert.match(source, /data object ConfigurationPublicHome/);
+  assert.match(source, /data class ConfigurationPublicHomePart/);
+  assert.match(source, /data class ConfigurationPublicHomeEditor/);
+  assert.match(source, /AdminRoute\.ConfigurationPublicHome -> AdminPublicHomeScreen/);
+  assert.match(source, /is AdminRoute\.ConfigurationPublicHomePart -> AdminPublicHomePartScreen/);
+  assert.match(source, /is AdminRoute\.ConfigurationPublicHomeEditor -> AdminPublicHomeEditorScreen/);
+  assert.match(source, /AdminPublicHomeEditorStep\.Detail -> AdminRoute\.ConfigurationPublicHomePart/);
+  assert.match(source, /is AdminRoute\.ConfigurationPublicHomePart -> AdminRoute\.ConfigurationPublicHome/);
+  assert.match(publicScreens, /AdminConfigurationGridScreen/);
+  assert.match(publicScreens, /Guardar borrador visual/);
+  assert.match(publicScreens, /Valor actual/);
+  assert.match(publicScreens, /Nuevo valor/);
+  assert.match(publicScreens, /Vista previa/);
+  assert.match(publicScreens, /Impacto visible/);
+  assert.match(publicScreens, /Confirmar visualmente/);
+  assert.match(publicScreens, /Auditoría visual/);
+  assert.match(publicScreens, /No crea productos ni modifica precios/);
+  assert.match(publicScreens, /Home público real permanece sin cambios/);
+  assert.doesNotMatch(publicScreens, /Firebase|Functions|Rules|backend|mock|demo|placeholder/i);
 });
 
 test("admin role access exposes internal visual sections without touching real users", () => {
