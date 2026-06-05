@@ -70,9 +70,9 @@ test("admin operation root exposes visual operation cards only", () => {
   assert.doesNotMatch(source, /AdminOperationUniverseCard|AdminStatusPill|AdminOperationLiveCardView/);
   assert.match(source, /onOpenView/);
   assert.match(source, /onOpenList/);
-  assert.match(source, /Aún no hay información real/);
+  assert.match(source, /Sin datos/);
   assert.doesNotMatch(source, /Mesa Operativa Viva|Necesitan atención|Finalizados recientes|Capas de lectura/);
-  assert.match(source, /AdminBottomItem\("Operación"/);
+  assert.match(source, /AdminBottomItem\(Icons\.Outlined\.Dashboard, "Operación"/);
   assert.doesNotMatch(source, /"Moto"|"Cfg"|"Rol"/);
 });
 
@@ -103,8 +103,8 @@ test("admin operation internal screens expose planned operation subworlds", () =
     "Con problemas",
     "Esperando local",
     "Preparando",
-    "Esperando repartidor",
-    "En entrega",
+    "Buscando repartidor",
+    "En camino",
     "Local no responde",
     "Reclamo de cliente",
     "Demorados",
@@ -442,11 +442,10 @@ test("admin order detail exposes Pedido #____ read-only ficha with real-data fal
     "Total",
     "Pago",
     "Problemas",
-    "Historial operativo",
+    "Historial",
     "Opciones",
-    "Sin acciones disponibles por ahora",
-    "Aún no hay información real",
-    "Aún no registrado",
+    "Sin acciones",
+    "Sin datos",
     "Sin dato",
     "—",
   ].forEach((label) => assert.match(source, new RegExp(label)));
@@ -465,6 +464,28 @@ test("admin order detail exposes Pedido #____ read-only ficha with real-data fal
   assert.match(source, /AdminOrderSection\.Options/);
   assert.doesNotMatch(detailScreen, /AdminOrderFactPanel/);
   forbiddenTitles.forEach((title) => assert.doesNotMatch(source, new RegExp(`"${title}"`)));
+});
+
+test("admin operation uses real icons chips and tactile feedback", () => {
+  const source = readAdminSourceTree();
+  const adminSource = fs.readFileSync(admin, "utf8");
+  const operationIcons = adminSource.slice(
+    adminSource.indexOf("private fun operationIconFor"),
+    adminSource.indexOf("private fun operationCompactTitle"),
+  );
+
+  assert.match(source, /material\.icons\.outlined/);
+  assert.match(source, /Icon\(/);
+  assert.match(source, /ImageVector/);
+  assert.match(source, /MutableInteractionSource/);
+  assert.match(source, /collectIsPressedAsState/);
+  assert.match(source, /AdminStatusChip/);
+  assert.match(source, /Buscando repartidor/);
+  assert.match(source, /En camino/);
+  assert.match(source, /Entregado/);
+  assert.doesNotMatch(operationIcons, /-> "[#>!+xLPRC?•]"/);
+  assert.doesNotMatch(source, /Text\("[#>!+xLPRC?•]"/);
+  assert.doesNotMatch(source, /Aún no hay información real|Sin acciones disponibles por ahora|Pedido read-only/);
 });
 
 test("admin order detail keeps shell rules and visual entry paths", () => {

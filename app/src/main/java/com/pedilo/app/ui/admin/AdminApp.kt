@@ -4,6 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,8 +24,31 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
+import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.Cancel
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.CreditCard
+import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.Feedback
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.LocalShipping
+import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material.icons.outlined.PersonOff
+import androidx.compose.material.icons.outlined.ReportProblem
+import androidx.compose.material.icons.outlined.Restaurant
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Storefront
+import androidx.compose.material.icons.outlined.TaskAlt
+import androidx.compose.material.icons.outlined.TwoWheeler
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,7 +59,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -162,7 +189,7 @@ private enum class AdminOperationMetricTone {
 }
 
 private data class AdminOperationalLiveCard(
-    val icon: String,
+    val icon: ImageVector,
     val title: String,
     val countLabel: String,
     val detail: String,
@@ -172,12 +199,13 @@ private data class AdminOperationalLiveCard(
 
 private data class AdminOrderNavigationEntry(
     val section: AdminOrderSection,
+    val icon: ImageVector,
     val title: String,
     val note: String,
 )
 
 private data class AdminOperationSubcard(
-    val icon: String,
+    val icon: ImageVector,
     val title: String,
     val value: String,
     val detail: String,
@@ -855,7 +883,7 @@ private fun AdminOperationListScreen(
     ) {
         item {
             AdminHeader(
-                title = "${operationCompactTitle(list.title)} · ${orderEntries.size} ${if (orderEntries.size == 1) "pedido" else "pedidos"}",
+                title = "${operationCompactTitle(list.title)} · ${orderEntries.size}",
                 eyebrow = view.title,
                 summary = if (orderEntries.isEmpty()) list.emptyText else list.summary,
                 onSignOut = {},
@@ -865,7 +893,7 @@ private fun AdminOperationListScreen(
         items(orderEntries) { entry ->
             AdminOperationOrderCard(
                 card = AdminOperationalLiveCard(
-                    icon = "#",
+                    icon = Icons.Outlined.ChevronRight,
                     title = entry.label,
                     countLabel = entry.note.substringBefore(" · "),
                     detail = entry.note.substringAfter(" · ", entry.note),
@@ -930,7 +958,7 @@ private fun AdminOperationDeskScreen(
         item {
             AdminOperationMotherCard(
                 title = "Repartidores",
-                summary = "Aún no hay información real",
+                summary = "Sin datos",
                 subcards = driverView.lists.map { list ->
                     AdminOperationSubcard(
                         icon = operationIconFor(list.title),
@@ -946,7 +974,7 @@ private fun AdminOperationDeskScreen(
         item {
             AdminOperationMotherCard(
                 title = "Locales",
-                summary = "Aún no hay información real",
+                summary = "Sin datos",
                 subcards = storeView.lists.map { list ->
                     AdminOperationSubcard(
                         icon = operationIconFor(list.title),
@@ -983,9 +1011,20 @@ private fun AdminOperationMotherCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, color = PediloText, fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.ExtraBold)
-                Text(summary, color = PediloMuted, fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Bold)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = operationIconFor(title),
+                    contentDescription = title,
+                    tint = PediloOrange,
+                    modifier = Modifier.size(24.dp),
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(title, color = PediloText, fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.ExtraBold)
+                    Text(summary, color = PediloMuted, fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Bold)
+                }
             }
             prominentValue?.let {
                 Text(it, color = PediloOrange, fontSize = 28.sp, lineHeight = 32.sp, fontWeight = FontWeight.ExtraBold)
@@ -1002,13 +1041,16 @@ private fun AdminOperationMotherCard(
 @Composable
 private fun AdminOperationSubcardView(subcard: AdminOperationSubcard) {
     val toneColor = subcard.tone.operationToneColor()
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .scale(if (pressed) 0.988f else 1f)
             .clip(RoundedCornerShape(12.dp))
-            .background(PediloPanel.copy(alpha = 0.88f), RoundedCornerShape(12.dp))
-            .border(1.dp, toneColor.copy(alpha = 0.34f), RoundedCornerShape(12.dp))
-            .clickable(role = Role.Button, onClick = subcard.onClick)
+            .background(if (pressed) PediloPanelSoft else PediloPanel.copy(alpha = 0.88f), RoundedCornerShape(12.dp))
+            .border(1.dp, toneColor.copy(alpha = if (pressed) 0.82f else 0.34f), RoundedCornerShape(12.dp))
+            .clickable(interactionSource = interactionSource, indication = null, role = Role.Button, onClick = subcard.onClick)
             .defaultMinSize(minHeight = if (subcard.preview.isEmpty()) 58.dp else 92.dp)
             .padding(horizontal = 10.dp, vertical = 9.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1022,18 +1064,27 @@ private fun AdminOperationSubcardView(subcard: AdminOperationSubcard) {
                 .size(30.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text(subcard.icon, color = toneColor, fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.ExtraBold)
+            Icon(
+                imageVector = subcard.icon,
+                contentDescription = subcard.title,
+                tint = toneColor,
+                modifier = Modifier.size(18.dp),
+            )
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(subcard.title, color = PediloText, fontSize = 14.sp, lineHeight = 17.sp, fontWeight = FontWeight.ExtraBold)
-            Text(
-                subcard.detail,
-                color = PediloMuted,
-                fontSize = 11.sp,
-                lineHeight = 14.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (subcard.detail.length <= 24) {
+                AdminStatusChip(label = subcard.detail, toneColor = toneColor)
+            } else {
+                Text(
+                    subcard.detail,
+                    color = PediloMuted,
+                    fontSize = 11.sp,
+                    lineHeight = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             subcard.preview.forEach { preview ->
                 Text(
                     preview,
@@ -1097,8 +1148,29 @@ private fun String.adminHumanStatusValue(fallback: String = "—"): String =
 private fun List<String>?.adminItemsSummary(): String =
     this?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }?.joinToString(separator = "\n") ?: "Sin dato"
 
-private fun AdminOrderDetail?.adminPersonName(): String =
-    this?.component15().adminDisplayValue()
+private fun AdminOrderDetail?.adminPersonName(fallback: String = "Sin datos"): String =
+    this?.component15().adminDisplayValue(fallback)
+
+private fun adminHumanOperationStatus(
+    publicStatus: String,
+    operationalStatus: String,
+    rawStatus: String,
+    hasProblem: Boolean,
+): String {
+    val visible = "$publicStatus $operationalStatus"
+    return when {
+        visible.contains("local no responde", ignoreCase = true) ||
+            visible.contains("sin respuesta", ignoreCase = true) -> "Local sin respuesta"
+        visible.contains("demora", ignoreCase = true) ||
+            visible.contains("retras", ignoreCase = true) -> "Demorado"
+        visible.contains("preparando", ignoreCase = true) -> "Preparando"
+        visible.contains("esperando repartidor", ignoreCase = true) -> "Buscando repartidor"
+        visible.contains("en entrega", ignoreCase = true) -> "En camino"
+        hasProblem -> "Con problema"
+        publicStatus.isNotBlank() -> publicStatus
+        else -> rawStatus.adminHumanStatusValue("Sin datos")
+    }
+}
 
 private fun adminOrderProblemFocus(
     variant: OperationOrderVariant,
@@ -1114,30 +1186,33 @@ private fun adminOrderProblemFocus(
         statusText.contains("demora", ignoreCase = true) ||
             statusText.contains("retras", ignoreCase = true) -> "Demorado" to "Requiere revisión"
         activeIncident -> "Incidencia registrada" to "Requiere revisión"
-        needsAttention || variant == OperationOrderVariant.WithProblem -> "Requiere revisión" to "Necesita atención operativa"
+        needsAttention || variant == OperationOrderVariant.WithProblem -> "Requiere revisión" to "Con problema"
         variant == OperationOrderVariant.NeedsAttention -> "Esperando respuesta" to "Requiere seguimiento"
         else -> null
     }
 }
 
-private fun operationIconFor(title: String): String =
+private fun operationIconFor(title: String): ImageVector =
     when (title) {
-        "Hoy", "Ingresaron hoy" -> "#"
-        "Activos", "Activos de hoy" -> ">"
-        "Problemas", "Problemas de hoy", "Con problemas", "Con incidencias" -> "!"
-        "Cerrados", "Cerrados de hoy", "Finalizados" -> "+"
-        "Cancelados" -> "x"
-        "Demorados", "Con demoras" -> "!"
-        "Esperando local" -> "L"
-        "Preparando" -> "P"
-        "Esperando repartidor", "En servicio", "Disponibles", "Repartidores" -> "R"
-        "En entrega" -> ">"
-        "Local no responde", "Locales" -> "L"
-        "Reclamo de cliente" -> "C"
-        "Sin responsable" -> "?"
-        "Operando" -> "+"
-        "Pausados" -> "x"
-        else -> "•"
+        "Hoy", "Ingresaron hoy" -> Icons.Outlined.CalendarToday
+        "Pedidos" -> Icons.AutoMirrored.Outlined.ReceiptLong
+        "Activos", "Activos de hoy" -> Icons.Outlined.Bolt
+        "Problemas", "Problemas de hoy", "Con problemas", "Con incidencias" -> Icons.Outlined.ReportProblem
+        "Cerrados", "Cerrados de hoy", "Finalizados" -> Icons.Outlined.TaskAlt
+        "Cancelados", "Pausados" -> Icons.Outlined.Cancel
+        "Demorados", "Con demoras" -> Icons.Outlined.Schedule
+        "Esperando local", "Local no responde", "Locales", "Local / Retiro", "Retiro" -> Icons.Outlined.Storefront
+        "Preparando", "Compra" -> Icons.Outlined.Restaurant
+        "Esperando repartidor", "Buscando repartidor", "En servicio", "Disponibles", "Repartidores" -> Icons.Outlined.TwoWheeler
+        "En entrega", "En camino", "Entrega" -> Icons.Outlined.LocalShipping
+        "Reclamo de cliente" -> Icons.Outlined.Feedback
+        "Sin responsable" -> Icons.Outlined.PersonOff
+        "Operando" -> Icons.Outlined.CheckCircle
+        "Pago" -> Icons.Outlined.CreditCard
+        "Historial" -> Icons.Outlined.History
+        "Opciones" -> Icons.Outlined.MoreHoriz
+        "Resumen" -> Icons.Outlined.Dashboard
+        else -> Icons.Outlined.ChevronRight
     }
 
 private fun operationCompactTitle(title: String): String =
@@ -1146,7 +1221,8 @@ private fun operationCompactTitle(title: String): String =
         "Con demoras" -> "Demoras"
         "Reclamo de cliente" -> "Reclamos"
         "Local no responde" -> "Local sin respuesta"
-        "Esperando repartidor" -> "Repartidor"
+        "Esperando repartidor", "Buscando repartidor" -> "Buscando repartidor"
+        "En entrega" -> "En camino"
         else -> title
     }
 
@@ -1154,8 +1230,8 @@ private fun operationHomeViewTitle(title: String): String =
     title
 
 private fun operationUniverseSummary(universe: AdminOperationUniverse, orders: List<AdminOrderSummary>): String {
-    if (universe.key != AdminOperationUniverseKey.Orders) return "Aún no hay información real"
-    return if (orders.isEmpty()) "Sin pedidos por ahora" else "Movimiento operativo"
+    if (universe.key != AdminOperationUniverseKey.Orders) return "Sin datos"
+    return if (orders.isEmpty()) "Sin pedidos" else "Movimiento operativo"
 }
 
 private fun operationViewOrderCount(view: AdminOperationView, orders: List<AdminOrderSummary>): Int =
@@ -1176,8 +1252,8 @@ private fun operationViewOrders(view: AdminOperationView, orders: List<AdminOrde
 private fun operationViewStateLabel(view: AdminOperationView, orders: List<AdminOrderSummary>): String {
     val count = operationViewOrderCount(view, orders)
     return when {
-        count == 0 && view.title == "Problemas" -> "Sin casos por ahora"
-        count == 0 -> "Sin pedidos por ahora"
+        count == 0 && view.title == "Problemas" -> "Sin casos"
+        count == 0 -> "Sin pedidos"
         view.title == "Problemas" -> "Prioridad"
         view.title == "Activos" -> "En curso"
         view.title == "Cerrados" -> "Completados"
@@ -1201,7 +1277,7 @@ private fun operationListTensionLabel(list: AdminOperationList, orders: List<Adm
     val count = orders.forOperationList(list.kind).size
     return when {
         !list.kind.isOrderList() -> "Sin datos"
-        count == 0 -> if (list.emptyText == "Sin casos por ahora.") "Sin casos" else "Sin pedidos"
+        count == 0 -> if (list.emptyText == "Sin casos") "Sin casos" else "Sin pedidos"
         list.kind in setOf(
             AdminOperationListKind.TodayProblems,
             AdminOperationListKind.ProblemStoreNotResponding,
@@ -1257,13 +1333,16 @@ private fun AdminOperationOrderCard(
     card: AdminOperationalLiveCard,
     onClick: () -> Unit,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .scale(if (pressed) 0.988f else 1f)
             .clip(RoundedCornerShape(14.dp))
-            .background(PediloPanel, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
-            .clickable(role = Role.Button, onClick = onClick)
+            .background(if (pressed) PediloPanelSoft else PediloPanel, RoundedCornerShape(14.dp))
+            .border(1.dp, if (pressed) PediloOrange.copy(alpha = 0.72f) else PediloLine.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
+            .clickable(interactionSource = interactionSource, indication = null, role = Role.Button, onClick = onClick)
             .defaultMinSize(minHeight = 82.dp)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(7.dp),
@@ -1274,9 +1353,14 @@ private fun AdminOperationOrderCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(card.title, color = PediloText, fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.ExtraBold)
-            Text(card.icon, color = PediloOrange, fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.ExtraBold)
+            Icon(
+                imageVector = card.icon,
+                contentDescription = "Pedido",
+                tint = PediloOrange,
+                modifier = Modifier.size(20.dp),
+            )
         }
-        Text(card.countLabel, color = PediloText, fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold)
+        AdminStatusChip(label = card.countLabel, toneColor = PediloOrange)
         Text(card.detail, color = PediloMuted, fontSize = 12.sp, lineHeight = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
@@ -1621,9 +1705,12 @@ private fun AdminOrderDetailScreen(
         needsAttention = needsAttention,
         activeIncident = activeIncident,
     )
-    val statusText = publicStatus.ifBlank {
-        (detail?.status ?: summary?.status.orEmpty()).adminHumanStatusValue("Aún no registrado")
-    }
+    val statusText = adminHumanOperationStatus(
+        publicStatus = publicStatus,
+        operationalStatus = operationalStatus,
+        rawStatus = detail?.status ?: summary?.status.orEmpty(),
+        hasProblem = problemFocus != null,
+    )
     val operationTitle = adminOrderOperationSectionTitle(identity)
     val operationNote = when (identity) {
         AdminOperationOrderClassification.IDENTITY_LOCAL_PICKUP -> storeName.adminDisplayValue("Información de retiro")
@@ -1631,13 +1718,13 @@ private fun AdminOrderDetailScreen(
         else -> "Información de retiro"
     }
     val navigationEntries = listOf(
-        AdminOrderNavigationEntry(AdminOrderSection.Summary, "Resumen", "$statusText · $operationFunction"),
-        AdminOrderNavigationEntry(AdminOrderSection.Operation, operationTitle, operationNote),
-        AdminOrderNavigationEntry(AdminOrderSection.Delivery, "Entrega", detail.adminPersonName()),
-        AdminOrderNavigationEntry(AdminOrderSection.Payment, "Pago", (detail?.total ?: summary?.total).adminDisplayValue("Aún no registrado")),
-        AdminOrderNavigationEntry(AdminOrderSection.Problems, "Problemas", problemFocus?.first ?: "Sin problemas registrados"),
-        AdminOrderNavigationEntry(AdminOrderSection.History, "Historial", detail?.lastEventSummary.adminDisplayValue("Aún no registrado")),
-        AdminOrderNavigationEntry(AdminOrderSection.Options, "Opciones", "Sin acciones disponibles por ahora"),
+        AdminOrderNavigationEntry(AdminOrderSection.Summary, Icons.Outlined.Dashboard, "Resumen", statusText),
+        AdminOrderNavigationEntry(AdminOrderSection.Operation, operationIconFor(operationTitle), operationTitle, operationNote),
+        AdminOrderNavigationEntry(AdminOrderSection.Delivery, Icons.Outlined.LocalShipping, "Entrega", detail.adminPersonName("Sin datos")),
+        AdminOrderNavigationEntry(AdminOrderSection.Payment, Icons.Outlined.Payments, "Pago", (detail?.total ?: summary?.total).adminDisplayValue("Sin datos")),
+        AdminOrderNavigationEntry(AdminOrderSection.Problems, Icons.Outlined.ReportProblem, "Problemas", problemFocus?.first ?: "Sin problemas"),
+        AdminOrderNavigationEntry(AdminOrderSection.History, Icons.Outlined.History, "Historial", detail?.lastEventSummary.adminDisplayValue("Sin datos")),
+        AdminOrderNavigationEntry(AdminOrderSection.Options, Icons.Outlined.Tune, "Opciones", "Sin acciones"),
     )
     LazyColumn(
         modifier = Modifier
@@ -1657,15 +1744,13 @@ private fun AdminOrderDetailScreen(
                 showSignOut = false,
             )
         }
-        item { AdminOrderMomentPanel(title = identity, detail = operationFunction, highlighted = problemFocus != null) }
+        item { AdminOrderMomentPanel(title = statusText, detail = operationFunction, highlighted = problemFocus != null) }
         item {
             AdminOrderMomentPanel(
-                title = "Ubicación actual",
-                detail = listOfNotNull(
-                    placement.adminPlacementLabel(),
-                    "Ingresó hoy".takeIf { enteredToday },
-                ).joinToString(" · "),
+                title = placement.adminPlacementLabel(),
+                detail = if (enteredToday) "Ingresó hoy" else "Ubicación principal",
                 highlighted = placement == AdminOrderPrimaryPlacement.PROBLEM,
+                eyebrow = "Ubicación actual",
             )
         }
         if (operationMessage.isNotBlank()) {
@@ -1694,9 +1779,6 @@ private fun AdminOrderSectionScreen(
     val identity = AdminOperationOrderClassification.operationalIdentity(source, requestType)
     val operationFunction = AdminOperationOrderClassification.operationalFunction(source, requestType)
     val publicStatus = detail?.publicStatus ?: summary?.publicStatus.orEmpty()
-    val status = publicStatus.ifBlank {
-        (detail?.status ?: summary?.status.orEmpty()).adminHumanStatusValue("Aún no registrado")
-    }
     val storeName = detail?.storeName ?: summary?.storeName.orEmpty()
     val problem = adminOrderProblemFocus(
         variant = variant,
@@ -1705,33 +1787,39 @@ private fun AdminOrderSectionScreen(
         needsAttention = detail?.needsAttention ?: summary?.needsAttention ?: false,
         activeIncident = detail?.activeIncident ?: summary?.activeIncident ?: false,
     )
+    val status = adminHumanOperationStatus(
+        publicStatus = publicStatus,
+        operationalStatus = detail?.operationalStatus ?: summary?.operationalStatus.orEmpty(),
+        rawStatus = detail?.status ?: summary?.status.orEmpty(),
+        hasProblem = problem != null,
+    )
     val title = when (section) {
         AdminOrderSection.Summary -> "Resumen"
         AdminOrderSection.Operation -> adminOrderOperationSectionTitle(identity)
         AdminOrderSection.Delivery -> "Entrega"
         AdminOrderSection.Payment -> "Pago"
         AdminOrderSection.Problems -> "Problemas"
-        AdminOrderSection.History -> "Historial operativo"
+        AdminOrderSection.History -> "Historial"
         AdminOrderSection.Options -> "Opciones"
     }
     val facts = when (section) {
         AdminOrderSection.Summary -> listOf(
-            "Identidad operativa" to identity,
-            "Función operativa" to operationFunction,
-            "Estado actual" to status,
-            "Dato clave" to (problem?.first ?: storeName.adminDisplayValue(detail?.itemsSummary.adminItemsSummary())),
+            "Tipo" to identity,
+            "Estado" to status,
+            "Función" to operationFunction,
+            "Referencia" to (problem?.first ?: storeName.adminDisplayValue(detail?.itemsSummary.adminItemsSummary())),
         )
         AdminOrderSection.Operation -> adminOrderOperationFacts(identity, storeName, detail)
-        AdminOrderSection.Delivery -> listOf("Persona" to detail.adminPersonName())
-        AdminOrderSection.Payment -> listOf("Total" to (detail?.total ?: summary?.total).adminDisplayValue("Aún no registrado"))
+        AdminOrderSection.Delivery -> listOf("Persona" to detail.adminPersonName("Sin datos"))
+        AdminOrderSection.Payment -> listOf("Total" to (detail?.total ?: summary?.total).adminDisplayValue("Sin datos"))
         AdminOrderSection.Problems -> listOf(
-            "Estado" to (problem?.first ?: "Sin problemas registrados"),
-            "Seguimiento" to (problem?.second ?: "Sin problemas registrados"),
+            "Estado" to (problem?.first ?: "Sin problemas"),
+            "Seguimiento" to (problem?.second ?: "Sin problemas"),
         )
         AdminOrderSection.History -> listOf(
-            "Último movimiento registrado" to detail?.lastEventSummary.adminDisplayValue("Aún no registrado"),
+            "Último movimiento" to detail?.lastEventSummary.adminDisplayValue("Sin datos"),
         )
-        AdminOrderSection.Options -> listOf("Opciones" to "Sin acciones disponibles por ahora")
+        AdminOrderSection.Options -> listOf("Opciones" to "Sin acciones")
     }
     LazyColumn(
         modifier = Modifier
@@ -1772,27 +1860,35 @@ private fun adminOrderOperationFacts(
             "Detalle de compra" to detail?.itemsSummary.adminItemsSummary(),
         )
         AdminOperationOrderClassification.IDENTITY_LOCAL_PICKUP -> listOf(
-            "Local" to storeName.adminDisplayValue("Aún no registrado"),
-            "Retiro" to "Aún no registrado",
+            "Local" to storeName.adminDisplayValue("Sin datos"),
+            "Retiro" to "Sin datos",
         )
-        else -> listOf("Lugar de retiro" to storeName.adminDisplayValue("Aún no registrado"))
+        else -> listOf("Lugar de retiro" to storeName.adminDisplayValue("Sin datos"))
     }
 
 @Composable
 private fun AdminOrderNavigationCard(entry: AdminOrderNavigationEntry, onClick: () -> Unit) {
-    Column(
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    Row(
         modifier = Modifier
             .fillMaxWidth()
+            .scale(if (pressed) 0.988f else 1f)
             .clip(RoundedCornerShape(14.dp))
-            .background(PediloPanelSoft, RoundedCornerShape(14.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
-            .clickable(role = Role.Button, onClick = onClick)
+            .background(if (pressed) PediloPanel else PediloPanelSoft, RoundedCornerShape(14.dp))
+            .border(1.dp, if (pressed) PediloOrange.copy(alpha = 0.72f) else PediloLine, RoundedCornerShape(14.dp))
+            .clickable(interactionSource = interactionSource, indication = null, role = Role.Button, onClick = onClick)
             .defaultMinSize(minHeight = 72.dp)
             .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(entry.title, color = PediloText, fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.ExtraBold)
-        Text(entry.note, color = PediloMuted, fontSize = 12.sp, lineHeight = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Icon(entry.icon, contentDescription = entry.title, tint = PediloOrange, modifier = Modifier.size(24.dp))
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(entry.title, color = PediloText, fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.ExtraBold)
+            AdminStatusChip(label = entry.note, toneColor = PediloMuted)
+        }
+        Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = PediloMuted, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -1801,6 +1897,7 @@ private fun AdminOrderMomentPanel(
     title: String,
     detail: String,
     highlighted: Boolean,
+    eyebrow: String? = null,
 ) {
     Column(
         modifier = Modifier
@@ -1810,9 +1907,30 @@ private fun AdminOrderMomentPanel(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(title, color = if (highlighted) PediloOrange else PediloText, fontSize = 22.sp, lineHeight = 26.sp, fontWeight = FontWeight.ExtraBold)
+        eyebrow?.let {
+            Text(it, color = PediloMuted, fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold)
+        }
+        AdminStatusChip(label = title, toneColor = if (highlighted) PediloWarning else PediloGreen)
         Text(detail, color = PediloText, fontSize = 14.sp, lineHeight = 20.sp)
     }
+}
+
+@Composable
+private fun AdminStatusChip(label: String, toneColor: Color) {
+    Text(
+        text = label,
+        color = toneColor,
+        fontSize = 11.sp,
+        lineHeight = 14.sp,
+        fontWeight = FontWeight.ExtraBold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(toneColor.copy(alpha = 0.12f), RoundedCornerShape(50))
+            .border(1.dp, toneColor.copy(alpha = 0.34f), RoundedCornerShape(50))
+            .padding(horizontal = 9.dp, vertical = 4.dp),
+    )
 }
 
 @Composable

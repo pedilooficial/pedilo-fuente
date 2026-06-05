@@ -78,9 +78,9 @@ test("admin UI keeps order detail read-only without direct order writes", () => 
   assert.doesNotMatch(source, /adminOrders\.execute/);
   assert.match(detailScreen, /AdminOperationOrderClassification\.operationalIdentity/);
   assert.match(detailScreen, /AdminOperationOrderClassification\.operationalFunction/);
-  assert.match(detailScreen, /Aún no registrado/);
+  assert.match(detailScreen, /Sin datos/);
   assert.match(detailScreen, /Opciones/);
-  assert.match(detailScreen, /Sin acciones disponibles por ahora/);
+  assert.match(detailScreen, /Sin acciones/);
   assert.match(detailScreen, /AdminOrderNavigationCard/);
   assert.match(source, /AdminOrderSectionScreen/);
   assert.doesNotMatch(detailScreen, /AdminActionCard|onAction\(|Acciones disponibles|action\.label|action\.impact/);

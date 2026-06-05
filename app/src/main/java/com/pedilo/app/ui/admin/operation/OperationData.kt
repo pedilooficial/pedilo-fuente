@@ -24,10 +24,10 @@ internal val operationUniverses = listOf(
                 contextTitle = "Hoy",
                 contextText = "Movimiento de pedidos ingresados hoy.",
                 lists = listOf(
-                    AdminOperationList("Ingresaron hoy", "Todos los pedidos ingresados hoy.", "Sin pedidos por ahora.", AdminOperationListKind.TodayAll),
-                    AdminOperationList("Activos de hoy", "Pedidos ingresados hoy que siguen activos.", "Sin pedidos por ahora.", AdminOperationListKind.TodayActive),
-                    AdminOperationList("Problemas de hoy", "Pedidos ingresados hoy que requieren revisión.", "Sin casos por ahora.", AdminOperationListKind.TodayProblems),
-                    AdminOperationList("Cerrados de hoy", "Pedidos ingresados hoy que ya cerraron.", "Sin pedidos por ahora.", AdminOperationListKind.TodayClosed),
+                    AdminOperationList("Ingresaron hoy", "Todos los pedidos ingresados hoy.", "Sin pedidos", AdminOperationListKind.TodayAll),
+                    AdminOperationList("Activos de hoy", "Pedidos ingresados hoy que siguen activos.", "Sin pedidos", AdminOperationListKind.TodayActive),
+                    AdminOperationList("Problemas de hoy", "Pedidos ingresados hoy que requieren revisión.", "Sin casos", AdminOperationListKind.TodayProblems),
+                    AdminOperationList("Cerrados de hoy", "Pedidos ingresados hoy que ya cerraron.", "Sin pedidos", AdminOperationListKind.TodayClosed),
                 ),
             ),
             AdminOperationView(
@@ -36,10 +36,10 @@ internal val operationUniverses = listOf(
                 contextTitle = "Activos",
                 contextText = "Pedidos que todavía siguen en curso.",
                 lists = listOf(
-                    AdminOperationList("Esperando local", "Necesitan respuesta del local.", "Sin pedidos por ahora.", AdminOperationListKind.ActiveWaitingStore),
-                    AdminOperationList("Preparando", "El local está preparando.", "Sin pedidos por ahora.", AdminOperationListKind.ActivePreparing),
-                    AdminOperationList("Esperando repartidor", "Listos para asignar o retirar.", "Sin pedidos por ahora.", AdminOperationListKind.ActiveWaitingDriver),
-                    AdminOperationList("En entrega", "Ya están camino al destino.", "Sin pedidos por ahora.", AdminOperationListKind.ActiveInDelivery),
+                    AdminOperationList("Esperando local", "Necesitan respuesta del local.", "Sin pedidos", AdminOperationListKind.ActiveWaitingStore),
+                    AdminOperationList("Preparando", "El local está preparando.", "Sin pedidos", AdminOperationListKind.ActivePreparing),
+                    AdminOperationList("Buscando repartidor", "Listos para asignar o retirar.", "Sin pedidos", AdminOperationListKind.ActiveWaitingDriver),
+                    AdminOperationList("En camino", "Ya están camino al destino.", "Sin pedidos", AdminOperationListKind.ActiveInDelivery),
                 ),
             ),
             AdminOperationView(
@@ -48,10 +48,10 @@ internal val operationUniverses = listOf(
                 contextTitle = "Problemas",
                 contextText = "Casos que necesitan revisión.",
                 lists = listOf(
-                    AdminOperationList("Local no responde", "Pedidos detenidos por falta de respuesta.", "Sin casos por ahora.", AdminOperationListKind.ProblemStoreNotResponding),
-                    AdminOperationList("Reclamo de cliente", "Casos avisados por el cliente.", "Sin casos por ahora.", AdminOperationListKind.ProblemUserClaim),
-                    AdminOperationList("Demorados", "Pedidos que superaron el tiempo esperado.", "Sin casos por ahora.", AdminOperationListKind.ProblemDelayed),
-                    AdminOperationList("Sin responsable", "Pedidos que necesitan responsable.", "Sin casos por ahora.", AdminOperationListKind.ProblemWithoutResponsible),
+                    AdminOperationList("Local no responde", "Pedidos detenidos por falta de respuesta.", "Sin casos", AdminOperationListKind.ProblemStoreNotResponding),
+                    AdminOperationList("Reclamo de cliente", "Casos avisados por el cliente.", "Sin casos", AdminOperationListKind.ProblemUserClaim),
+                    AdminOperationList("Demorados", "Pedidos que superaron el tiempo esperado.", "Sin casos", AdminOperationListKind.ProblemDelayed),
+                    AdminOperationList("Sin responsable", "Pedidos que necesitan responsable.", "Sin casos", AdminOperationListKind.ProblemWithoutResponsible),
                 ),
             ),
             AdminOperationView(
@@ -60,8 +60,8 @@ internal val operationUniverses = listOf(
                 contextTitle = "Cerrados",
                 contextText = "Pedidos que ya terminaron.",
                 lists = listOf(
-                    AdminOperationList("Finalizados", "Pedidos cerrados correctamente.", "Sin pedidos por ahora.", AdminOperationListKind.ClosedFinished),
-                    AdminOperationList("Cancelados", "Pedidos cerrados sin completar.", "Sin pedidos por ahora.", AdminOperationListKind.ClosedCancelled),
+                    AdminOperationList("Finalizados", "Pedidos cerrados correctamente.", "Sin pedidos", AdminOperationListKind.ClosedFinished),
+                    AdminOperationList("Cancelados", "Pedidos cerrados sin completar.", "Sin pedidos", AdminOperationListKind.ClosedCancelled),
                 ),
             ),
         ),
@@ -126,14 +126,33 @@ internal fun orderDetailEntriesFor(
     return orders.map {
         val identity = AdminOperationOrderClassification.operationalIdentity(it.source, it.requestType)
         val function = AdminOperationOrderClassification.operationalFunction(it.source, it.requestType)
+        val status = it.adminHumanOperationStatus()
         val secondary = it.storeName.ifBlank { function }
         AdminOrderDetailEntry(
             label = if (it.trackingNumber.isNotBlank()) "Pedido #${it.trackingNumber}" else "Pedido #____",
-            note = listOf(identity, function, secondary)
+            note = listOf(identity, status, function, secondary)
                 .distinct()
                 .joinToString(" · "),
             variant = variant,
             realOrderId = it.id,
         )
+    }
+}
+
+private fun AdminOrderSummary.adminHumanOperationStatus(): String {
+    val visible = "$publicStatus $operationalStatus"
+    return when {
+        visible.contains("local no responde", ignoreCase = true) ||
+            visible.contains("sin respuesta", ignoreCase = true) -> "Local sin respuesta"
+        visible.contains("demora", ignoreCase = true) ||
+            visible.contains("retras", ignoreCase = true) -> "Demorado"
+        visible.contains("preparando", ignoreCase = true) -> "Preparando"
+        visible.contains("esperando repartidor", ignoreCase = true) -> "Buscando repartidor"
+        visible.contains("en entrega", ignoreCase = true) -> "En camino"
+        status.equals("delivered", ignoreCase = true) -> "Entregado"
+        status.equals("cancelled", ignoreCase = true) || status.equals("canceled", ignoreCase = true) -> "Cancelado"
+        needsAttention || activeIncident -> "Con problema"
+        publicStatus.isNotBlank() -> publicStatus
+        else -> "Sin datos"
     }
 }
