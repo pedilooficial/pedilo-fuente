@@ -7,10 +7,12 @@ internal enum class AdminOperationUniverseKey {
 }
 
 internal enum class AdminOperationListKind {
+    TodayAll,
     TodayActive,
-    TodayFinished,
-    TodayCancelled,
-    TodayWithProblems,
+    TodayProblems,
+    TodayClosed,
+    ClosedFinished,
+    ClosedCancelled,
     ActiveWaitingStore,
     ActivePreparing,
     ActiveWaitingDriver,

@@ -52,14 +52,16 @@ test("admin operation root exposes visual operation cards only", () => {
   const source = readAdminSourceTree();
 
   [
-    "Pedidos del día",
+    "Hoy",
     "Pedidos",
     "Repartidores",
     "Locales",
   ].forEach((label) => assert.match(source, new RegExp(label)));
-  assert.match(source, /Resumen de hoy/);
-  assert.match(source, /Pedidos activos/);
-  assert.match(source, /Pedidos con problemas/);
+  assert.match(source, /Resumen temporal/);
+  assert.match(source, /Activos/);
+  assert.match(source, /Problemas/);
+  assert.match(source, /Cerrados/);
+  assert.doesNotMatch(source, /Pedidos del día|Pedidos activos|Pedidos con problemas/);
   assert.match(source, /En servicio/);
   assert.match(source, /Operando/);
   assert.match(source, /AdminOperationMotherCard/);
@@ -93,6 +95,9 @@ test("admin operation internal screens expose planned operation subworlds", () =
 
   [
     "Activos",
+    "Activos de hoy",
+    "Problemas de hoy",
+    "Cerrados de hoy",
     "Finalizados",
     "Cancelados",
     "Con problemas",
@@ -447,6 +452,9 @@ test("admin order detail exposes Pedido #____ read-only ficha with real-data fal
   ].forEach((label) => assert.match(source, new RegExp(label)));
   forbiddenOrderCopy.forEach((label) => assert.doesNotMatch(detailScreen, new RegExp(label)));
   assert.match(detailScreen, /AdminOrderNavigationCard/);
+  assert.match(detailScreen, /"Ubicación actual"/);
+  assert.match(detailScreen, /adminPlacementLabel/);
+  assert.match(detailScreen, /"Ingresó hoy"/);
   assert.match(source, /AdminOrderSectionScreen/);
   assert.match(source, /AdminOrderSection\.Summary/);
   assert.match(source, /AdminOrderSection\.Operation/);
@@ -499,6 +507,11 @@ test("admin orders board removes repeated summaries and exposes useful hierarchy
   assert.match(source, /\.distinctBy \{ it\.id \}/);
   assert.match(source, /createdAtMillis\.isAdminToday\(\)/);
   assert.match(source, /val todaySignals = signals\.filter/);
+  assert.match(source, /forPrimaryPlacement\(AdminOrderPrimaryPlacement\.ACTIVE\)/);
+  assert.match(source, /forPrimaryPlacement\(AdminOrderPrimaryPlacement\.PROBLEM\)/);
+  assert.match(source, /AdminOperationListKind\.TodayClosed/);
+  assert.match(source, /AdminOperationListKind\.ClosedFinished/);
+  assert.match(source, /AdminOperationListKind\.ClosedCancelled/);
   assert.doesNotMatch(viewScreen, /AdminOperationMotherCard/);
   assert.doesNotMatch(listScreen, /AdminInfoPanel/);
   assert.match(listScreen, /operationCompactTitle\(list\.title\)/);

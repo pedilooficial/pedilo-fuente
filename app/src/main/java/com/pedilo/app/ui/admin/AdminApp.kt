@@ -42,12 +42,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pedilo.app.core.model.AdminActiveOrdersBucket
+import com.pedilo.app.core.model.AdminOrderPrimaryPlacement
 import com.pedilo.app.core.model.AdminOperationOrderClassification
 import com.pedilo.app.core.model.AdminOperationOrderSignals
 import com.pedilo.app.core.model.AdminOrderDetail
 import com.pedilo.app.core.model.AdminOrderSummary
 import com.pedilo.app.core.model.AdminProblemOrdersBucket
-import com.pedilo.app.core.model.AdminTodayOrdersBucket
 import com.pedilo.app.core.result.CoreResult
 import com.pedilo.app.core.runtime.adminOrdersUseCase
 import com.pedilo.app.ui.admin.components.AdminBottomBar
@@ -1122,10 +1122,10 @@ private fun adminOrderProblemFocus(
 
 private fun operationIconFor(title: String): String =
     when (title) {
-        "Pedidos del día" -> "#"
-        "Pedidos activos", "Activos" -> ">"
-        "Pedidos con problemas", "Con problemas", "Con incidencias" -> "!"
-        "Finalizados" -> "+"
+        "Hoy", "Ingresaron hoy" -> "#"
+        "Activos", "Activos de hoy" -> ">"
+        "Problemas", "Problemas de hoy", "Con problemas", "Con incidencias" -> "!"
+        "Cerrados", "Cerrados de hoy", "Finalizados" -> "+"
         "Cancelados" -> "x"
         "Demorados", "Con demoras" -> "!"
         "Esperando local" -> "L"
@@ -1151,11 +1151,7 @@ private fun operationCompactTitle(title: String): String =
     }
 
 private fun operationHomeViewTitle(title: String): String =
-    when (title) {
-        "Pedidos activos" -> "Activos"
-        "Pedidos con problemas" -> "Problemas"
-        else -> title
-    }
+    title
 
 private fun operationUniverseSummary(universe: AdminOperationUniverse, orders: List<AdminOrderSummary>): String {
     if (universe.key != AdminOperationUniverseKey.Orders) return "Aún no hay información real"
@@ -1166,18 +1162,26 @@ private fun operationViewOrderCount(view: AdminOperationView, orders: List<Admin
     operationViewOrders(view, orders).size
 
 private fun operationViewOrders(view: AdminOperationView, orders: List<AdminOrderSummary>): List<AdminOrderSummary> =
-    view.lists
-        .flatMap { orders.forOperationList(it.kind) }
-        .distinctBy { it.id }
+    when (view.title) {
+        "Hoy" -> orders.forOperationList(AdminOperationListKind.TodayAll)
+        "Activos" -> orders.forPrimaryPlacement(AdminOrderPrimaryPlacement.ACTIVE)
+        "Problemas" -> orders.forPrimaryPlacement(AdminOrderPrimaryPlacement.PROBLEM)
+        "Cerrados" -> orders.forPrimaryPlacements(
+            AdminOrderPrimaryPlacement.FINISHED,
+            AdminOrderPrimaryPlacement.CANCELLED,
+        )
+        else -> view.lists.flatMap { orders.forOperationList(it.kind) }.distinctBy { it.id }
+    }
 
 private fun operationViewStateLabel(view: AdminOperationView, orders: List<AdminOrderSummary>): String {
     val count = operationViewOrderCount(view, orders)
     return when {
-        count == 0 && view.title == "Pedidos con problemas" -> "Sin casos por ahora"
+        count == 0 && view.title == "Problemas" -> "Sin casos por ahora"
         count == 0 -> "Sin pedidos por ahora"
-        view.title == "Pedidos con problemas" -> "Prioridad"
-        view.title == "Pedidos activos" -> "En curso"
-        else -> "Del día"
+        view.title == "Problemas" -> "Prioridad"
+        view.title == "Activos" -> "En curso"
+        view.title == "Cerrados" -> "Completados"
+        else -> "Ingresados hoy"
     }
 }
 
@@ -1199,7 +1203,7 @@ private fun operationListTensionLabel(list: AdminOperationList, orders: List<Adm
         !list.kind.isOrderList() -> "Sin datos"
         count == 0 -> if (list.emptyText == "Sin casos por ahora.") "Sin casos" else "Sin pedidos"
         list.kind in setOf(
-            AdminOperationListKind.TodayWithProblems,
+            AdminOperationListKind.TodayProblems,
             AdminOperationListKind.ProblemStoreNotResponding,
             AdminOperationListKind.ProblemUserClaim,
             AdminOperationListKind.ProblemDelayed,
@@ -1213,8 +1217,8 @@ private fun operationToneFor(view: AdminOperationView, orders: List<AdminOrderSu
     val count = operationViewOrderCount(view, orders)
     return when {
         count == 0 -> AdminOperationMetricTone.Neutral
-        view.title == "Pedidos con problemas" -> AdminOperationMetricTone.Danger
-        view.title == "Pedidos activos" -> AdminOperationMetricTone.Healthy
+        view.title == "Problemas" -> AdminOperationMetricTone.Danger
+        view.title == "Activos" -> AdminOperationMetricTone.Healthy
         else -> AdminOperationMetricTone.Neutral
     }
 }
@@ -1224,19 +1228,20 @@ private fun operationToneFor(list: AdminOperationList, orders: List<AdminOrderSu
     return when {
         count == 0 -> AdminOperationMetricTone.Neutral
         list.kind in setOf(
-            AdminOperationListKind.TodayWithProblems,
+            AdminOperationListKind.TodayProblems,
             AdminOperationListKind.ProblemStoreNotResponding,
             AdminOperationListKind.ProblemUserClaim,
             AdminOperationListKind.ProblemDelayed,
             AdminOperationListKind.ProblemWithoutResponsible,
         ) -> AdminOperationMetricTone.Danger
         list.kind in setOf(
-            AdminOperationListKind.TodayFinished,
+            AdminOperationListKind.ClosedFinished,
             AdminOperationListKind.StoreOperating,
             AdminOperationListKind.DriverAvailable,
         ) -> AdminOperationMetricTone.Healthy
         list.kind in setOf(
-            AdminOperationListKind.TodayCancelled,
+            AdminOperationListKind.TodayClosed,
+            AdminOperationListKind.ClosedCancelled,
             AdminOperationListKind.ActiveWaitingStore,
             AdminOperationListKind.ActiveWaitingDriver,
             AdminOperationListKind.StorePaused,
@@ -1596,6 +1601,19 @@ private fun AdminOrderDetailScreen(
     val storeName = detail?.storeName ?: summary?.storeName.orEmpty()
     val identity = AdminOperationOrderClassification.operationalIdentity(source, requestType)
     val operationFunction = AdminOperationOrderClassification.operationalFunction(source, requestType)
+    val placement = AdminOperationOrderClassification.primaryPlacement(
+        AdminOperationOrderSignals(
+            status = detail?.status ?: summary?.status.orEmpty(),
+            publicStatus = publicStatus,
+            operationalStatus = operationalStatus,
+            responsibleRole = detail?.responsibleRole ?: summary?.responsibleRole.orEmpty(),
+            needsAttention = needsAttention,
+            activeIncident = activeIncident,
+            source = source,
+            requestType = requestType,
+        ),
+    )
+    val enteredToday = (detail?.createdAtMillis ?: summary?.createdAtMillis).isAdminToday()
     val problemFocus = adminOrderProblemFocus(
         variant = variant,
         publicStatus = publicStatus,
@@ -1640,6 +1658,16 @@ private fun AdminOrderDetailScreen(
             )
         }
         item { AdminOrderMomentPanel(title = identity, detail = operationFunction, highlighted = problemFocus != null) }
+        item {
+            AdminOrderMomentPanel(
+                title = "Ubicación actual",
+                detail = listOfNotNull(
+                    placement.adminPlacementLabel(),
+                    "Ingresó hoy".takeIf { enteredToday },
+                ).joinToString(" · "),
+                highlighted = placement == AdminOrderPrimaryPlacement.PROBLEM,
+            )
+        }
         if (operationMessage.isNotBlank()) {
             item { AdminInfoPanel(title = "Resultado", text = operationMessage) }
         }
@@ -1842,16 +1870,6 @@ private fun AdminRoute.root(): AdminRoot = when (this) {
     is AdminRoute.Section -> root
 }
 
-private fun List<AdminOrderSummary>.todayOrders(): Map<AdminTodayOrdersBucket, List<AdminOrderSummary>> {
-    val ordersWithSignals = filter { it.createdAtMillis.isAdminToday() }
-        .map { order -> order to AdminOperationOrderSignals.from(order) }
-    return ordersWithSignals
-        .mapNotNull { (order, signals) ->
-            AdminOperationOrderClassification.todayBucket(signals)?.let { it to order }
-        }
-        .groupBy({ it.first }, { it.second })
-}
-
 private fun List<AdminOrderSummary>.activeOrders(): Map<AdminActiveOrdersBucket, List<AdminOrderSummary>> {
     val ordersWithSignals = map { order -> order to AdminOperationOrderSignals.from(order) }
     return ordersWithSignals
@@ -1874,45 +1892,74 @@ private fun List<AdminOrderSummary>.forOperationList(kind: AdminOperationListKin
     val signals = this.map { it to AdminOperationOrderSignals.from(it) }
     val todaySignals = signals.filter { (order, _) -> order.createdAtMillis.isAdminToday() }
     return when (kind) {
+        AdminOperationListKind.TodayAll -> todaySignals.map { it.first }
         AdminOperationListKind.TodayActive -> todaySignals.filter { (_, s) ->
-            AdminOperationOrderClassification.todayBucket(s) == AdminTodayOrdersBucket.ACTIVE
+            AdminOperationOrderClassification.primaryPlacement(s) == AdminOrderPrimaryPlacement.ACTIVE
         }.map { it.first }
-        AdminOperationListKind.TodayFinished -> todaySignals.filter { (_, s) ->
-            AdminOperationOrderClassification.todayBucket(s) == AdminTodayOrdersBucket.FINISHED
+        AdminOperationListKind.TodayProblems -> todaySignals.filter { (_, s) ->
+            AdminOperationOrderClassification.primaryPlacement(s) == AdminOrderPrimaryPlacement.PROBLEM
         }.map { it.first }
-        AdminOperationListKind.TodayCancelled -> todaySignals.filter { (_, s) ->
-            AdminOperationOrderClassification.todayBucket(s) == AdminTodayOrdersBucket.CANCELLED
+        AdminOperationListKind.TodayClosed -> todaySignals.filter { (_, s) ->
+            AdminOperationOrderClassification.primaryPlacement(s) in setOf(
+                AdminOrderPrimaryPlacement.FINISHED,
+                AdminOrderPrimaryPlacement.CANCELLED,
+            )
         }.map { it.first }
-        AdminOperationListKind.TodayWithProblems -> todaySignals.filter { (_, s) ->
-            AdminOperationOrderClassification.todayBucket(s) == AdminTodayOrdersBucket.WITH_PROBLEMS
+        AdminOperationListKind.ClosedFinished -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.primaryPlacement(s) == AdminOrderPrimaryPlacement.FINISHED
+        }.map { it.first }
+        AdminOperationListKind.ClosedCancelled -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.primaryPlacement(s) == AdminOrderPrimaryPlacement.CANCELLED
         }.map { it.first }
         AdminOperationListKind.ActiveWaitingStore -> signals.filter { (_, s) ->
-            AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.WAITING_STORE
+            AdminOperationOrderClassification.primaryPlacement(s) == AdminOrderPrimaryPlacement.ACTIVE &&
+                AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.WAITING_STORE
         }.map { it.first }
         AdminOperationListKind.ActivePreparing -> signals.filter { (_, s) ->
-            AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.PREPARING
+            AdminOperationOrderClassification.primaryPlacement(s) == AdminOrderPrimaryPlacement.ACTIVE &&
+                AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.PREPARING
         }.map { it.first }
         AdminOperationListKind.ActiveWaitingDriver -> signals.filter { (_, s) ->
-            AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.WAITING_DRIVER
+            AdminOperationOrderClassification.primaryPlacement(s) == AdminOrderPrimaryPlacement.ACTIVE &&
+                AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.WAITING_DRIVER
         }.map { it.first }
         AdminOperationListKind.ActiveInDelivery -> signals.filter { (_, s) ->
-            AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.IN_DELIVERY
+            AdminOperationOrderClassification.primaryPlacement(s) == AdminOrderPrimaryPlacement.ACTIVE &&
+                AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.IN_DELIVERY
         }.map { it.first }
         AdminOperationListKind.ProblemStoreNotResponding -> signals.filter { (_, s) ->
-            AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.STORE_NOT_RESPONDING
+            AdminOperationOrderClassification.primaryPlacement(s) == AdminOrderPrimaryPlacement.PROBLEM &&
+                AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.STORE_NOT_RESPONDING
         }.map { it.first }
         AdminOperationListKind.ProblemUserClaim -> signals.filter { (_, s) ->
-            AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.CUSTOMER_CLAIM
+            AdminOperationOrderClassification.primaryPlacement(s) == AdminOrderPrimaryPlacement.PROBLEM &&
+                AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.CUSTOMER_CLAIM
         }.map { it.first }
         AdminOperationListKind.ProblemDelayed -> signals.filter { (_, s) ->
-            AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.DELAYED
+            AdminOperationOrderClassification.primaryPlacement(s) == AdminOrderPrimaryPlacement.PROBLEM &&
+                AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.DELAYED
         }.map { it.first }
         AdminOperationListKind.ProblemWithoutResponsible -> signals.filter { (_, s) ->
-            AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.WITHOUT_RESPONSIBLE
+            AdminOperationOrderClassification.primaryPlacement(s) == AdminOrderPrimaryPlacement.PROBLEM &&
+                AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.WITHOUT_RESPONSIBLE
         }.map { it.first }
         else -> emptyList()
-    }
+    }.distinctBy { it.id }
 }
+
+private fun List<AdminOrderSummary>.forPrimaryPlacement(
+    placement: AdminOrderPrimaryPlacement,
+): List<AdminOrderSummary> =
+    filter {
+        AdminOperationOrderClassification.primaryPlacement(AdminOperationOrderSignals.from(it)) == placement
+    }.distinctBy { it.id }
+
+private fun List<AdminOrderSummary>.forPrimaryPlacements(
+    vararg placements: AdminOrderPrimaryPlacement,
+): List<AdminOrderSummary> =
+    filter {
+        AdminOperationOrderClassification.primaryPlacement(AdminOperationOrderSignals.from(it)) in placements
+    }.distinctBy { it.id }
 
 private fun Long?.isAdminToday(): Boolean {
     if (this == null) return false
@@ -1925,10 +1972,12 @@ private fun Long?.isAdminToday(): Boolean {
 
 private fun AdminOperationListKind.isOrderList(): Boolean =
     this in setOf(
+        AdminOperationListKind.TodayAll,
         AdminOperationListKind.TodayActive,
-        AdminOperationListKind.TodayFinished,
-        AdminOperationListKind.TodayCancelled,
-        AdminOperationListKind.TodayWithProblems,
+        AdminOperationListKind.TodayProblems,
+        AdminOperationListKind.TodayClosed,
+        AdminOperationListKind.ClosedFinished,
+        AdminOperationListKind.ClosedCancelled,
         AdminOperationListKind.ActiveWaitingStore,
         AdminOperationListKind.ActivePreparing,
         AdminOperationListKind.ActiveWaitingDriver,
@@ -1938,3 +1987,12 @@ private fun AdminOperationListKind.isOrderList(): Boolean =
         AdminOperationListKind.ProblemDelayed,
         AdminOperationListKind.ProblemWithoutResponsible,
     )
+
+private fun AdminOrderPrimaryPlacement.adminPlacementLabel(): String =
+    when (this) {
+        AdminOrderPrimaryPlacement.PROBLEM -> "Con problemas"
+        AdminOrderPrimaryPlacement.ACTIVE -> "Activo"
+        AdminOrderPrimaryPlacement.FINISHED -> "Finalizado"
+        AdminOrderPrimaryPlacement.CANCELLED -> "Cancelado"
+        AdminOrderPrimaryPlacement.UNCLASSIFIED -> "Sin clasificar"
+    }

@@ -65,6 +65,14 @@ function hasNormalActiveSignal(s) {
   return hasRealActiveSignal(s) && !hasRealProblemSignal(s);
 }
 
+function primaryPlacement(s) {
+  if (hasRealProblemSignal(s)) return "PROBLEM";
+  if (hasRealCancellationSignal(s)) return "CANCELLED";
+  if (hasRealFinishedSignal(s)) return "FINISHED";
+  if (hasNormalActiveSignal(s)) return "ACTIVE";
+  return "UNCLASSIFIED";
+}
+
 function todayBucket(s) {
   if (hasRealProblemSignal(s)) return "WITH_PROBLEMS";
   if (hasRealCancellationSignal(s)) return "CANCELLED";
@@ -118,13 +126,15 @@ function operationalFunction(source, requestType = "") {
 test("kotlin classifier exists as pure core without firebase", () => {
   const source = read(classifierPath);
   assert.match(source, /object AdminOperationOrderClassification/);
+  assert.match(source, /enum class AdminOrderPrimaryPlacement/);
+  assert.match(source, /fun primaryPlacement/);
   assert.match(source, /enum class AdminTodayOrdersBucket/);
   assert.match(source, /enum class AdminActiveOrdersBucket/);
   assert.doesNotMatch(source, /import.*firebase|import.*Firestore|com\.google\.firebase/);
   assert.doesNotMatch(source, /\.set\(|\.update\(|\.delete\(|writeBatch|runTransaction/);
   assert.match(source, /hasNormalActiveSignal/);
   assert.match(source, /if \(!hasNormalActiveSignal\(signals\)\) return null/);
-  assert.match(source, /if \(hasRealProblemSignal\(signals\)\) return AdminTodayOrdersBucket\.WITH_PROBLEMS/);
+  assert.match(source, /AdminOrderPrimaryPlacement\.PROBLEM -> AdminTodayOrdersBucket\.WITH_PROBLEMS/);
   assert.doesNotMatch(source, /hasRealWaitingStoreSignal\(signals: AdminOperationOrderSignals\): Boolean =\s*hasRealActiveSignal/);
 });
 
@@ -181,7 +191,23 @@ test("today and problem classifications use exclusive priority", () => {
   });
 
   assert.equal(todayBucket(conflicted), "WITH_PROBLEMS");
+  assert.equal(primaryPlacement(conflicted), "PROBLEM");
   assert.equal(problemBucket(conflicted), "STORE_NOT_RESPONDING");
+});
+
+test("primary placement is exclusive and today remains a separate temporal filter", () => {
+  assert.equal(primaryPlacement(signals({
+    status: "created",
+    publicStatus: "Pedido recibido",
+    operationalStatus: "Demorado",
+  })), "PROBLEM");
+  assert.equal(primaryPlacement(signals({status: "cancelled"})), "CANCELLED");
+  assert.equal(primaryPlacement(signals({status: "delivered"})), "FINISHED");
+  assert.equal(primaryPlacement(signals({
+    status: "created",
+    publicStatus: "Pedido recibido",
+  })), "ACTIVE");
+  assert.equal(primaryPlacement(signals({status: "created"})), "UNCLASSIFIED");
 });
 
 test("created + Pedido recibido does not map to problem or cancelled buckets", () => {

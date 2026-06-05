@@ -4,7 +4,7 @@ import com.pedilo.app.core.model.AdminOperationOrderClassification
 import com.pedilo.app.core.model.AdminOrderSummary
 
 internal val operationEntries = listOf(
-    AdminEntry("Pedidos del día", "Resumen de hoy"),
+    AdminEntry("Hoy", "Resumen temporal"),
     AdminEntry("Pedidos", "En curso, cerrados o con revisión"),
     AdminEntry("Repartidores", "Estado del equipo de reparto"),
     AdminEntry("Locales", "Estado de los locales activos"),
@@ -19,21 +19,21 @@ internal val operationUniverses = listOf(
         contextText = "Estado actual de pedidos.",
         views = listOf(
             AdminOperationView(
-                title = "Pedidos del día",
-                summary = "Todo lo que ingresó hoy.",
-                contextTitle = "Pedidos del día",
-                contextText = "Todo lo que ingresó hoy.",
+                title = "Hoy",
+                summary = "Movimiento de pedidos ingresados hoy.",
+                contextTitle = "Hoy",
+                contextText = "Movimiento de pedidos ingresados hoy.",
                 lists = listOf(
-                    AdminOperationList("Activos", "Pedidos que siguen abiertos.", "Sin pedidos por ahora.", AdminOperationListKind.TodayActive),
-                    AdminOperationList("Finalizados", "Pedidos cerrados correctamente.", "Sin pedidos por ahora.", AdminOperationListKind.TodayFinished),
-                    AdminOperationList("Cancelados", "Pedidos cerrados sin completar.", "Sin pedidos por ahora.", AdminOperationListKind.TodayCancelled),
-                    AdminOperationList("Con problemas", "Pedidos del día que requieren revisión.", "Sin casos por ahora.", AdminOperationListKind.TodayWithProblems),
+                    AdminOperationList("Ingresaron hoy", "Todos los pedidos ingresados hoy.", "Sin pedidos por ahora.", AdminOperationListKind.TodayAll),
+                    AdminOperationList("Activos de hoy", "Pedidos ingresados hoy que siguen activos.", "Sin pedidos por ahora.", AdminOperationListKind.TodayActive),
+                    AdminOperationList("Problemas de hoy", "Pedidos ingresados hoy que requieren revisión.", "Sin casos por ahora.", AdminOperationListKind.TodayProblems),
+                    AdminOperationList("Cerrados de hoy", "Pedidos ingresados hoy que ya cerraron.", "Sin pedidos por ahora.", AdminOperationListKind.TodayClosed),
                 ),
             ),
             AdminOperationView(
-                title = "Pedidos activos",
+                title = "Activos",
                 summary = "Pedidos que todavía siguen en curso.",
-                contextTitle = "Pedidos activos",
+                contextTitle = "Activos",
                 contextText = "Pedidos que todavía siguen en curso.",
                 lists = listOf(
                     AdminOperationList("Esperando local", "Necesitan respuesta del local.", "Sin pedidos por ahora.", AdminOperationListKind.ActiveWaitingStore),
@@ -43,15 +43,25 @@ internal val operationUniverses = listOf(
                 ),
             ),
             AdminOperationView(
-                title = "Pedidos con problemas",
+                title = "Problemas",
                 summary = "Casos que necesitan revisión.",
-                contextTitle = "Pedidos con problemas",
+                contextTitle = "Problemas",
                 contextText = "Casos que necesitan revisión.",
                 lists = listOf(
                     AdminOperationList("Local no responde", "Pedidos detenidos por falta de respuesta.", "Sin casos por ahora.", AdminOperationListKind.ProblemStoreNotResponding),
                     AdminOperationList("Reclamo de cliente", "Casos avisados por el cliente.", "Sin casos por ahora.", AdminOperationListKind.ProblemUserClaim),
                     AdminOperationList("Demorados", "Pedidos que superaron el tiempo esperado.", "Sin casos por ahora.", AdminOperationListKind.ProblemDelayed),
                     AdminOperationList("Sin responsable", "Pedidos que necesitan responsable.", "Sin casos por ahora.", AdminOperationListKind.ProblemWithoutResponsible),
+                ),
+            ),
+            AdminOperationView(
+                title = "Cerrados",
+                summary = "Pedidos que ya terminaron.",
+                contextTitle = "Cerrados",
+                contextText = "Pedidos que ya terminaron.",
+                lists = listOf(
+                    AdminOperationList("Finalizados", "Pedidos cerrados correctamente.", "Sin pedidos por ahora.", AdminOperationListKind.ClosedFinished),
+                    AdminOperationList("Cancelados", "Pedidos cerrados sin completar.", "Sin pedidos por ahora.", AdminOperationListKind.ClosedCancelled),
                 ),
             ),
         ),
@@ -104,7 +114,7 @@ internal fun orderDetailEntriesFor(
 ): List<AdminOrderDetailEntry> {
     val variant = when {
         listKind in setOf(
-            AdminOperationListKind.TodayWithProblems,
+            AdminOperationListKind.TodayProblems,
             AdminOperationListKind.ProblemStoreNotResponding,
             AdminOperationListKind.ProblemUserClaim,
             AdminOperationListKind.ProblemDelayed,

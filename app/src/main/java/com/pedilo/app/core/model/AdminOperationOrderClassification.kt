@@ -11,6 +11,14 @@ enum class AdminTodayOrdersBucket {
     WITH_PROBLEMS,
 }
 
+enum class AdminOrderPrimaryPlacement {
+    PROBLEM,
+    ACTIVE,
+    FINISHED,
+    CANCELLED,
+    UNCLASSIFIED,
+}
+
 enum class AdminActiveOrdersBucket {
     WAITING_STORE,
     PREPARING,
@@ -70,12 +78,23 @@ object AdminOperationOrderClassification {
     const val FUNCTION_PICKUP_AND_DELIVER = "Retirar y entregar"
     const val FUNCTION_REVIEW_ORDER = "Revisar pedido"
 
+    fun primaryPlacement(signals: AdminOperationOrderSignals): AdminOrderPrimaryPlacement =
+        when {
+            hasRealProblemSignal(signals) -> AdminOrderPrimaryPlacement.PROBLEM
+            hasRealCancellationSignal(signals) -> AdminOrderPrimaryPlacement.CANCELLED
+            hasRealFinishedSignal(signals) -> AdminOrderPrimaryPlacement.FINISHED
+            hasNormalActiveSignal(signals) -> AdminOrderPrimaryPlacement.ACTIVE
+            else -> AdminOrderPrimaryPlacement.UNCLASSIFIED
+        }
+
     fun todayBucket(signals: AdminOperationOrderSignals): AdminTodayOrdersBucket? {
-        if (hasRealProblemSignal(signals)) return AdminTodayOrdersBucket.WITH_PROBLEMS
-        if (hasRealCancellationSignal(signals)) return AdminTodayOrdersBucket.CANCELLED
-        if (hasRealFinishedSignal(signals)) return AdminTodayOrdersBucket.FINISHED
-        if (hasNormalActiveSignal(signals)) return AdminTodayOrdersBucket.ACTIVE
-        return null
+        return when (primaryPlacement(signals)) {
+            AdminOrderPrimaryPlacement.PROBLEM -> AdminTodayOrdersBucket.WITH_PROBLEMS
+            AdminOrderPrimaryPlacement.CANCELLED -> AdminTodayOrdersBucket.CANCELLED
+            AdminOrderPrimaryPlacement.FINISHED -> AdminTodayOrdersBucket.FINISHED
+            AdminOrderPrimaryPlacement.ACTIVE -> AdminTodayOrdersBucket.ACTIVE
+            AdminOrderPrimaryPlacement.UNCLASSIFIED -> null
+        }
     }
 
     fun activeBucket(signals: AdminOperationOrderSignals): AdminActiveOrdersBucket? {
