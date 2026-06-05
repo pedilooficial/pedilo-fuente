@@ -78,7 +78,7 @@ function todayBucket(s) {
   if (hasRealCancellationSignal(s)) return "CANCELLED";
   if (hasRealFinishedSignal(s)) return "FINISHED";
   if (hasNormalActiveSignal(s)) return "ACTIVE";
-  return null;
+  return "REVIEW";
 }
 
 function activeBucket(s) {
@@ -87,17 +87,18 @@ function activeBucket(s) {
   if (includes(s.operationalStatus, "esperando repartidor")) return "WAITING_DRIVER";
   if (includes(s.operationalStatus, "en entrega")) return "IN_DELIVERY";
   if (includes(s.operationalStatus, "esperando local")) return "WAITING_STORE";
-  return null;
+  return "REVIEW_STATE";
 }
 
 function problemBucket(s) {
+  if (!hasRealProblemSignal(s)) return null;
   if (includes(s.operationalStatus, "local no responde") || includes(s.operationalStatus, "sin respuesta")) {
     return "STORE_NOT_RESPONDING";
   }
   if (includes(s.publicStatus, "reclamo") || includes(s.publicStatus, "problema")) return "CUSTOMER_CLAIM";
   if (hasRealDelaySignal(s)) return "DELAYED";
   if (hasRealActiveSignal(s) && String(s.responsibleRole || "").trim() === "") return "WITHOUT_RESPONSIBLE";
-  return null;
+  return "OPERATIONAL_REVIEW";
 }
 
 function operationalIdentity(source, requestType = "") {
@@ -134,6 +135,9 @@ test("kotlin classifier exists as pure core without firebase", () => {
   assert.doesNotMatch(source, /\.set\(|\.update\(|\.delete\(|writeBatch|runTransaction/);
   assert.match(source, /hasNormalActiveSignal/);
   assert.match(source, /if \(!hasNormalActiveSignal\(signals\)\) return null/);
+  assert.match(source, /return AdminActiveOrdersBucket\.REVIEW_STATE/);
+  assert.match(source, /return AdminProblemOrdersBucket\.OPERATIONAL_REVIEW/);
+  assert.match(source, /AdminOrderPrimaryPlacement\.UNCLASSIFIED -> AdminTodayOrdersBucket\.REVIEW/);
   assert.match(source, /AdminOrderPrimaryPlacement\.PROBLEM -> AdminTodayOrdersBucket\.WITH_PROBLEMS/);
   assert.doesNotMatch(source, /hasRealWaitingStoreSignal\(signals: AdminOperationOrderSignals\): Boolean =\s*hasRealActiveSignal/);
 });
@@ -155,10 +159,11 @@ test("normal active order needs an explicit stage for active sub-bucket", () => 
   assert.equal(activeBucket(s), "WAITING_STORE");
 });
 
-test("active order without explicit stage is not forced into Esperando local", () => {
+test("active order without explicit stage goes only to Revisar estado", () => {
   const s = signals({status: "created", publicStatus: "Pedido recibido"});
   assert.equal(todayBucket(s), "ACTIVE");
-  assert.equal(activeBucket(s), null);
+  assert.equal(activeBucket(s), "REVIEW_STATE");
+  assert.notEqual(activeBucket(s), "WAITING_STORE");
 });
 
 test("problem orders leave normal active buckets", () => {
@@ -193,6 +198,49 @@ test("today and problem classifications use exclusive priority", () => {
   assert.equal(todayBucket(conflicted), "WITH_PROBLEMS");
   assert.equal(primaryPlacement(conflicted), "PROBLEM");
   assert.equal(problemBucket(conflicted), "STORE_NOT_RESPONDING");
+});
+
+test("generic real problem goes only to operational review", () => {
+  const genericProblem = signals({
+    status: "created",
+    publicStatus: "Pedido recibido",
+    needsAttention: true,
+  });
+  assert.equal(primaryPlacement(genericProblem), "PROBLEM");
+  assert.equal(problemBucket(genericProblem), "OPERATIONAL_REVIEW");
+
+  const specificProblem = signals({
+    status: "created",
+    publicStatus: "Reclamo del cliente",
+    needsAttention: true,
+  });
+  assert.equal(problemBucket(specificProblem), "CUSTOMER_CLAIM");
+  assert.notEqual(problemBucket(specificProblem), "OPERATIONAL_REVIEW");
+});
+
+test("every representative order has a findable exclusive operational location", () => {
+  const rows = [
+    signals({status: "created", publicStatus: "Pedido recibido", operationalStatus: "Preparando"}),
+    signals({status: "created", publicStatus: "Pedido recibido"}),
+    signals({status: "created", publicStatus: "Pedido recibido", needsAttention: true}),
+    signals({status: "cancelled"}),
+    signals({status: "delivered"}),
+    signals({status: "created"}),
+  ];
+  const primaryCounts = new Map();
+  for (const row of rows) {
+    const placement = primaryPlacement(row);
+    primaryCounts.set(placement, (primaryCounts.get(placement) || 0) + 1);
+    assert.notEqual(todayBucket(row), null);
+  }
+
+  assert.equal([...primaryCounts.values()].reduce((sum, count) => sum + count, 0), rows.length);
+  for (const row of rows.filter((candidate) => primaryPlacement(candidate) === "ACTIVE")) {
+    assert.ok(["WAITING_STORE", "PREPARING", "WAITING_DRIVER", "IN_DELIVERY", "REVIEW_STATE"].includes(activeBucket(row)));
+  }
+  for (const row of rows.filter((candidate) => primaryPlacement(candidate) === "PROBLEM")) {
+    assert.ok(["STORE_NOT_RESPONDING", "CUSTOMER_CLAIM", "DELAYED", "WITHOUT_RESPONSIBLE", "OPERATIONAL_REVIEW"].includes(problemBucket(row)));
+  }
 });
 
 test("primary placement is exclusive and today remains a separate temporal filter", () => {
@@ -261,9 +309,10 @@ test("operational labels translate public flows into human identities", () => {
   assert.doesNotMatch(source, /Pedido de local|Botón \+ Comprar|Botón \+ Retiro|Origen técnico/);
 });
 
-test("legacy created without publicStatus stays unmapped conservatively", () => {
+test("legacy created without publicStatus stays visible for review", () => {
   const s = signals({status: "created", publicStatus: "", source: "public_app"});
-  assert.equal(todayBucket(s), null);
+  assert.equal(primaryPlacement(s), "UNCLASSIFIED");
+  assert.equal(todayBucket(s), "REVIEW");
   assert.equal(activeBucket(s), null);
 });
 
@@ -278,7 +327,7 @@ test("real firebase combinations from audit classify conservatively", () => {
       requestType: "",
       bucket: "ACTIVE",
     },
-    {status: "created", publicStatus: "", source: "public_app", requestType: "", bucket: null},
+    {status: "created", publicStatus: "", source: "public_app", requestType: "", bucket: "REVIEW"},
     {
       status: "created",
       publicStatus: "Pedido recibido",

@@ -109,6 +109,10 @@ test("admin operation internal screens expose planned operation subworlds", () =
     "Reclamo de cliente",
     "Demorados",
     "Sin responsable",
+    "Revisar pedido",
+    "Revisar estado",
+    "Revisión operativa",
+    "Revisión de hoy",
     "En servicio",
     "Disponibles",
     "Con incidencias",
@@ -533,10 +537,45 @@ test("admin orders board removes repeated summaries and exposes useful hierarchy
   assert.match(source, /AdminOperationListKind\.TodayClosed/);
   assert.match(source, /AdminOperationListKind\.ClosedFinished/);
   assert.match(source, /AdminOperationListKind\.ClosedCancelled/);
+  assert.match(source, /AdminOperationListKind\.TodayReview/);
+  assert.match(source, /AdminOperationListKind\.Unclassified/);
+  assert.match(source, /AdminOperationListKind\.ActiveReviewState/);
+  assert.match(source, /AdminOperationListKind\.ProblemOperationalReview/);
+  assert.match(source, /forPrimaryPlacement\(AdminOrderPrimaryPlacement\.UNCLASSIFIED\)/);
+  assert.match(source, /activeBucket\(s\) == AdminActiveOrdersBucket\.REVIEW_STATE/);
+  assert.match(source, /problemBucket\(s\) == AdminProblemOrdersBucket\.OPERATIONAL_REVIEW/);
   assert.doesNotMatch(viewScreen, /AdminOperationMotherCard/);
   assert.doesNotMatch(listScreen, /AdminInfoPanel/);
   assert.match(listScreen, /operationCompactTitle\(list\.title\)/);
   assert.match(listScreen, /entry\.note\.substringAfter/);
+});
+
+test("admin operation fallback cards keep counts previews and human detail aligned", () => {
+  const source = readAdminSourceTree();
+  const adminSource = fs.readFileSync(admin, "utf8");
+  const detailScreen = adminSource.slice(
+    adminSource.indexOf("private fun AdminOrderDetailScreen"),
+    adminSource.indexOf("private fun AdminOrderSectionScreen"),
+  );
+  const placementLabels = adminSource.slice(
+    adminSource.indexOf("private fun AdminOrderPrimaryPlacement.adminPlacementLabel"),
+  );
+
+  assert.match(source, /AdminOperationList\("Revisar pedido"[\s\S]*AdminOperationListKind\.Unclassified\)/);
+  assert.match(source, /AdminOperationList\("Revisar estado"[\s\S]*AdminOperationListKind\.ActiveReviewState\)/);
+  assert.match(source, /AdminOperationList\("Revisión operativa"[\s\S]*AdminOperationListKind\.ProblemOperationalReview\)/);
+  assert.match(source, /AdminOperationList\("Revisión de hoy"[\s\S]*AdminOperationListKind\.TodayReview\)/);
+  assert.match(adminSource, /operationListCountLabel[\s\S]*orders\.forOperationList\(list\.kind\)\.size/);
+  assert.match(adminSource, /preview = orderDetailEntriesFor\(list\.kind, orders\.forOperationList\(list\.kind\)\)/);
+  assert.match(adminSource, /val scopedOrders = orders\.forOperationList\(list\.kind\)/);
+  assert.match(detailScreen, /AdminOrderPrimaryPlacement\.UNCLASSIFIED -> "Sin datos"/);
+  assert.match(detailScreen, /AdminActiveOrdersBucket\.REVIEW_STATE -> "Revisar estado"/);
+  assert.match(placementLabels, /AdminOrderPrimaryPlacement\.UNCLASSIFIED -> "Revisar pedido"/);
+  const visibleLines = new Set(readVisibleAdminStrings().split("\n").map((line) => line.trim()));
+  for (const technicalCopy of ["UNCLASSIFIED", "operationalStatus", "requestType", "source", "mock", "demo", "placeholder"]) {
+    assert.equal(visibleLines.has(technicalCopy), false);
+  }
+  assert.doesNotMatch(placementLabels, /Sin clasificar/);
 });
 
 test("admin operation universe avoids explanatory mockup panels", () => {

@@ -45,6 +45,7 @@ import androidx.compose.material.icons.outlined.PersonOff
 import androidx.compose.material.icons.outlined.ReportProblem
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material.icons.outlined.TwoWheeler
@@ -1197,7 +1198,7 @@ private fun operationIconFor(title: String): ImageVector =
         "Hoy", "Ingresaron hoy" -> Icons.Outlined.CalendarToday
         "Pedidos" -> Icons.AutoMirrored.Outlined.ReceiptLong
         "Activos", "Activos de hoy" -> Icons.Outlined.Bolt
-        "Problemas", "Problemas de hoy", "Con problemas", "Con incidencias" -> Icons.Outlined.ReportProblem
+        "Problemas", "Problemas de hoy", "Con problemas", "Con incidencias", "Revisión operativa" -> Icons.Outlined.ReportProblem
         "Cerrados", "Cerrados de hoy", "Finalizados" -> Icons.Outlined.TaskAlt
         "Cancelados", "Pausados" -> Icons.Outlined.Cancel
         "Demorados", "Con demoras" -> Icons.Outlined.Schedule
@@ -1207,6 +1208,7 @@ private fun operationIconFor(title: String): ImageVector =
         "En entrega", "En camino", "Entrega" -> Icons.Outlined.LocalShipping
         "Reclamo de cliente" -> Icons.Outlined.Feedback
         "Sin responsable" -> Icons.Outlined.PersonOff
+        "Revisar pedido", "Revisar estado", "Revisión de hoy" -> Icons.Outlined.Search
         "Operando" -> Icons.Outlined.CheckCircle
         "Pago" -> Icons.Outlined.CreditCard
         "Historial" -> Icons.Outlined.History
@@ -1242,6 +1244,7 @@ private fun operationViewOrders(view: AdminOperationView, orders: List<AdminOrde
         "Hoy" -> orders.forOperationList(AdminOperationListKind.TodayAll)
         "Activos" -> orders.forPrimaryPlacement(AdminOrderPrimaryPlacement.ACTIVE)
         "Problemas" -> orders.forPrimaryPlacement(AdminOrderPrimaryPlacement.PROBLEM)
+        "Revisar pedido" -> orders.forPrimaryPlacement(AdminOrderPrimaryPlacement.UNCLASSIFIED)
         "Cerrados" -> orders.forPrimaryPlacements(
             AdminOrderPrimaryPlacement.FINISHED,
             AdminOrderPrimaryPlacement.CANCELLED,
@@ -1257,6 +1260,7 @@ private fun operationViewStateLabel(view: AdminOperationView, orders: List<Admin
         view.title == "Problemas" -> "Prioridad"
         view.title == "Activos" -> "En curso"
         view.title == "Cerrados" -> "Completados"
+        view.title == "Revisar pedido" -> "Requiere revisión"
         else -> "Ingresados hoy"
     }
 }
@@ -1284,6 +1288,7 @@ private fun operationListTensionLabel(list: AdminOperationList, orders: List<Adm
             AdminOperationListKind.ProblemUserClaim,
             AdminOperationListKind.ProblemDelayed,
             AdminOperationListKind.ProblemWithoutResponsible,
+            AdminOperationListKind.ProblemOperationalReview,
         ) -> "Con casos"
         else -> "En curso"
     }
@@ -1295,6 +1300,7 @@ private fun operationToneFor(view: AdminOperationView, orders: List<AdminOrderSu
         count == 0 -> AdminOperationMetricTone.Neutral
         view.title == "Problemas" -> AdminOperationMetricTone.Danger
         view.title == "Activos" -> AdminOperationMetricTone.Healthy
+        view.title == "Revisar pedido" -> AdminOperationMetricTone.Warning
         else -> AdminOperationMetricTone.Neutral
     }
 }
@@ -1309,6 +1315,7 @@ private fun operationToneFor(list: AdminOperationList, orders: List<AdminOrderSu
             AdminOperationListKind.ProblemUserClaim,
             AdminOperationListKind.ProblemDelayed,
             AdminOperationListKind.ProblemWithoutResponsible,
+            AdminOperationListKind.ProblemOperationalReview,
         ) -> AdminOperationMetricTone.Danger
         list.kind in setOf(
             AdminOperationListKind.ClosedFinished,
@@ -1320,6 +1327,9 @@ private fun operationToneFor(list: AdminOperationList, orders: List<AdminOrderSu
             AdminOperationListKind.ClosedCancelled,
             AdminOperationListKind.ActiveWaitingStore,
             AdminOperationListKind.ActiveWaitingDriver,
+            AdminOperationListKind.ActiveReviewState,
+            AdminOperationListKind.TodayReview,
+            AdminOperationListKind.Unclassified,
             AdminOperationListKind.StorePaused,
             AdminOperationListKind.StoreDelayed,
             AdminOperationListKind.DriverWithIncidents,
@@ -1685,18 +1695,17 @@ private fun AdminOrderDetailScreen(
     val storeName = detail?.storeName ?: summary?.storeName.orEmpty()
     val identity = AdminOperationOrderClassification.operationalIdentity(source, requestType)
     val operationFunction = AdminOperationOrderClassification.operationalFunction(source, requestType)
-    val placement = AdminOperationOrderClassification.primaryPlacement(
-        AdminOperationOrderSignals(
-            status = detail?.status ?: summary?.status.orEmpty(),
-            publicStatus = publicStatus,
-            operationalStatus = operationalStatus,
-            responsibleRole = detail?.responsibleRole ?: summary?.responsibleRole.orEmpty(),
-            needsAttention = needsAttention,
-            activeIncident = activeIncident,
-            source = source,
-            requestType = requestType,
-        ),
+    val signals = AdminOperationOrderSignals(
+        status = detail?.status ?: summary?.status.orEmpty(),
+        publicStatus = publicStatus,
+        operationalStatus = operationalStatus,
+        responsibleRole = detail?.responsibleRole ?: summary?.responsibleRole.orEmpty(),
+        needsAttention = needsAttention,
+        activeIncident = activeIncident,
+        source = source,
+        requestType = requestType,
     )
+    val placement = AdminOperationOrderClassification.primaryPlacement(signals)
     val enteredToday = (detail?.createdAtMillis ?: summary?.createdAtMillis).isAdminToday()
     val problemFocus = adminOrderProblemFocus(
         variant = variant,
@@ -1705,12 +1714,17 @@ private fun AdminOrderDetailScreen(
         needsAttention = needsAttention,
         activeIncident = activeIncident,
     )
-    val statusText = adminHumanOperationStatus(
-        publicStatus = publicStatus,
-        operationalStatus = operationalStatus,
-        rawStatus = detail?.status ?: summary?.status.orEmpty(),
-        hasProblem = problemFocus != null,
-    )
+    val statusText = when {
+        placement == AdminOrderPrimaryPlacement.UNCLASSIFIED -> "Sin datos"
+        placement == AdminOrderPrimaryPlacement.ACTIVE &&
+            AdminOperationOrderClassification.activeBucket(signals) == AdminActiveOrdersBucket.REVIEW_STATE -> "Revisar estado"
+        else -> adminHumanOperationStatus(
+            publicStatus = publicStatus,
+            operationalStatus = operationalStatus,
+            rawStatus = detail?.status ?: summary?.status.orEmpty(),
+            hasProblem = problemFocus != null,
+        )
+    }
     val operationTitle = adminOrderOperationSectionTitle(identity)
     val operationNote = when (identity) {
         AdminOperationOrderClassification.IDENTITY_LOCAL_PICKUP -> storeName.adminDisplayValue("Información de retiro")
@@ -1779,20 +1793,39 @@ private fun AdminOrderSectionScreen(
     val identity = AdminOperationOrderClassification.operationalIdentity(source, requestType)
     val operationFunction = AdminOperationOrderClassification.operationalFunction(source, requestType)
     val publicStatus = detail?.publicStatus ?: summary?.publicStatus.orEmpty()
+    val operationalStatus = detail?.operationalStatus ?: summary?.operationalStatus.orEmpty()
+    val needsAttention = detail?.needsAttention ?: summary?.needsAttention ?: false
+    val activeIncident = detail?.activeIncident ?: summary?.activeIncident ?: false
+    val signals = AdminOperationOrderSignals(
+        status = detail?.status ?: summary?.status.orEmpty(),
+        publicStatus = publicStatus,
+        operationalStatus = operationalStatus,
+        responsibleRole = detail?.responsibleRole ?: summary?.responsibleRole.orEmpty(),
+        needsAttention = needsAttention,
+        activeIncident = activeIncident,
+        source = source,
+        requestType = requestType,
+    )
+    val placement = AdminOperationOrderClassification.primaryPlacement(signals)
     val storeName = detail?.storeName ?: summary?.storeName.orEmpty()
     val problem = adminOrderProblemFocus(
         variant = variant,
         publicStatus = publicStatus,
-        operationalStatus = detail?.operationalStatus ?: summary?.operationalStatus.orEmpty(),
-        needsAttention = detail?.needsAttention ?: summary?.needsAttention ?: false,
-        activeIncident = detail?.activeIncident ?: summary?.activeIncident ?: false,
+        operationalStatus = operationalStatus,
+        needsAttention = needsAttention,
+        activeIncident = activeIncident,
     )
-    val status = adminHumanOperationStatus(
-        publicStatus = publicStatus,
-        operationalStatus = detail?.operationalStatus ?: summary?.operationalStatus.orEmpty(),
-        rawStatus = detail?.status ?: summary?.status.orEmpty(),
-        hasProblem = problem != null,
-    )
+    val status = when {
+        placement == AdminOrderPrimaryPlacement.UNCLASSIFIED -> "Sin datos"
+        placement == AdminOrderPrimaryPlacement.ACTIVE &&
+            AdminOperationOrderClassification.activeBucket(signals) == AdminActiveOrdersBucket.REVIEW_STATE -> "Revisar estado"
+        else -> adminHumanOperationStatus(
+            publicStatus = publicStatus,
+            operationalStatus = operationalStatus,
+            rawStatus = detail?.status ?: summary?.status.orEmpty(),
+            hasProblem = problem != null,
+        )
+    }
     val title = when (section) {
         AdminOrderSection.Summary -> "Resumen"
         AdminOrderSection.Operation -> adminOrderOperationSectionTitle(identity)
@@ -2023,6 +2056,12 @@ private fun List<AdminOrderSummary>.forOperationList(kind: AdminOperationListKin
                 AdminOrderPrimaryPlacement.CANCELLED,
             )
         }.map { it.first }
+        AdminOperationListKind.TodayReview -> todaySignals.filter { (_, s) ->
+            AdminOperationOrderClassification.primaryPlacement(s) == AdminOrderPrimaryPlacement.UNCLASSIFIED
+        }.map { it.first }
+        AdminOperationListKind.Unclassified -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.primaryPlacement(s) == AdminOrderPrimaryPlacement.UNCLASSIFIED
+        }.map { it.first }
         AdminOperationListKind.ClosedFinished -> signals.filter { (_, s) ->
             AdminOperationOrderClassification.primaryPlacement(s) == AdminOrderPrimaryPlacement.FINISHED
         }.map { it.first }
@@ -2045,6 +2084,10 @@ private fun List<AdminOrderSummary>.forOperationList(kind: AdminOperationListKin
             AdminOperationOrderClassification.primaryPlacement(s) == AdminOrderPrimaryPlacement.ACTIVE &&
                 AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.IN_DELIVERY
         }.map { it.first }
+        AdminOperationListKind.ActiveReviewState -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.primaryPlacement(s) == AdminOrderPrimaryPlacement.ACTIVE &&
+                AdminOperationOrderClassification.activeBucket(s) == AdminActiveOrdersBucket.REVIEW_STATE
+        }.map { it.first }
         AdminOperationListKind.ProblemStoreNotResponding -> signals.filter { (_, s) ->
             AdminOperationOrderClassification.primaryPlacement(s) == AdminOrderPrimaryPlacement.PROBLEM &&
                 AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.STORE_NOT_RESPONDING
@@ -2060,6 +2103,10 @@ private fun List<AdminOrderSummary>.forOperationList(kind: AdminOperationListKin
         AdminOperationListKind.ProblemWithoutResponsible -> signals.filter { (_, s) ->
             AdminOperationOrderClassification.primaryPlacement(s) == AdminOrderPrimaryPlacement.PROBLEM &&
                 AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.WITHOUT_RESPONSIBLE
+        }.map { it.first }
+        AdminOperationListKind.ProblemOperationalReview -> signals.filter { (_, s) ->
+            AdminOperationOrderClassification.primaryPlacement(s) == AdminOrderPrimaryPlacement.PROBLEM &&
+                AdminOperationOrderClassification.problemBucket(s) == AdminProblemOrdersBucket.OPERATIONAL_REVIEW
         }.map { it.first }
         else -> emptyList()
     }.distinctBy { it.id }
@@ -2094,16 +2141,20 @@ private fun AdminOperationListKind.isOrderList(): Boolean =
         AdminOperationListKind.TodayActive,
         AdminOperationListKind.TodayProblems,
         AdminOperationListKind.TodayClosed,
+        AdminOperationListKind.TodayReview,
+        AdminOperationListKind.Unclassified,
         AdminOperationListKind.ClosedFinished,
         AdminOperationListKind.ClosedCancelled,
         AdminOperationListKind.ActiveWaitingStore,
         AdminOperationListKind.ActivePreparing,
         AdminOperationListKind.ActiveWaitingDriver,
         AdminOperationListKind.ActiveInDelivery,
+        AdminOperationListKind.ActiveReviewState,
         AdminOperationListKind.ProblemStoreNotResponding,
         AdminOperationListKind.ProblemUserClaim,
         AdminOperationListKind.ProblemDelayed,
         AdminOperationListKind.ProblemWithoutResponsible,
+        AdminOperationListKind.ProblemOperationalReview,
     )
 
 private fun AdminOrderPrimaryPlacement.adminPlacementLabel(): String =
@@ -2112,5 +2163,5 @@ private fun AdminOrderPrimaryPlacement.adminPlacementLabel(): String =
         AdminOrderPrimaryPlacement.ACTIVE -> "Activo"
         AdminOrderPrimaryPlacement.FINISHED -> "Finalizado"
         AdminOrderPrimaryPlacement.CANCELLED -> "Cancelado"
-        AdminOrderPrimaryPlacement.UNCLASSIFIED -> "Sin clasificar"
+        AdminOrderPrimaryPlacement.UNCLASSIFIED -> "Revisar pedido"
     }

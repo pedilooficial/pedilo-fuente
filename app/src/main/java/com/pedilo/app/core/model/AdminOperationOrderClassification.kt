@@ -9,6 +9,7 @@ enum class AdminTodayOrdersBucket {
     FINISHED,
     CANCELLED,
     WITH_PROBLEMS,
+    REVIEW,
 }
 
 enum class AdminOrderPrimaryPlacement {
@@ -24,6 +25,7 @@ enum class AdminActiveOrdersBucket {
     PREPARING,
     WAITING_DRIVER,
     IN_DELIVERY,
+    REVIEW_STATE,
 }
 
 enum class AdminProblemOrdersBucket {
@@ -31,6 +33,7 @@ enum class AdminProblemOrdersBucket {
     CUSTOMER_CLAIM,
     DELAYED,
     WITHOUT_RESPONSIBLE,
+    OPERATIONAL_REVIEW,
 }
 
 data class AdminOperationOrderSignals(
@@ -93,7 +96,7 @@ object AdminOperationOrderClassification {
             AdminOrderPrimaryPlacement.CANCELLED -> AdminTodayOrdersBucket.CANCELLED
             AdminOrderPrimaryPlacement.FINISHED -> AdminTodayOrdersBucket.FINISHED
             AdminOrderPrimaryPlacement.ACTIVE -> AdminTodayOrdersBucket.ACTIVE
-            AdminOrderPrimaryPlacement.UNCLASSIFIED -> null
+            AdminOrderPrimaryPlacement.UNCLASSIFIED -> AdminTodayOrdersBucket.REVIEW
         }
     }
 
@@ -103,15 +106,16 @@ object AdminOperationOrderClassification {
         if (hasRealWaitingDriverSignal(signals)) return AdminActiveOrdersBucket.WAITING_DRIVER
         if (hasRealInDeliverySignal(signals)) return AdminActiveOrdersBucket.IN_DELIVERY
         if (hasRealWaitingStoreSignal(signals)) return AdminActiveOrdersBucket.WAITING_STORE
-        return null
+        return AdminActiveOrdersBucket.REVIEW_STATE
     }
 
     fun problemBucket(signals: AdminOperationOrderSignals): AdminProblemOrdersBucket? {
+        if (!hasRealProblemSignal(signals)) return null
         if (hasRealStoreNotRespondingSignal(signals)) return AdminProblemOrdersBucket.STORE_NOT_RESPONDING
         if (hasRealCustomerClaimSignal(signals)) return AdminProblemOrdersBucket.CUSTOMER_CLAIM
         if (hasRealDelaySignal(signals)) return AdminProblemOrdersBucket.DELAYED
         if (hasRealWithoutResponsibleSignal(signals)) return AdminProblemOrdersBucket.WITHOUT_RESPONSIBLE
-        return null
+        return AdminProblemOrdersBucket.OPERATIONAL_REVIEW
     }
 
     fun operationalIdentity(source: String, requestType: String = ""): String =

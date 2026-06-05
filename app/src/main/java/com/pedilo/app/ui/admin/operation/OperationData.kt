@@ -1,6 +1,9 @@
 package com.pedilo.app.ui.admin
 
 import com.pedilo.app.core.model.AdminOperationOrderClassification
+import com.pedilo.app.core.model.AdminActiveOrdersBucket
+import com.pedilo.app.core.model.AdminOperationOrderSignals
+import com.pedilo.app.core.model.AdminOrderPrimaryPlacement
 import com.pedilo.app.core.model.AdminOrderSummary
 
 internal val operationEntries = listOf(
@@ -28,6 +31,7 @@ internal val operationUniverses = listOf(
                     AdminOperationList("Activos de hoy", "Pedidos ingresados hoy que siguen activos.", "Sin pedidos", AdminOperationListKind.TodayActive),
                     AdminOperationList("Problemas de hoy", "Pedidos ingresados hoy que requieren revisión.", "Sin casos", AdminOperationListKind.TodayProblems),
                     AdminOperationList("Cerrados de hoy", "Pedidos ingresados hoy que ya cerraron.", "Sin pedidos", AdminOperationListKind.TodayClosed),
+                    AdminOperationList("Revisión de hoy", "Pedidos ingresados hoy sin datos suficientes para ubicarlos.", "Sin pedidos", AdminOperationListKind.TodayReview),
                 ),
             ),
             AdminOperationView(
@@ -40,6 +44,7 @@ internal val operationUniverses = listOf(
                     AdminOperationList("Preparando", "El local está preparando.", "Sin pedidos", AdminOperationListKind.ActivePreparing),
                     AdminOperationList("Buscando repartidor", "Listos para asignar o retirar.", "Sin pedidos", AdminOperationListKind.ActiveWaitingDriver),
                     AdminOperationList("En camino", "Ya están camino al destino.", "Sin pedidos", AdminOperationListKind.ActiveInDelivery),
+                    AdminOperationList("Revisar estado", "Activos sin una etapa explícita.", "Sin pedidos", AdminOperationListKind.ActiveReviewState),
                 ),
             ),
             AdminOperationView(
@@ -52,6 +57,7 @@ internal val operationUniverses = listOf(
                     AdminOperationList("Reclamo de cliente", "Casos avisados por el cliente.", "Sin casos", AdminOperationListKind.ProblemUserClaim),
                     AdminOperationList("Demorados", "Pedidos que superaron el tiempo esperado.", "Sin casos", AdminOperationListKind.ProblemDelayed),
                     AdminOperationList("Sin responsable", "Pedidos que necesitan responsable.", "Sin casos", AdminOperationListKind.ProblemWithoutResponsible),
+                    AdminOperationList("Revisión operativa", "Problemas sin una causa específica.", "Sin casos", AdminOperationListKind.ProblemOperationalReview),
                 ),
             ),
             AdminOperationView(
@@ -62,6 +68,15 @@ internal val operationUniverses = listOf(
                 lists = listOf(
                     AdminOperationList("Finalizados", "Pedidos cerrados correctamente.", "Sin pedidos", AdminOperationListKind.ClosedFinished),
                     AdminOperationList("Cancelados", "Pedidos cerrados sin completar.", "Sin pedidos", AdminOperationListKind.ClosedCancelled),
+                ),
+            ),
+            AdminOperationView(
+                title = "Revisar pedido",
+                summary = "Pedidos sin datos suficientes para ubicarlos.",
+                contextTitle = "Revisar pedido",
+                contextText = "Pedidos que necesitan ubicación operativa.",
+                lists = listOf(
+                    AdminOperationList("Revisar pedido", "Pedidos sin datos suficientes para ubicarlos.", "Sin pedidos", AdminOperationListKind.Unclassified),
                 ),
             ),
         ),
@@ -119,6 +134,7 @@ internal fun orderDetailEntriesFor(
             AdminOperationListKind.ProblemUserClaim,
             AdminOperationListKind.ProblemDelayed,
             AdminOperationListKind.ProblemWithoutResponsible,
+            AdminOperationListKind.ProblemOperationalReview,
         ) -> OperationOrderVariant.WithProblem
         listKind == AdminOperationListKind.ActiveWaitingStore -> OperationOrderVariant.NeedsAttention
         else -> OperationOrderVariant.Normal
@@ -126,7 +142,15 @@ internal fun orderDetailEntriesFor(
     return orders.map {
         val identity = AdminOperationOrderClassification.operationalIdentity(it.source, it.requestType)
         val function = AdminOperationOrderClassification.operationalFunction(it.source, it.requestType)
-        val status = it.adminHumanOperationStatus()
+        val signals = AdminOperationOrderSignals.from(it)
+        val placement = AdminOperationOrderClassification.primaryPlacement(signals)
+        val status = when {
+            placement == AdminOrderPrimaryPlacement.UNCLASSIFIED -> "Sin datos"
+            placement == AdminOrderPrimaryPlacement.ACTIVE &&
+                AdminOperationOrderClassification.activeBucket(signals) ==
+                AdminActiveOrdersBucket.REVIEW_STATE -> "Revisar estado"
+            else -> it.adminHumanOperationStatus()
+        }
         val secondary = it.storeName.ifBlank { function }
         AdminOrderDetailEntry(
             label = if (it.trackingNumber.isNotBlank()) "Pedido #${it.trackingNumber}" else "Pedido #____",
