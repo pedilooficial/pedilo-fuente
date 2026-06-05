@@ -401,7 +401,7 @@ test("admin order detail exposes Pedido #____ read-only ficha with real-data fal
   const adminSource = fs.readFileSync(admin, "utf8");
   const detailScreen = adminSource.slice(
     adminSource.indexOf("private fun AdminOrderDetailScreen"),
-    adminSource.indexOf("private fun AdminOrderMomentPanel"),
+    adminSource.indexOf("private fun AdminOrderSectionScreen"),
   );
   const forbiddenTitles = ["Pedido vivo", "Detalle del pedido", "Resolución del pedido"];
   const forbiddenOrderCopy = [
@@ -418,6 +418,8 @@ test("admin order detail exposes Pedido #____ read-only ficha with real-data fal
   ];
 
   assert.match(source, /OperationOrderDetail/);
+  assert.match(source, /OperationOrderSection/);
+  assert.match(source, /enum class AdminOrderSection/);
   assert.match(source, /OperationOrderVariant/);
   assert.match(source, /"Pedido #____"/);
   assert.match(source, /AdminOrderDetailScreen/);
@@ -434,7 +436,6 @@ test("admin order detail exposes Pedido #____ read-only ficha with real-data fal
     "Entrega",
     "Total",
     "Pago",
-    "Tiempos",
     "Problemas",
     "Historial operativo",
     "Opciones",
@@ -445,6 +446,16 @@ test("admin order detail exposes Pedido #____ read-only ficha with real-data fal
     "—",
   ].forEach((label) => assert.match(source, new RegExp(label)));
   forbiddenOrderCopy.forEach((label) => assert.doesNotMatch(detailScreen, new RegExp(label)));
+  assert.match(detailScreen, /AdminOrderNavigationCard/);
+  assert.match(source, /AdminOrderSectionScreen/);
+  assert.match(source, /AdminOrderSection\.Summary/);
+  assert.match(source, /AdminOrderSection\.Operation/);
+  assert.match(source, /AdminOrderSection\.Delivery/);
+  assert.match(source, /AdminOrderSection\.Payment/);
+  assert.match(source, /AdminOrderSection\.Problems/);
+  assert.match(source, /AdminOrderSection\.History/);
+  assert.match(source, /AdminOrderSection\.Options/);
+  assert.doesNotMatch(detailScreen, /AdminOrderFactPanel/);
   forbiddenTitles.forEach((title) => assert.doesNotMatch(source, new RegExp(`"${title}"`)));
 });
 
@@ -458,14 +469,36 @@ test("admin order detail keeps shell rules and visual entry paths", () => {
   assert.match(source, /AdminOperationOrderClassification\.problemBucket/);
   assert.match(source, /AdminOperationOrderClassification\.activeBucket/);
   assert.match(source, /is AdminRoute\.OperationOrderDetail -> current\.returnRoute/);
+  assert.match(source, /is AdminRoute\.OperationOrderSection -> current\.detailRoute/);
   assert.match(source, /is AdminRoute\.OperationOrderDetail -> AdminOrderDetailScreen/);
+  assert.match(source, /is AdminRoute\.OperationOrderSection -> AdminOrderSectionScreen/);
   assert.match(source, /adminOrderVisibleNumber/);
   assert.match(source, /adminDisplayValue/);
   assert.match(source, /adminItemsSummary/);
-  assert.match(source, /adminMillisValue/);
+  assert.match(source, /component15\(\)\.adminDisplayValue/);
   assert.doesNotMatch(source, /Acciones disponibles/);
   forbiddenReturnLabels.forEach((label) => assert.doesNotMatch(source, new RegExp(`"${label}"`)));
   assert.match(source, /private fun AdminOrderDetailScreen[\s\S]*showSignOut = false/);
+});
+
+test("admin orders board removes repeated summaries and exposes useful hierarchy", () => {
+  const source = fs.readFileSync(admin, "utf8");
+  const viewScreen = source.slice(
+    source.indexOf("private fun AdminOperationViewScreen"),
+    source.indexOf("private fun AdminOperationListScreen"),
+  );
+  const listScreen = source.slice(
+    source.indexOf("private fun AdminOperationListScreen"),
+    source.indexOf("private fun AdminOperationDeskScreen"),
+  );
+
+  assert.match(source, /prominentValue = orders\.size\.toString\(\)/);
+  assert.match(source, /summary = "Movimiento operativo"/);
+  assert.match(source, /preview = orderDetailEntriesFor/);
+  assert.doesNotMatch(viewScreen, /AdminOperationMotherCard/);
+  assert.doesNotMatch(listScreen, /AdminInfoPanel/);
+  assert.match(listScreen, /operationCompactTitle\(list\.title\)/);
+  assert.match(listScreen, /entry\.note\.substringAfter/);
 });
 
 test("admin visual shell keeps non-operational actions and avoids writes", () => {

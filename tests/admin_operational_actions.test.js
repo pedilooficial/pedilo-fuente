@@ -69,7 +69,7 @@ test("admin UI keeps order detail read-only without direct order writes", () => 
   const source = read(adminUiPath);
   const detailScreen = source.slice(
     source.indexOf("private fun AdminOrderDetailScreen"),
-    source.indexOf("private fun AdminOrderMomentPanel"),
+    source.indexOf("private fun AdminOrderSectionScreen"),
   );
 
   assert.doesNotMatch(source, /AdminOrderActionRequest/);
@@ -81,6 +81,8 @@ test("admin UI keeps order detail read-only without direct order writes", () => 
   assert.match(detailScreen, /Aún no registrado/);
   assert.match(detailScreen, /Opciones/);
   assert.match(detailScreen, /Sin acciones disponibles por ahora/);
+  assert.match(detailScreen, /AdminOrderNavigationCard/);
+  assert.match(source, /AdminOrderSectionScreen/);
   assert.doesNotMatch(detailScreen, /AdminActionCard|onAction\(|Acciones disponibles|action\.label|action\.impact/);
   assert.doesNotMatch(source, /collection\("orders"\)|\.set\(|\.add\(|\.update\(|\.delete\(|runTransaction|writeBatch/);
 });

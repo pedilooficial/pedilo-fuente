@@ -65,9 +65,6 @@ import com.pedilo.app.ui.publicuser.PediloPanelSoft
 import com.pedilo.app.ui.publicuser.PediloText
 import com.pedilo.app.ui.publicuser.PediloWarning
 import com.pedilo.app.ui.publicuser.pediloCardDepth
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import kotlinx.coroutines.launch
 
 enum class AdminRoot(val label: String) {
@@ -81,6 +78,16 @@ internal enum class OperationOrderVariant {
     NeedsAttention,
     WithProblem,
     ActionUnavailable,
+}
+
+private enum class AdminOrderSection {
+    Summary,
+    Operation,
+    Delivery,
+    Payment,
+    Problems,
+    History,
+    Options,
 }
 
 private sealed interface AdminRoute {
@@ -98,6 +105,10 @@ private sealed interface AdminRoute {
         val returnRoute: AdminRoute,
         val variant: OperationOrderVariant,
         val realOrderId: String? = null,
+    ) : AdminRoute
+    data class OperationOrderSection(
+        val detailRoute: OperationOrderDetail,
+        val section: AdminOrderSection,
     ) : AdminRoute
     data class Section(val root: AdminRoot, val title: String) : AdminRoute
     data class ConfigurationSection(val section: AdminConfigurationSection) : AdminRoute
@@ -158,11 +169,18 @@ private data class AdminOperationalLiveCard(
     val tension: String,
 )
 
+private data class AdminOrderNavigationEntry(
+    val section: AdminOrderSection,
+    val title: String,
+    val note: String,
+)
+
 private data class AdminOperationSubcard(
     val icon: String,
     val title: String,
     val value: String,
     val detail: String,
+    val preview: List<String> = emptyList(),
     val tone: AdminOperationMetricTone,
     val onClick: () -> Unit,
 )
@@ -483,6 +501,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             is AdminRoute.RoleAccessSection -> AdminRoute.RoleAccess
             is AdminRoute.ConfigurationSubsection -> AdminRoute.ConfigurationSection(current.section)
             is AdminRoute.ConfigurationSection -> AdminRoute.Configuration
+            is AdminRoute.OperationOrderSection -> current.detailRoute
             is AdminRoute.OperationOrderDetail -> current.returnRoute
             is AdminRoute.OperationList -> AdminRoute.OperationView(current.universe, current.view)
             is AdminRoute.OperationView -> AdminRoute.Operation
@@ -594,6 +613,16 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                         }
                     }
                 },
+                onSection = { section ->
+                    route = AdminRoute.OperationOrderSection(current, section)
+                },
+            )
+            is AdminRoute.OperationOrderSection -> AdminOrderSectionScreen(
+                section = current.section,
+                variant = current.detailRoute.variant,
+                orderId = current.detailRoute.realOrderId,
+                summary = current.detailRoute.realOrderId?.let { id -> readOnlyOrders.firstOrNull { it.id == id } },
+                detail = current.detailRoute.realOrderId?.let { readOnlyOrderDetails[it] },
             )
             is AdminRoute.ConfigurationSection -> AdminConfigurationSectionScreen(
                 section = current.section,
@@ -747,10 +776,11 @@ private fun AdminOperationUniverseScreen(
             AdminOperationMotherCard(
                 title = universe.title,
                 summary = operationUniverseSummary(universe, orders),
+                prominentValue = if (universe.key == AdminOperationUniverseKey.Orders) orders.size.toString() else null,
                 subcards = universe.views.map { view ->
                     AdminOperationSubcard(
                         icon = operationIconFor(view.title),
-                        title = view.title,
+                        title = operationHomeViewTitle(view.title),
                         value = operationViewCountLabel(view, orders),
                         detail = operationViewStateLabel(view, orders),
                         tone = operationToneFor(view, orders),
@@ -769,6 +799,7 @@ private fun AdminOperationViewScreen(
     orders: List<AdminOrderSummary>,
     onList: (AdminOperationList) -> Unit,
 ) {
+    val viewCount = operationViewOrderCount(view, orders)
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -780,27 +811,26 @@ private fun AdminOperationViewScreen(
     ) {
         item {
             AdminHeader(
-                title = view.title,
+                title = "${view.title} · $viewCount",
                 eyebrow = universe.title,
-                summary = view.summary,
+                summary = operationViewStateLabel(view, orders),
                 onSignOut = {},
                 showSignOut = false,
             )
         }
-        item {
-            AdminOperationMotherCard(
-                title = view.contextTitle,
-                summary = operationViewSummary(view, orders),
-                subcards = view.lists.map { list ->
-                    AdminOperationSubcard(
-                        icon = operationIconFor(list.title),
-                        title = operationCompactTitle(list.title),
-                        value = operationListCountLabel(list, orders),
-                        detail = operationListTensionLabel(list, orders),
-                        tone = operationToneFor(list, orders),
-                        onClick = { onList(list) },
-                    )
-                },
+        items(view.lists) { list ->
+            AdminOperationSubcardView(
+                AdminOperationSubcard(
+                    icon = operationIconFor(list.title),
+                    title = operationCompactTitle(list.title),
+                    value = operationListCountLabel(list, orders),
+                    detail = list.summary,
+                    preview = orderDetailEntriesFor(list.kind, orders.forOperationList(list.kind))
+                        .take(2)
+                        .map { "${it.label} · ${it.note.substringBefore(" · ")}" },
+                    tone = operationToneFor(list, orders),
+                    onClick = { onList(list) },
+                ),
             )
         }
     }
@@ -827,17 +857,11 @@ private fun AdminOperationListScreen(
     ) {
         item {
             AdminHeader(
-                title = list.title,
+                title = "${operationCompactTitle(list.title)} · ${orderEntries.size} ${if (orderEntries.size == 1) "pedido" else "pedidos"}",
                 eyebrow = view.title,
-                summary = list.summary,
+                summary = if (orderEntries.isEmpty()) list.emptyText else list.summary,
                 onSignOut = {},
                 showSignOut = false,
-            )
-        }
-        item {
-            AdminInfoPanel(
-                title = universe.title,
-                text = if (orderEntries.isEmpty()) list.emptyText else "${orderEntries.size} pedidos.",
             )
         }
         items(orderEntries) { entry ->
@@ -846,7 +870,7 @@ private fun AdminOperationListScreen(
                     icon = "#",
                     title = entry.label,
                     countLabel = entry.note.substringBefore(" · "),
-                    detail = entry.note,
+                    detail = entry.note.substringAfter(" · ", entry.note),
                     priority = "",
                     tension = "",
                 ),
@@ -891,11 +915,12 @@ private fun AdminOperationDeskScreen(
         item {
             AdminOperationMotherCard(
                 title = "Pedidos",
-                summary = operationUniverseSummary(orderUniverse, orders),
+                summary = "Movimiento operativo",
+                prominentValue = orders.size.toString(),
                 subcards = orderViews.map { view ->
                     AdminOperationSubcard(
                         icon = operationIconFor(view.title),
-                        title = view.title,
+                        title = operationHomeViewTitle(view.title),
                         value = operationViewCountLabel(view, orders),
                         detail = operationViewStateLabel(view, orders),
                         tone = operationToneFor(view, orders),
@@ -943,6 +968,7 @@ private fun AdminOperationDeskScreen(
 private fun AdminOperationMotherCard(
     title: String,
     summary: String,
+    prominentValue: String? = null,
     subcards: List<AdminOperationSubcard>,
 ) {
     Column(
@@ -959,17 +985,13 @@ private fun AdminOperationMotherCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(title, color = PediloText, fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.ExtraBold)
-            Text(
-                summary,
-                color = PediloMuted,
-                fontSize = 11.sp,
-                lineHeight = 14.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.End,
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, color = PediloText, fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.ExtraBold)
+                Text(summary, color = PediloMuted, fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Bold)
+            }
+            prominentValue?.let {
+                Text(it, color = PediloOrange, fontSize = 28.sp, lineHeight = 32.sp, fontWeight = FontWeight.ExtraBold)
+            }
         }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             subcards.forEach { subcard ->
@@ -989,7 +1011,7 @@ private fun AdminOperationSubcardView(subcard: AdminOperationSubcard) {
             .background(PediloPanel.copy(alpha = 0.88f), RoundedCornerShape(12.dp))
             .border(1.dp, toneColor.copy(alpha = 0.34f), RoundedCornerShape(12.dp))
             .clickable(role = Role.Button, onClick = subcard.onClick)
-            .defaultMinSize(minHeight = 58.dp)
+            .defaultMinSize(minHeight = if (subcard.preview.isEmpty()) 58.dp else 92.dp)
             .padding(horizontal = 10.dp, vertical = 9.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1014,6 +1036,16 @@ private fun AdminOperationSubcardView(subcard: AdminOperationSubcard) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            subcard.preview.forEach { preview ->
+                Text(
+                    preview,
+                    color = PediloMuted,
+                    fontSize = 10.sp,
+                    lineHeight = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         Text(
             subcard.value,
@@ -1064,24 +1096,11 @@ private fun String.adminHumanStatusValue(fallback: String = "—"): String =
         else -> trim()
     }
 
-private fun String.adminPriorityValue(): String =
-    when (trim().lowercase()) {
-        "" -> "Normal"
-        "normal" -> "Normal"
-        "high" -> "Alta"
-        "medium" -> "Media"
-        "low" -> "Baja"
-        else -> trim().replaceFirstChar { it.uppercase() }
-    }
-
 private fun List<String>?.adminItemsSummary(): String =
     this?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }?.joinToString(separator = "\n") ?: "Sin dato"
 
 private fun AdminOrderDetail?.adminPersonName(): String =
-    this?.component14().adminDisplayValue()
-
-private fun Long?.adminMillisValue(): String =
-    this?.let { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("es", "AR")).format(Date(it)) } ?: "Aún no registrado"
+    this?.component15().adminDisplayValue()
 
 private fun adminOrderProblemFocus(
     variant: OperationOrderVariant,
@@ -1100,56 +1119,6 @@ private fun adminOrderProblemFocus(
         needsAttention || variant == OperationOrderVariant.WithProblem -> "Requiere revisión" to "Necesita atención operativa"
         variant == OperationOrderVariant.NeedsAttention -> "Esperando respuesta" to "Requiere seguimiento"
         else -> null
-    }
-}
-
-private fun adminOrderDetailSections(
-    identity: String,
-    detail: AdminOrderDetail?,
-    storeName: String,
-    total: String,
-    createdAt: Long?,
-): List<Pair<String, List<Pair<String, String>>>> {
-    val person = listOf("Persona" to detail.adminPersonName())
-    val order = listOf("Detalle" to detail?.itemsSummary.adminItemsSummary())
-    val pickup = listOf("Lugar de retiro" to storeName.adminDisplayValue("Aún no registrado"))
-    val store = listOf("Local" to storeName.adminDisplayValue("Aún no registrado"))
-    val delivery = listOf("Entrega" to "Aún no registrado")
-    val payment = listOf("Total" to total.adminDisplayValue("Aún no registrado"))
-    val times = listOf(
-        "Creado" to createdAt.adminMillisValue(),
-        "Última actualización" to detail?.updatedAtMillis.adminMillisValue(),
-    )
-    return when (identity) {
-        AdminOperationOrderClassification.IDENTITY_PLUS_BUY -> listOf(
-            "Pedido" to order,
-            "Persona" to person,
-            "Entrega" to delivery,
-            "Pago" to payment,
-            "Tiempos" to times,
-        )
-        AdminOperationOrderClassification.IDENTITY_PLUS_PICKUP -> listOf(
-            "Retiro" to pickup,
-            "Persona" to person,
-            "Entrega" to delivery,
-            "Pago" to payment,
-            "Tiempos" to times,
-        )
-        AdminOperationOrderClassification.IDENTITY_LOCAL_PICKUP -> listOf(
-            "Local" to store,
-            "Persona" to person,
-            "Pedido" to order,
-            "Entrega" to delivery,
-            "Pago" to payment,
-            "Tiempos" to times,
-        )
-        else -> listOf(
-            "Pedido" to order,
-            "Persona" to person,
-            "Entrega" to delivery,
-            "Pago" to payment,
-            "Tiempos" to times,
-        )
     }
 }
 
@@ -1179,26 +1148,27 @@ private fun operationCompactTitle(title: String): String =
         "Con demoras" -> "Demoras"
         "Reclamo de cliente" -> "Reclamos"
         "Local no responde" -> "Local sin respuesta"
+        "Esperando repartidor" -> "Repartidor"
+        else -> title
+    }
+
+private fun operationHomeViewTitle(title: String): String =
+    when (title) {
+        "Pedidos activos" -> "Activos"
+        "Pedidos con problemas" -> "Problemas"
         else -> title
     }
 
 private fun operationUniverseSummary(universe: AdminOperationUniverse, orders: List<AdminOrderSummary>): String {
-    val count = universe.views.flatMap { it.lists }.sumOf { orders.forOperationList(it.kind).size }
     if (universe.key != AdminOperationUniverseKey.Orders) return "Aún no hay información real"
-    return if (count == 0) "Sin pedidos por ahora" else "$count pedidos"
+    return if (orders.isEmpty()) "Sin pedidos por ahora" else "Movimiento operativo"
 }
 
-private fun operationViewSummary(view: AdminOperationView, orders: List<AdminOrderSummary>): String {
-    val count = view.lists.sumOf { orders.forOperationList(it.kind).size }
-    return if (count == 0) {
-        if (view.title == "Pedidos con problemas") "Sin casos por ahora" else "Sin pedidos por ahora"
-    } else {
-        "$count pedidos"
-    }
-}
+private fun operationViewOrderCount(view: AdminOperationView, orders: List<AdminOrderSummary>): Int =
+    view.lists.sumOf { orders.forOperationList(it.kind).size }
 
 private fun operationViewStateLabel(view: AdminOperationView, orders: List<AdminOrderSummary>): String {
-    val count = view.lists.sumOf { orders.forOperationList(it.kind).size }
+    val count = operationViewOrderCount(view, orders)
     return when {
         count == 0 && view.title == "Pedidos con problemas" -> "Sin casos por ahora"
         count == 0 -> "Sin pedidos por ahora"
@@ -1210,7 +1180,7 @@ private fun operationViewStateLabel(view: AdminOperationView, orders: List<Admin
 
 private fun operationViewCountLabel(view: AdminOperationView, orders: List<AdminOrderSummary>): String {
     if (view.lists.none { it.kind.isOrderList() }) return "Aún no hay información real"
-    val count = view.lists.sumOf { orders.forOperationList(it.kind).size }
+    val count = operationViewOrderCount(view, orders)
     return if (count == 0) "0" else count.toString()
 }
 
@@ -1610,18 +1580,16 @@ private fun AdminOrderDetailScreen(
     operationMessage: String,
     operationError: String,
     onLoadDetail: (String) -> Unit,
+    onSection: (AdminOrderSection) -> Unit,
 ) {
     orderId?.let { LaunchedEffect(it) { onLoadDetail(it) } }
     val visibleNumber = adminOrderVisibleNumber(summary, detail, orderId)
     val source = detail?.source ?: summary?.source.orEmpty()
     val requestType = detail?.requestType ?: summary?.requestType.orEmpty()
-    val status = detail?.status ?: summary?.status.orEmpty()
     val publicStatus = detail?.publicStatus ?: summary?.publicStatus.orEmpty()
     val operationalStatus = detail?.operationalStatus ?: summary?.operationalStatus.orEmpty()
     val needsAttention = detail?.needsAttention ?: summary?.needsAttention ?: false
     val activeIncident = detail?.activeIncident ?: summary?.activeIncident ?: false
-    val createdAt = detail?.createdAtMillis ?: summary?.createdAtMillis
-    val total = detail?.total ?: summary?.total.orEmpty()
     val storeName = detail?.storeName ?: summary?.storeName.orEmpty()
     val identity = AdminOperationOrderClassification.operationalIdentity(source, requestType)
     val operationFunction = AdminOperationOrderClassification.operationalFunction(source, requestType)
@@ -1632,7 +1600,24 @@ private fun AdminOrderDetailScreen(
         needsAttention = needsAttention,
         activeIncident = activeIncident,
     )
-    val problemText = problemFocus?.let { "${it.first}\n${it.second}" } ?: "Sin problemas registrados."
+    val statusText = publicStatus.ifBlank {
+        (detail?.status ?: summary?.status.orEmpty()).adminHumanStatusValue("Aún no registrado")
+    }
+    val operationTitle = adminOrderOperationSectionTitle(identity)
+    val operationNote = when (identity) {
+        AdminOperationOrderClassification.IDENTITY_LOCAL_PICKUP -> storeName.adminDisplayValue("Información de retiro")
+        AdminOperationOrderClassification.IDENTITY_PLUS_BUY -> detail?.itemsSummary.adminItemsSummary()
+        else -> "Información de retiro"
+    }
+    val navigationEntries = listOf(
+        AdminOrderNavigationEntry(AdminOrderSection.Summary, "Resumen", "$statusText · $operationFunction"),
+        AdminOrderNavigationEntry(AdminOrderSection.Operation, operationTitle, operationNote),
+        AdminOrderNavigationEntry(AdminOrderSection.Delivery, "Entrega", detail.adminPersonName()),
+        AdminOrderNavigationEntry(AdminOrderSection.Payment, "Pago", (detail?.total ?: summary?.total).adminDisplayValue("Aún no registrado")),
+        AdminOrderNavigationEntry(AdminOrderSection.Problems, "Problemas", problemFocus?.first ?: "Sin problemas registrados"),
+        AdminOrderNavigationEntry(AdminOrderSection.History, "Historial", detail?.lastEventSummary.adminDisplayValue("Aún no registrado")),
+        AdminOrderNavigationEntry(AdminOrderSection.Options, "Opciones", "Sin acciones disponibles por ahora"),
+    )
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1651,46 +1636,132 @@ private fun AdminOrderDetailScreen(
                 showSignOut = false,
             )
         }
-        item {
-            AdminOrderMomentPanel(
-                title = problemFocus?.first ?: identity,
-                detail = problemFocus?.second ?: operationFunction,
-                highlighted = problemFocus != null,
-            )
-        }
+        item { AdminOrderMomentPanel(title = identity, detail = operationFunction, highlighted = problemFocus != null) }
         if (operationMessage.isNotBlank()) {
             item { AdminInfoPanel(title = "Resultado", text = operationMessage) }
         }
         if (operationError.isNotBlank()) {
             item { AdminInfoPanel(title = "Error operativo", text = operationError) }
         }
-        adminOrderDetailSections(
-            identity = identity,
-            detail = detail,
-            storeName = storeName,
-            total = total,
-            createdAt = createdAt,
-        ).forEach { section ->
-            item { AdminOrderFactPanel(title = section.first, facts = section.second) }
+        items(navigationEntries) { entry ->
+            AdminOrderNavigationCard(entry = entry, onClick = { onSection(entry.section) })
         }
+    }
+}
+
+@Composable
+private fun AdminOrderSectionScreen(
+    section: AdminOrderSection,
+    variant: OperationOrderVariant,
+    orderId: String?,
+    summary: AdminOrderSummary?,
+    detail: AdminOrderDetail?,
+) {
+    val visibleNumber = adminOrderVisibleNumber(summary, detail, orderId)
+    val source = detail?.source ?: summary?.source.orEmpty()
+    val requestType = detail?.requestType ?: summary?.requestType.orEmpty()
+    val identity = AdminOperationOrderClassification.operationalIdentity(source, requestType)
+    val operationFunction = AdminOperationOrderClassification.operationalFunction(source, requestType)
+    val publicStatus = detail?.publicStatus ?: summary?.publicStatus.orEmpty()
+    val status = publicStatus.ifBlank {
+        (detail?.status ?: summary?.status.orEmpty()).adminHumanStatusValue("Aún no registrado")
+    }
+    val storeName = detail?.storeName ?: summary?.storeName.orEmpty()
+    val problem = adminOrderProblemFocus(
+        variant = variant,
+        publicStatus = publicStatus,
+        operationalStatus = detail?.operationalStatus ?: summary?.operationalStatus.orEmpty(),
+        needsAttention = detail?.needsAttention ?: summary?.needsAttention ?: false,
+        activeIncident = detail?.activeIncident ?: summary?.activeIncident ?: false,
+    )
+    val title = when (section) {
+        AdminOrderSection.Summary -> "Resumen"
+        AdminOrderSection.Operation -> adminOrderOperationSectionTitle(identity)
+        AdminOrderSection.Delivery -> "Entrega"
+        AdminOrderSection.Payment -> "Pago"
+        AdminOrderSection.Problems -> "Problemas"
+        AdminOrderSection.History -> "Historial operativo"
+        AdminOrderSection.Options -> "Opciones"
+    }
+    val facts = when (section) {
+        AdminOrderSection.Summary -> listOf(
+            "Identidad operativa" to identity,
+            "Función operativa" to operationFunction,
+            "Estado actual" to status,
+            "Dato clave" to (problem?.first ?: storeName.adminDisplayValue(detail?.itemsSummary.adminItemsSummary())),
+        )
+        AdminOrderSection.Operation -> adminOrderOperationFacts(identity, storeName, detail)
+        AdminOrderSection.Delivery -> listOf("Persona" to detail.adminPersonName())
+        AdminOrderSection.Payment -> listOf("Total" to (detail?.total ?: summary?.total).adminDisplayValue("Aún no registrado"))
+        AdminOrderSection.Problems -> listOf(
+            "Estado" to (problem?.first ?: "Sin problemas registrados"),
+            "Seguimiento" to (problem?.second ?: "Sin problemas registrados"),
+        )
+        AdminOrderSection.History -> listOf(
+            "Último movimiento registrado" to detail?.lastEventSummary.adminDisplayValue("Aún no registrado"),
+        )
+        AdminOrderSection.Options -> listOf("Opciones" to "Sin acciones disponibles por ahora")
+    }
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = adminBottomBarReservedPadding),
+        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         item {
-            AdminInfoPanel(
-                title = "Problemas",
-                text = problemText,
+            AdminHeader(
+                title = title,
+                eyebrow = "Pedido $visibleNumber",
+                summary = identity,
+                onSignOut = {},
+                showSignOut = false,
             )
         }
-        item {
-            AdminInfoPanel(
-                title = "Historial operativo",
-                text = detail?.lastEventSummary.adminDisplayValue("Aún no registrado"),
-            )
-        }
-        item {
-            AdminInfoPanel(
-                title = "Opciones",
-                text = "Sin acciones disponibles por ahora.",
-            )
-        }
+        item { AdminOrderFactPanel(title = title, facts = facts) }
+    }
+}
+
+private fun adminOrderOperationSectionTitle(identity: String): String =
+    when (identity) {
+        AdminOperationOrderClassification.IDENTITY_PLUS_BUY -> "Compra"
+        AdminOperationOrderClassification.IDENTITY_LOCAL_PICKUP -> "Local / Retiro"
+        else -> "Retiro"
+    }
+
+private fun adminOrderOperationFacts(
+    identity: String,
+    storeName: String,
+    detail: AdminOrderDetail?,
+): List<Pair<String, String>> =
+    when (identity) {
+        AdminOperationOrderClassification.IDENTITY_PLUS_BUY -> listOf(
+            "Detalle de compra" to detail?.itemsSummary.adminItemsSummary(),
+        )
+        AdminOperationOrderClassification.IDENTITY_LOCAL_PICKUP -> listOf(
+            "Local" to storeName.adminDisplayValue("Aún no registrado"),
+            "Retiro" to "Aún no registrado",
+        )
+        else -> listOf("Lugar de retiro" to storeName.adminDisplayValue("Aún no registrado"))
+    }
+
+@Composable
+private fun AdminOrderNavigationCard(entry: AdminOrderNavigationEntry, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(PediloPanelSoft, RoundedCornerShape(14.dp))
+            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .defaultMinSize(minHeight = 72.dp)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Text(entry.title, color = PediloText, fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.ExtraBold)
+        Text(entry.note, color = PediloMuted, fontSize = 12.sp, lineHeight = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -1734,21 +1805,6 @@ private fun AdminOrderFactPanel(title: String, facts: List<Pair<String, String>>
 }
 
 @Composable
-private fun AdminDisabledActionCard(title: String, note: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(PediloPanel.copy(alpha = 0.55f), RoundedCornerShape(15.dp))
-            .border(1.dp, PediloLine.copy(alpha = 0.7f), RoundedCornerShape(15.dp))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(7.dp),
-    ) {
-        Text(title, color = PediloMuted, fontSize = 19.sp, lineHeight = 23.sp, fontWeight = FontWeight.ExtraBold)
-        Text(note, color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp)
-    }
-}
-
-@Composable
 private fun AdminActionCard(title: String, note: String, onClick: () -> Unit) {
     Column(
         modifier = Modifier
@@ -1773,6 +1829,7 @@ private fun AdminRoute.root(): AdminRoot = when (this) {
     is AdminRoute.OperationView -> AdminRoot.Operation
     is AdminRoute.OperationList -> AdminRoot.Operation
     is AdminRoute.OperationOrderDetail -> AdminRoot.Operation
+    is AdminRoute.OperationOrderSection -> AdminRoot.Operation
     is AdminRoute.ConfigurationSection -> AdminRoot.Configuration
     is AdminRoute.ConfigurationSubsection -> AdminRoot.Configuration
     is AdminRoute.ConfigurationConvergence -> AdminRoot.Configuration
