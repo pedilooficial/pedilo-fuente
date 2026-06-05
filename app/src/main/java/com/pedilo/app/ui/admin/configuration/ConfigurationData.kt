@@ -1,14 +1,18 @@
 package com.pedilo.app.ui.admin
 
 internal val configurationEntries = listOf(
-    "Usuario público",
+    "Público",
     "Locales",
-    "Catálogo y productos",
+    "Reparto",
+    "Marketplace",
     "Pedidos",
-    "Comunicación",
-    "Operación",
-    "Reglas y validaciones",
+    "Precios",
+    "Cobros",
+    "Mensajes",
+    "Reglas",
+    "Notificaciones",
+    "Métricas",
     "Auditoría",
     "Emergencias",
     "General",
-).map { AdminEntry(it, "Ajustes preparados para la app") }
+).map { AdminEntry(it, "Abrir tablero") }

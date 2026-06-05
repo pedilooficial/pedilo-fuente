@@ -215,15 +215,23 @@ test("admin relies on native back and only shows sign out on operation root", ()
 
 test("admin configuration and role access roots expose their planned entries", () => {
   const source = readAdminSourceTree();
+  const configuration = fs.readFileSync(
+    "app/src/main/java/com/pedilo/app/ui/admin/configuration/ConfigurationData.kt",
+    "utf8",
+  );
 
   [
-    "Usuario público",
+    "Público",
     "Locales",
-    "Catálogo y productos",
+    "Reparto",
+    "Marketplace",
     "Pedidos",
-    "Comunicación",
-    "Operación",
-    "Reglas y validaciones",
+    "Precios",
+    "Cobros",
+    "Mensajes",
+    "Reglas",
+    "Notificaciones",
+    "Métricas",
     "Auditoría",
     "Emergencias",
     "General",
@@ -235,83 +243,94 @@ test("admin configuration and role access roots expose their planned entries", (
     "Usuarios inactivos",
     "Vinculaciones pendientes",
   ].forEach((label) => assert.match(source, new RegExp(label)));
+
+  [
+    "Usuario público",
+    "Catálogo y productos",
+    "Comunicación",
+    "Operación",
+    "Reglas y validaciones",
+  ].forEach((label) => assert.doesNotMatch(configuration, new RegExp(`"${label}"`)));
+
+  assert.deepEqual(
+    [...configuration.matchAll(/^    "([^"]+)",$/gm)].map((match) => match[1]),
+    ["Público", "Locales", "Reparto", "Marketplace", "Pedidos", "Precios", "Cobros", "Mensajes", "Reglas", "Notificaciones", "Métricas", "Auditoría", "Emergencias", "General"],
+  );
 });
 
 test("admin configuration exposes internal visual sections without operational mixing", () => {
   const source = fs.readFileSync(admin, "utf8");
 
   [
-    "Presentación pública",
-    "Banners y avisos",
-    "Textos visibles",
+    "Home público",
+    "Tienda pública",
+    "Botón +",
     "Seguimiento público",
-    "Orden y visibilidad de secciones",
+    "Avisos y textos",
+    "Pantallas vacías",
+    "Listado de locales",
     "Datos del local",
-    "Información pública",
-    "Horarios y descripción",
-    "Estado de configuración",
-    "Revisión estructural",
+    "Horarios y capacidad",
+    "Catálogo del local",
+    "Productos y variantes",
+    "Listado de repartidores",
+    "Habilitación y bloqueos",
+    "Cierre financiero",
     "Categorías",
     "Subcategorías",
-    "Productos",
-    "Precios",
-    "Imágenes",
-    "Disponibilidad",
-    "Visibilidad",
+    "Destacados y nuevos",
+    "Ranking público",
     "Reglas de creación",
-    "Estados visibles",
-    "Seguimiento futuro",
-    "Reglas de tiempos extendidos",
-    "Reglas de cancelación",
-    "Comportamiento del pedido",
+    "Estados públicos",
+    "Estados internos",
+    "Tracking y fallbacks",
+    "Precios comerciales",
+    "Tarifas operativas",
+    "Modo lluvia",
+    "Formas de pago",
+    "Quién paga y cobra",
+    "Comprobantes",
     "Plantillas",
-    "Avisos",
-    "Destinatario conceptual",
-    "Canal previsto",
-    "Revisión de mensaje",
-    "Impacto del cambio",
-    "Criterios de retraso",
-    "Criterios de problemas",
-    "Umbrales operativos",
-    "Clasificaciones",
-    "Reglas de atención",
-    "Condiciones para revisión",
-    "Datos mínimos",
-    "Reglas de publicación",
-    "Bloqueos por incompleto",
-    "Validaciones de pedido",
-    "Validaciones de local",
-    "Validaciones de producto",
-    "Condiciones generales",
-    "Cambios de configuración",
+    "Mensajes por estado",
+    "Mensajes por problema",
+    "Publicación de locales",
+    "Publicación de productos",
+    "Solicitud de repartidor",
+    "Eventos notificables",
+    "Canales por rol",
+    "Alertas críticas",
+    "Pedidos y productos",
+    "Visibilidad por rol",
+    "Registro de cambios",
     "Publicaciones",
-    "Desactivaciones",
     "Cambios sensibles",
-    "Intervenciones Admin registradas",
     "Detalle de registro",
-    "Impacto registrado",
-    "Resultado registrado",
     "Modo seguro",
-    "Restricciones temporales",
-    "Avisos globales excepcionales",
-    "Estado de emergencia",
-    "Alcance",
-    "Confirmación futura",
+    "Pausa general",
+    "Pausa de locales",
+    "Pausa de reparto",
     "Registro posterior",
-    "Parámetros generales",
+    "Estado global",
     "Preferencias administrativas",
-    "Estado general de configuración",
     "Pendientes globales",
     "Derivación al bloque dueño",
   ].forEach((label) => assert.match(source, new RegExp(label)));
 
+  assert.match(source, /AdminConfigurationHomeScreen/);
+  assert.match(source, /LazyVerticalGrid/);
+  assert.match(source, /GridCells\.Fixed\(2\)/);
+  assert.match(source, /\.aspectRatio\(1f\)/);
+  assert.match(source, /AdminConfigurationRootCard/);
+  assert.match(source, /configurationIconFor/);
+  assert.match(source, /textAlign = TextAlign\.Center/);
+  assert.match(source, /collectIsPressedAsState/);
   assert.match(source, /AdminConfigurationSectionScreen/);
   assert.match(source, /AdminRoute\.ConfigurationSection/);
   assert.match(source, /AdminRoute\.ConfigurationSubsection/);
   assert.match(source, /AdminRoute\.ConfigurationConvergence/);
   assert.match(
     source,
-    /AdminRoute\.Configuration -> AdminRootScreen[\s\S]*showSignOut = false/,
+    /AdminRoute\.Configuration -> AdminConfigurationHomeScreen/,
   );
 });
 
@@ -324,6 +343,7 @@ test("admin configuration convergence flow is available and remains visual only"
     "Impacto",
     "Confirmación sensible",
     "Resultado",
+    "Auditoría visual",
     "No se aplicaron cambios reales",
   ].forEach((label) => assert.match(source, new RegExp(label)));
 

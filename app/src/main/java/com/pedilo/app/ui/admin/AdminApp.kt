@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -22,6 +23,10 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -38,14 +43,18 @@ import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Feedback
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.PersonOff
 import androidx.compose.material.icons.outlined.ReportProblem
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material.icons.outlined.TwoWheeler
@@ -163,6 +172,7 @@ private enum class AdminConfigurationConvergenceStep {
     Impact,
     SensitiveConfirmation,
     Result,
+    Audit,
 }
 
 private enum class AdminRoleAccessConvergenceStep {
@@ -241,149 +251,104 @@ private data class AdminRoleAccessSection(
 private val adminBottomBarReservedPadding = 112.dp
 private val adminContentBottomPadding = 24.dp
 
+private fun configurationSection(
+    title: String,
+    summary: String,
+    context: String,
+    vararg entries: Pair<String, String>,
+) = AdminConfigurationSection(
+    title = title,
+    summary = summary,
+    contextTitle = "Tablero de $title",
+    contextText = context,
+    entries = entries.map { AdminEntry(it.first, it.second) },
+)
+
 private val configurationSections = listOf(
-    AdminConfigurationSection(
-        title = "Usuario público",
-        summary = "Definiciones de experiencia visible para personas usuarias.",
-        contextTitle = "Experiencia pública",
-        contextText = "Ordena criterios de presentación sin cambiar flujos reales ni guardar cambios.",
-        entries = listOf(
-            AdminEntry("Presentación pública", "Lineamientos de portada y acceso"),
-            AdminEntry("Banners y avisos", "Espacios de comunicación visible"),
-            AdminEntry("Textos visibles", "Mensajes y etiquetas públicas"),
-            AdminEntry("Seguimiento público", "Criterios de lectura de seguimiento"),
-            AdminEntry("Orden y visibilidad de secciones", "Prioridad de bloques en pantalla"),
-        ),
+    configurationSection(
+        "Público", "Contenido visible para personas usuarias.", "Información humana, segura y preparada para publicar.",
+        "Home público" to "Orden, avisos y convenciones", "Tienda pública" to "Presentación de oferta",
+        "Botón +" to "Contenido y opciones visibles", "Seguimiento público" to "Estados y textos humanos",
+        "Avisos y textos" to "Buscar, editar y previsualizar", "Pantallas vacías" to "Mensajes sin datos",
     ),
-    AdminConfigurationSection(
-        title = "Locales",
-        summary = "Estructura de información de comercios.",
-        contextTitle = "Estructura del local",
-        contextText = "Prepara criterios de datos del local sin operar pedidos ni cuentas.",
-        entries = listOf(
-            AdminEntry("Datos del local", "Identidad y referencia comercial"),
-            AdminEntry("Información pública", "Datos mostrables al usuario público"),
-            AdminEntry("Horarios y descripción", "Disponibilidad declarativa"),
-            AdminEntry("Estado de configuración", "Nivel de preparación del local"),
-            AdminEntry("Revisión estructural", "Control de consistencia administrativa"),
-        ),
+    configurationSection(
+        "Locales", "Entidades comerciales, catálogo y capacidad.", "Un local incompleto no se publica ni opera.",
+        "Listado de locales" to "Buscar, filtrar y ver detalle", "Datos del local" to "Identidad, contacto y dirección",
+        "Horarios y capacidad" to "Apertura, pausas y saturación", "Publicación y visibilidad" to "Estado público y administrativo",
+        "Catálogo del local" to "Productos ligados al local", "Productos y variantes" to "Oferta, extras e imágenes",
+        "Disponibilidad y promos" to "Oferta para pedidos futuros", "Pendientes de revisión" to "Faltantes e impacto",
     ),
-    AdminConfigurationSection(
-        title = "Catálogo y productos",
-        summary = "Estructura de entidades vendibles.",
-        contextTitle = "Oferta configurable",
-        contextText = "Prepara categorías y criterios de oferta para pedidos futuros.",
-        entries = listOf(
-            AdminEntry("Categorías", "Agrupación principal de oferta"),
-            AdminEntry("Subcategorías", "Detalle interno de categorías"),
-            AdminEntry("Productos", "Entidades publicables"),
-            AdminEntry("Precios", "Criterios de valor"),
-            AdminEntry("Imágenes", "Recursos visuales de producto"),
-            AdminEntry("Disponibilidad", "Condiciones de oferta"),
-            AdminEntry("Visibilidad", "Reglas de exposición pública"),
-        ),
+    configurationSection(
+        "Reparto", "Condiciones administrativas de repartidores.", "Define habilitación y finanzas; no opera entregas vivas.",
+        "Listado de repartidores" to "Buscar y ver detalle", "Habilitación y bloqueos" to "Condiciones administrativas",
+        "Documentación" to "Datos requeridos y pendientes", "Perfil operativo" to "Disponibilidad y condiciones",
+        "Cierre financiero" to "Reglas, deuda y comprobantes", "Sonidos y avisos" to "Preferencias del repartidor",
     ),
-    AdminConfigurationSection(
-        title = "Pedidos",
-        summary = "Criterios estructurales del flujo de pedido.",
-        contextTitle = "Reglas del pedido",
-        contextText = "Define parámetros generales sin abrir pedidos concretos ni estados vivos.",
-        entries = listOf(
-            AdminEntry("Reglas de creación", "Condiciones para iniciar pedidos"),
-            AdminEntry("Estados visibles", "Etapas mostrables al público"),
-            AdminEntry("Seguimiento futuro", "Criterios de lectura de avance"),
-            AdminEntry("Reglas de tiempos extendidos", "Criterios de tiempos extendidos"),
-            AdminEntry("Reglas de cancelación", "Criterios generales de cancelación"),
-            AdminEntry("Comportamiento del pedido", "Normas de consistencia del flujo"),
-        ),
+    configurationSection(
+        "Marketplace", "Orden y exposición de la oferta pública.", "Muestra oferta publicable de locales reales.",
+        "Categorías" to "Crear, editar y ordenar", "Subcategorías" to "Organización visible",
+        "Destacados y nuevos" to "Criterios de exposición", "Ofertas visibles" to "Promociones publicables",
+        "Ranking público" to "Orden configurable", "Previsualización" to "Revisión antes de publicar",
     ),
-    AdminConfigurationSection(
-        title = "Comunicación",
-        summary = "Estructura de mensajes y avisos.",
-        contextTitle = "Mensajería administrativa",
-        contextText = "Organiza plantillas y criterios de comunicación sin envío real.",
-        entries = listOf(
-            AdminEntry("Plantillas", "Base de mensajes reutilizables"),
-            AdminEntry("Avisos", "Comunicaciones puntuales"),
-            AdminEntry("Destinatario conceptual", "Segmentación administrativa"),
-            AdminEntry("Canal previsto", "Canal definido para futuras etapas"),
-            AdminEntry("Revisión de mensaje", "Control de claridad y tono"),
-            AdminEntry("Impacto del cambio", "Efecto esperado del ajuste"),
-        ),
+    configurationSection(
+        "Pedidos", "Reglas generales para pedidos futuros.", "Configura integridad sin abrir ni modificar pedidos vivos.",
+        "Reglas de creación" to "Datos y condiciones obligatorias", "Estados públicos" to "Lectura visible del avance",
+        "Estados internos" to "Etapas y estados ocultos", "Tracking y fallbacks" to "Seguimiento y contingencias",
+        "Tiempos y cancelaciones" to "Timeouts y criterios futuros", "Cambios sensibles" to "Impacto y confirmación",
     ),
-    AdminConfigurationSection(
-        title = "Operación",
-        summary = "Criterios de lectura operativa.",
-        contextTitle = "Marco de operación",
-        contextText = "Define criterios de interpretación, no la operación viva del día.",
-        entries = listOf(
-            AdminEntry("Criterios de retraso", "Reglas para identificar retrasos"),
-            AdminEntry("Criterios de problemas", "Reglas de clasificación de incidencias"),
-            AdminEntry("Umbrales operativos", "Límites para alertas de seguimiento"),
-            AdminEntry("Clasificaciones", "Ejes de agrupación operativa"),
-            AdminEntry("Reglas de atención", "Prioridades de revisión"),
-            AdminEntry("Condiciones para revisión", "Cuándo escalar un caso"),
-        ),
+    configurationSection(
+        "Precios", "Valores comerciales y operativos.", "Los cambios aplican a pedidos nuevos y conservan snapshots confirmados.",
+        "Precios comerciales" to "Producto, variante, extra y promo", "Tarifas operativas" to "Envío, distancia y recargos",
+        "Modo lluvia" to "Activación e impacto visible", "Partes de reparto" to "Repartidor y Pédilo",
+        "Promociones" to "Vigencia y pausas", "Historial de precios" to "Consulta y auditoría",
     ),
-    AdminConfigurationSection(
-        title = "Reglas y validaciones",
-        summary = "Condiciones generales de integridad.",
-        contextTitle = "Base de validación",
-        contextText = "Define mínimos de calidad sin tocar reglas técnicas de infraestructura.",
-        entries = listOf(
-            AdminEntry("Datos mínimos", "Campos requeridos por bloque"),
-            AdminEntry("Reglas de publicación", "Condiciones para mostrar cambios"),
-            AdminEntry("Bloqueos por incompleto", "Contenciones por faltantes"),
-            AdminEntry("Validaciones de pedido", "Consistencia del flujo de pedido"),
-            AdminEntry("Validaciones de local", "Consistencia de estructura comercial"),
-            AdminEntry("Validaciones de producto", "Consistencia de oferta vendible"),
-            AdminEntry("Condiciones generales", "Reglas comunes entre bloques"),
-        ),
+    configurationSection(
+        "Cobros", "Cómo, cuándo y quién paga o cobra.", "Define reglas futuras; no confirma pagos vivos.",
+        "Formas de pago" to "Opciones permitidas", "Quién paga y cobra" to "Responsabilidades de cobro",
+        "Pago al retirar" to "Reglas y montos requeridos", "Pago al entregar" to "Condiciones de cierre",
+        "Comprobantes" to "Validaciones y pendientes", "Cancelación y devolución" to "Reglas e impacto",
     ),
-    AdminConfigurationSection(
-        title = "Auditoría",
-        summary = "Trazabilidad administrativa de cambios.",
-        contextTitle = "Registro administrativo",
-        contextText = "Representa seguimiento de cambios sin exponer detalles técnicos crudos.",
-        entries = listOf(
-            AdminEntry("Cambios de configuración", "Registro por bloque"),
-            AdminEntry("Publicaciones", "Eventos de publicación"),
-            AdminEntry("Desactivaciones", "Eventos de desactivación"),
-            AdminEntry("Cambios sensibles", "Ajustes de mayor impacto"),
-            AdminEntry("Intervenciones Admin registradas", "Acciones administrativas documentadas"),
-            AdminEntry("Detalle de registro", "Resumen de contexto"),
-            AdminEntry("Impacto registrado", "Efecto administrativo declarado"),
-            AdminEntry("Resultado registrado", "Cierre del cambio representado"),
-        ),
+    configurationSection(
+        "Mensajes", "Comunicación preparada por contexto.", "Comunica sin gobernar estados ni enviar por canales reales.",
+        "Plantillas" to "Crear, editar y buscar", "Mensajes por estado" to "Persona usuaria, local y repartidor",
+        "Mensajes por problema" to "Demora, cancelación y pago", "Avisos públicos" to "Publicar y despublicar",
+        "Avisos internos" to "Comunicación Admin preparada", "Tono y canales" to "Previsualización y alcance",
     ),
-    AdminConfigurationSection(
-        title = "Emergencias",
-        summary = "Marco excepcional de configuración.",
-        contextTitle = "Gestión excepcional",
-        contextText = "Define criterios de contingencia sin activar acciones reales.",
-        entries = listOf(
-            AdminEntry("Modo seguro", "Perfil de contingencia"),
-            AdminEntry("Restricciones temporales", "Alcance limitado por ventana"),
-            AdminEntry("Avisos globales excepcionales", "Comunicación de contingencia"),
-            AdminEntry("Estado de emergencia", "Lectura de situación"),
-            AdminEntry("Alcance", "Bloques potencialmente impactados"),
-            AdminEntry("Impacto", "Efecto esperado en la experiencia"),
-            AdminEntry("Confirmación futura", "Paso de verificación previa"),
-            AdminEntry("Registro posterior", "Trazabilidad luego de la contingencia"),
-        ),
+    configurationSection(
+        "Reglas", "Condiciones de integridad del sistema.", "Define condiciones; la autoridad real queda fuera de esta herramienta.",
+        "Publicación de locales" to "Datos mínimos y bloqueos", "Publicación de productos" to "Completitud y revisión",
+        "Creación de pedidos" to "Validaciones y borradores", "Solicitud de repartidor" to "Límites y datos requeridos",
+        "Pagos y roles activos" to "Validaciones previas", "Confirmaciones sensibles" to "Impacto y auditoría",
     ),
-    AdminConfigurationSection(
-        title = "General",
-        summary = "Parámetros globales de administración.",
-        contextTitle = "Marco general",
-        contextText = "Agrupa criterios transversales y deriva cada tema a su bloque dueño.",
-        entries = listOf(
-            AdminEntry("Parámetros generales", "Ajustes de alcance amplio"),
-            AdminEntry("Preferencias administrativas", "Preferencias de gestión"),
-            AdminEntry("Estado general de configuración", "Lectura consolidada de preparación"),
-            AdminEntry("Pendientes globales", "Tareas por asignar al bloque dueño"),
-            AdminEntry("Derivación al bloque dueño", "Ruta al universo responsable"),
-        ),
+    configurationSection(
+        "Notificaciones", "Señales visuales y sonoras por rol.", "Cada señal tiene origen, destinatario y prioridad.",
+        "Eventos notificables" to "Origen y agrupación", "Canales por rol" to "Destinatarios permitidos",
+        "Badges y prioridad" to "Lectura visual", "Sonidos y silencios" to "Reglas anti-saturación",
+        "Alertas críticas" to "Alcance y restricciones", "Prueba visual" to "Previsualización sin push real",
+    ),
+    configurationSection(
+        "Métricas", "Criterios de lectura, ranking y visibilidad.", "Las métricas nacen de pedidos y eventos; no se inventan.",
+        "Pedidos y productos" to "Indicadores y tendencias", "Locales" to "Rendimiento, demoras y rechazos",
+        "Repartidores" to "Criterios operativos y financieros", "Marketplace" to "Exposición y ranking",
+        "Visibilidad por rol" to "Indicadores habilitados", "Detalle y tendencia" to "Consulta preparada",
+    ),
+    configurationSection(
+        "Auditoría", "Consulta de trazabilidad administrativa.", "La auditoría se consulta; no se edita ni se borra.",
+        "Registro de cambios" to "Buscar y filtrar", "Publicaciones" to "Historial de contenido",
+        "Cambios sensibles" to "Antes, después e impacto", "Precios y finanzas" to "Trazabilidad preparada",
+        "Emergencias" to "Alcance y resultado", "Detalle de registro" to "Quién, cuándo y resultado",
+    ),
+    configurationSection(
+        "Emergencias", "Contingencias controladas y auditables.", "Toda emergencia requiere impacto, confirmación y registro.",
+        "Modo seguro" to "Alcance y restricciones", "Modo lluvia" to "Contingencia y recargo visible",
+        "Pausa general" to "Impacto y confirmación", "Pausa de locales" to "Alcance comercial",
+        "Pausa de reparto" to "Alcance operativo", "Avisos globales" to "Comunicación excepcional",
+        "Registro posterior" to "Resultado y auditoría",
+    ),
+    configurationSection(
+        "General", "Parámetros transversales mínimos.", "General no absorbe: deriva cada pendiente al bloque dueño.",
+        "Estado global" to "Lectura consolidada", "Preferencias administrativas" to "Parámetros sin dueño",
+        "Pendientes globales" to "Revisión transversal", "Derivación al bloque dueño" to "Ruta responsable",
     ),
 )
 
@@ -512,6 +477,10 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 AdminConfigurationConvergenceStep.Impact -> current.copy(step = AdminConfigurationConvergenceStep.Preview)
                 AdminConfigurationConvergenceStep.SensitiveConfirmation -> current.copy(step = AdminConfigurationConvergenceStep.Impact)
                 AdminConfigurationConvergenceStep.Result -> current.copy(step = AdminConfigurationConvergenceStep.SensitiveConfirmation)
+                AdminConfigurationConvergenceStep.Audit -> AdminRoute.ConfigurationSubsection(
+                    section = configurationSections.first { it.title == current.section },
+                    title = current.subsection,
+                )
             }
             is AdminRoute.RoleAccessSubsection -> AdminRoute.RoleAccessSection(current.section)
             is AdminRoute.RoleAccessConvergence -> when (current.step) {
@@ -573,18 +542,13 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 },
                 onSignOut = { showSignOut = true },
             )
-            AdminRoute.Configuration -> AdminRootScreen(
-                title = "Configuración",
-                eyebrow = "Secciones de configuración",
-                summary = "Organizá cómo funciona Pédilo.",
+            AdminRoute.Configuration -> AdminConfigurationHomeScreen(
                 entries = configurationEntries,
                 onEntry = { entry ->
                     configurationSections.firstOrNull { it.title == entry.title }?.let {
                         route = AdminRoute.ConfigurationSection(it)
                     }
                 },
-                onSignOut = { showSignOut = true },
-                showSignOut = false,
             )
             AdminRoute.RoleAccess -> AdminRootScreen(
                 title = "Alta de roles",
@@ -668,7 +632,11 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                     route = AdminRoute.ConfigurationConvergence(
                         section = current.section.title,
                         subsection = current.title,
-                        step = AdminConfigurationConvergenceStep.Entity,
+                        step = if (current.section.title == "Auditoría") {
+                            AdminConfigurationConvergenceStep.Audit
+                        } else {
+                            AdminConfigurationConvergenceStep.Entity
+                        },
                     )
                 },
             )
@@ -774,6 +742,99 @@ private fun AdminRootScreen(
         }
     }
 }
+
+@Composable
+private fun AdminConfigurationHomeScreen(
+    entries: List<AdminEntry>,
+    onEntry: (AdminEntry) -> Unit,
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = adminBottomBarReservedPadding),
+        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            AdminHeader(
+                title = "Configuración",
+                eyebrow = "Datos y reglas",
+                summary = "Prepará cómo funciona Pédilo.",
+                onSignOut = {},
+                showSignOut = false,
+            )
+        }
+        gridItems(entries, key = { it.title }) { entry ->
+            AdminConfigurationRootCard(
+                entry = entry,
+                icon = configurationIconFor(entry.title),
+                onClick = { onEntry(entry) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun AdminConfigurationRootCard(
+    entry: AdminEntry,
+    icon: ImageVector,
+    onClick: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1f)
+            .scale(if (pressed) 0.98f else 1f)
+            .pediloCardDepth(RoundedCornerShape(16.dp))
+            .background(PediloCardBrush, RoundedCornerShape(16.dp))
+            .border(1.dp, if (pressed) PediloOrange else PediloLine, RoundedCornerShape(16.dp))
+            .clickable(interactionSource = interactionSource, indication = null, role = Role.Button, onClick = onClick)
+            .padding(14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = entry.title,
+            tint = PediloOrange,
+            modifier = Modifier.size(34.dp),
+        )
+        Text(
+            text = entry.title,
+            color = PediloText,
+            fontSize = 16.sp,
+            lineHeight = 19.sp,
+            fontWeight = FontWeight.ExtraBold,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+private fun configurationIconFor(title: String): ImageVector =
+    when (title) {
+        "Público" -> Icons.Outlined.Language
+        "Locales" -> Icons.Outlined.Storefront
+        "Reparto" -> Icons.Outlined.TwoWheeler
+        "Marketplace" -> Icons.Outlined.ShoppingCart
+        "Pedidos" -> Icons.AutoMirrored.Outlined.ReceiptLong
+        "Precios" -> Icons.Outlined.Payments
+        "Cobros" -> Icons.Outlined.CreditCard
+        "Mensajes" -> Icons.Outlined.Feedback
+        "Reglas" -> Icons.Outlined.TaskAlt
+        "Notificaciones" -> Icons.Outlined.Notifications
+        "Métricas" -> Icons.Outlined.BarChart
+        "Auditoría" -> Icons.Outlined.History
+        "Emergencias" -> Icons.Outlined.ReportProblem
+        else -> Icons.Outlined.Tune
+    }
 
 @Composable
 private fun AdminOperationUniverseScreen(
@@ -1602,6 +1663,7 @@ private fun AdminConfigurationConvergenceScreen(
         AdminConfigurationConvergenceStep.Impact -> "Impacto"
         AdminConfigurationConvergenceStep.SensitiveConfirmation -> "Confirmación sensible"
         AdminConfigurationConvergenceStep.Result -> "Resultado"
+        AdminConfigurationConvergenceStep.Audit -> "Auditoría visual"
     }
     val summary = when (step) {
         AdminConfigurationConvergenceStep.Entity -> "Lectura base de lo que se quiere ajustar."
@@ -1610,6 +1672,7 @@ private fun AdminConfigurationConvergenceScreen(
         AdminConfigurationConvergenceStep.Impact -> "Evaluación de alcance y efectos esperados."
         AdminConfigurationConvergenceStep.SensitiveConfirmation -> "Validación previa para cambios sensibles."
         AdminConfigurationConvergenceStep.Result -> "Cierre de la secuencia de revisión."
+        AdminConfigurationConvergenceStep.Audit -> "Consulta de trazabilidad sin edición."
     }
     val context = when (step) {
         AdminConfigurationConvergenceStep.Entity -> "Sección: $section · Subsección: $subsection.\nControla alcance, estado actual y restricciones sin ejecutar acciones."
@@ -1618,6 +1681,7 @@ private fun AdminConfigurationConvergenceScreen(
         AdminConfigurationConvergenceStep.Impact -> "Qué cambia, qué afecta y qué no cambia.\nSolo lectura de impacto, sin aplicación."
         AdminConfigurationConvergenceStep.SensitiveConfirmation -> "Confirmación humana del alcance y advertencias.\nEl botón de confirmar es solo visual en este bloque."
         AdminConfigurationConvergenceStep.Result -> "La revisión quedó preparada para una etapa posterior.\nNo se aplicaron cambios reales."
+        AdminConfigurationConvergenceStep.Audit -> "Registro preparado para buscar, filtrar y consultar.\nNo se edita ni se borra."
     }
     val action = when (step) {
         AdminConfigurationConvergenceStep.Entity -> "Ir al editor" to AdminConfigurationConvergenceStep.Editor
@@ -1625,7 +1689,8 @@ private fun AdminConfigurationConvergenceScreen(
         AdminConfigurationConvergenceStep.Preview -> "Revisar impacto" to AdminConfigurationConvergenceStep.Impact
         AdminConfigurationConvergenceStep.Impact -> "Continuar a confirmación" to AdminConfigurationConvergenceStep.SensitiveConfirmation
         AdminConfigurationConvergenceStep.SensitiveConfirmation -> "Confirmar de forma visual" to AdminConfigurationConvergenceStep.Result
-        AdminConfigurationConvergenceStep.Result -> "Reiniciar revisión" to AdminConfigurationConvergenceStep.Entity
+        AdminConfigurationConvergenceStep.Result -> "Consultar auditoría visual" to AdminConfigurationConvergenceStep.Audit
+        AdminConfigurationConvergenceStep.Audit -> "Revisar otro registro" to AdminConfigurationConvergenceStep.Audit
     }
 
     LazyColumn(
