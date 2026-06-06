@@ -267,11 +267,9 @@ test("admin configuration exposes internal visual sections without operational m
 
   [
     "Home público",
-    "Tienda pública",
-    "Botón +",
-    "Seguimiento público",
-    "Avisos y textos",
-    "Pantallas vacías",
+    "Compra / Retiro",
+    "Tienda",
+    "Seguimiento / Reclamos",
     "Listado de locales",
     "Datos del local",
     "Horarios y capacidad",
@@ -390,19 +388,19 @@ test("admin configuration keeps specialized roots within their final responsibil
   assert.doesNotMatch(general, /Catálogo del local|Precios comerciales|Formas de pago|Mensajes por estado|Eventos notificables|Registro de cambios|Modo seguro/);
 });
 
-test("admin public home uses specific layered cards and editor instead of generic configuration flow", () => {
+test("admin public configuration closes public worlds with layered visual editor", () => {
   const source = fs.readFileSync(admin, "utf8");
   const publicHome = source.slice(
     source.indexOf("private val publicWorldEntries"),
     source.indexOf("private val roleAccessSections"),
   );
   const publicScreens = source.slice(
-    source.indexOf("private fun AdminPublicHomeScreen"),
+    source.indexOf("private fun AdminPublicWorldScreen"),
     source.indexOf("private fun AdminConfigurationRootCard"),
   );
 
-  ["Home público", "Botón +", "Tienda", "Seguimiento / Reclamos"].forEach((label) => {
-    assert.match(publicHome, new RegExp(label.replace("+", "\\+")));
+  ["Home público", "Compra / Retiro", "Tienda", "Seguimiento / Reclamos"].forEach((label) => {
+    assert.match(publicHome, new RegExp(label));
   });
   [
     "Encabezado",
@@ -413,16 +411,27 @@ test("admin public home uses specific layered cards and editor instead of generi
     "Nuevos locales",
     "Buscador / tags",
     "Vista previa del Home",
+    "Pantalla inicial",
+    "Retiro / Envío",
+    "Confirmación",
+    "Ticket recibido",
+    "Portada Tienda",
+    "Categorías",
+    "Subcategorías",
+    "Locales visibles",
+    "Buscador Tienda",
+    "Seguimiento desde Tienda",
+    "Orden / visibilidad",
   ].forEach((label) => assert.match(publicHome, new RegExp(label)));
 
-  assert.match(source, /data object ConfigurationPublicHome/);
-  assert.match(source, /data class ConfigurationPublicHomePart/);
-  assert.match(source, /data class ConfigurationPublicHomeEditor/);
-  assert.match(source, /AdminRoute\.ConfigurationPublicHome -> AdminPublicHomeScreen/);
-  assert.match(source, /is AdminRoute\.ConfigurationPublicHomePart -> AdminPublicHomePartScreen/);
-  assert.match(source, /is AdminRoute\.ConfigurationPublicHomeEditor -> AdminPublicHomeEditorScreen/);
-  assert.match(source, /AdminPublicHomeEditorStep\.Detail -> AdminRoute\.ConfigurationPublicHomePart/);
-  assert.match(source, /is AdminRoute\.ConfigurationPublicHomePart -> AdminRoute\.ConfigurationPublicHome/);
+  assert.match(source, /data class ConfigurationPublicWorld/);
+  assert.match(source, /data class ConfigurationPublicWorldPart/);
+  assert.match(source, /data class ConfigurationPublicWorldEditor/);
+  assert.match(source, /is AdminRoute\.ConfigurationPublicWorld -> AdminPublicWorldScreen/);
+  assert.match(source, /is AdminRoute\.ConfigurationPublicWorldPart -> AdminPublicWorldPartScreen/);
+  assert.match(source, /is AdminRoute\.ConfigurationPublicWorldEditor -> AdminPublicHomeEditorScreen/);
+  assert.match(source, /AdminPublicHomeEditorStep\.Detail -> AdminRoute\.ConfigurationPublicWorldPart/);
+  assert.match(source, /is AdminRoute\.ConfigurationPublicWorldPart -> AdminRoute\.ConfigurationPublicWorld/);
   assert.match(publicScreens, /AdminConfigurationGridScreen/);
   assert.match(publicScreens, /Guardar borrador visual/);
   assert.match(publicScreens, /Valor actual/);
@@ -431,8 +440,10 @@ test("admin public home uses specific layered cards and editor instead of generi
   assert.match(publicScreens, /Impacto visible/);
   assert.match(publicScreens, /Confirmar visualmente/);
   assert.match(publicScreens, /Auditoría visual/);
-  assert.match(publicScreens, /No crea productos ni modifica precios/);
-  assert.match(publicScreens, /Home público real permanece sin cambios/);
+  assert.match(publicScreens, /No crea pedidos reales ni cambia pagos/);
+  assert.match(publicScreens, /No crea locales ni edita productos/);
+  assert.match(publicScreens, /usuario público real permanece sin cambios/);
+  assert.doesNotMatch(source, /Botón \+/);
   assert.doesNotMatch(publicScreens, /Firebase|Functions|Rules|backend|mock|demo|placeholder/i);
 });
 
@@ -446,20 +457,23 @@ test("admin role access exposes internal visual sections without touching real u
     "Altas pendientes",
     "Usuarios inactivos",
     "Vinculaciones pendientes",
+    "Auditoría de accesos",
     "Cuentas activas",
     "Cuentas en revisión",
     "Roles asignados",
     "Estado de acceso",
     "Vínculos operativos",
     "Cuentas Admin",
-    "Estado de revisión",
-    "Acceso administrativo",
-    "Sensibilidad del rol",
+    "Crear Admin",
+    "Nivel de sensibilidad",
+    "Permisos visibles",
     "Cuentas Local",
+    "Crear cuenta Local",
     "Local vinculado",
     "Vinculación pendiente",
     "Revisión de cuenta",
     "Cuentas Repartidor",
+    "Crear cuenta Repartidor",
     "Repartidor vinculado",
     "Cuentas por revisar",
     "Rol previsto",
@@ -470,12 +484,17 @@ test("admin role access exposes internal visual sections without touching real u
     "Acceso detenido",
     "Motivo visible",
     "Revisión pendiente",
-    "Posible reactivación futura",
-    "Cuenta store sin local vinculado",
-    "Cuenta driver sin repartidor vinculado",
+    "Posible reactivación",
+    "Store sin local",
+    "Driver sin repartidor",
     "Relación incompleta",
     "Entidad pendiente",
     "Revisión de vínculo",
+    "Cambios de rol",
+    "Activaciones",
+    "Bloqueos",
+    "Desbloqueos",
+    "Vinculaciones",
   ].forEach((label) => assert.match(source, new RegExp(label)));
 
   assert.match(source, /AdminRoleAccessSectionScreen/);
@@ -497,6 +516,7 @@ test("admin role access convergence flow is available and restricted to visual m
     "Impacto",
     "Confirmación sensible",
     "Resultado",
+    "Auditoría de accesos",
     "No se aplicaron cambios reales",
     "Admin · Local · Repartidor",
   ].forEach((label) => assert.match(source, new RegExp(label)));
