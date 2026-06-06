@@ -70,6 +70,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -93,12 +94,14 @@ import com.pedilo.app.ui.admin.components.AdminHeader
 import com.pedilo.app.ui.admin.components.AdminInfoPanel
 import com.pedilo.app.ui.publicuser.PediloBg
 import com.pedilo.app.ui.publicuser.PediloCardBrush
+import com.pedilo.app.ui.publicuser.PediloCyan
 import com.pedilo.app.ui.publicuser.PediloGreen
 import com.pedilo.app.ui.publicuser.PediloLine
 import com.pedilo.app.ui.publicuser.PediloMuted
 import com.pedilo.app.ui.publicuser.PediloOrange
 import com.pedilo.app.ui.publicuser.PediloPanel
 import com.pedilo.app.ui.publicuser.PediloPanelSoft
+import com.pedilo.app.ui.publicuser.PediloPink
 import com.pedilo.app.ui.publicuser.PediloText
 import com.pedilo.app.ui.publicuser.PediloWarning
 import com.pedilo.app.ui.publicuser.pediloCardDepth
@@ -216,6 +219,20 @@ private enum class AdminOperationMetricTone {
     Healthy,
     Warning,
     Danger,
+}
+
+private enum class AdminVisualIntent {
+    Info,
+    Success,
+    Warning,
+    Problem,
+    Emergency,
+    Audit,
+    Edit,
+    Preview,
+    Impact,
+    Confirm,
+    Access,
 }
 
 private data class AdminOperationalLiveCard(
@@ -992,7 +1009,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             is AdminRoute.RoleAccessSubsection -> AdminSectionScreen(
                 root = AdminRoot.RoleAccess,
                 title = current.title,
-                summary = "Subsección de acceso lista para revisión administrativa.",
+                summary = "Revisá cuenta, rol, estado y vínculo antes de preparar un cambio.",
                 panelTitle = current.section.title,
                 panelText = "Este espacio ordena cuentas y vínculos de forma visual sin modificar usuarios ni roles.",
                 onRoleAccessConvergence = { initial ->
@@ -1012,8 +1029,8 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             is AdminRoute.Section -> AdminSectionScreen(
                 root = current.root,
                 title = current.title,
-                summary = "Sección lista para organizar el próximo paso.",
-                panelTitle = "Sección preparada",
+                summary = "Revisá el contenido visible antes de avanzar.",
+                panelTitle = "Lectura preparada",
                 panelText = "Este espacio ordena el bloque sin leer información, guardar cambios ni operar pedidos.",
             )
         }
@@ -1395,6 +1412,8 @@ private fun AdminConfigurationRootCard(
     icon: ImageVector,
     onClick: () -> Unit,
 ) {
+    val intent = adminVisualIntentFor(entry.title, entry.note)
+    val toneColor = intent.adminIntentColor()
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     Column(
@@ -1403,19 +1422,33 @@ private fun AdminConfigurationRootCard(
             .aspectRatio(1f)
             .scale(if (pressed) 0.98f else 1f)
             .pediloCardDepth(RoundedCornerShape(16.dp))
-            .background(PediloCardBrush, RoundedCornerShape(16.dp))
-            .border(1.dp, if (pressed) PediloOrange else PediloLine, RoundedCornerShape(16.dp))
+            .background(
+                Brush.linearGradient(
+                    listOf(toneColor.copy(alpha = if (pressed) 0.20f else 0.12f), PediloPanelSoft.copy(alpha = 0.92f), PediloPanel),
+                ),
+                RoundedCornerShape(16.dp),
+            )
+            .border(1.dp, if (pressed) toneColor.copy(alpha = 0.82f) else toneColor.copy(alpha = 0.34f), RoundedCornerShape(16.dp))
             .clickable(interactionSource = interactionSource, indication = null, role = Role.Button, onClick = onClick)
             .padding(14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = entry.title,
-            tint = PediloOrange,
-            modifier = Modifier.size(34.dp),
-        )
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(14.dp))
+                .background(toneColor.copy(alpha = 0.16f), RoundedCornerShape(14.dp))
+                .border(1.dp, toneColor.copy(alpha = 0.34f), RoundedCornerShape(14.dp))
+                .size(48.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = entry.title,
+                tint = toneColor,
+                modifier = Modifier.size(30.dp),
+            )
+        }
         Text(
             text = entry.title,
             color = PediloText,
@@ -1426,6 +1459,7 @@ private fun AdminConfigurationRootCard(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
+        AdminStatusChip(label = intent.adminIntentLabel(), toneColor = toneColor)
     }
 }
 
@@ -2015,6 +2049,7 @@ private fun AdminOperationOrderCard(
     card: AdminOperationalLiveCard,
     onClick: () -> Unit,
 ) {
+    val toneColor = adminVisualIntentFor(card.title, card.detail).adminIntentColor()
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     Column(
@@ -2022,8 +2057,8 @@ private fun AdminOperationOrderCard(
             .fillMaxWidth()
             .scale(if (pressed) 0.988f else 1f)
             .clip(RoundedCornerShape(14.dp))
-            .background(if (pressed) PediloPanelSoft else PediloPanel, RoundedCornerShape(14.dp))
-            .border(1.dp, if (pressed) PediloOrange.copy(alpha = 0.72f) else PediloLine.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
+            .background(if (pressed) toneColor.copy(alpha = 0.14f) else PediloPanel, RoundedCornerShape(14.dp))
+            .border(1.dp, if (pressed) toneColor.copy(alpha = 0.72f) else toneColor.copy(alpha = 0.38f), RoundedCornerShape(14.dp))
             .clickable(interactionSource = interactionSource, indication = null, role = Role.Button, onClick = onClick)
             .defaultMinSize(minHeight = 82.dp)
             .padding(14.dp),
@@ -2038,11 +2073,11 @@ private fun AdminOperationOrderCard(
             Icon(
                 imageVector = card.icon,
                 contentDescription = "Pedido",
-                tint = PediloOrange,
+                tint = toneColor,
                 modifier = Modifier.size(20.dp),
             )
         }
-        AdminStatusChip(label = card.countLabel, toneColor = PediloOrange)
+        AdminStatusChip(label = card.countLabel, toneColor = toneColor)
         Text(card.detail, color = PediloMuted, fontSize = 12.sp, lineHeight = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
@@ -2690,20 +2725,77 @@ private fun AdminOrderFactPanel(title: String, facts: List<Pair<String, String>>
 
 @Composable
 private fun AdminActionCard(title: String, note: String, onClick: () -> Unit) {
+    val intent = adminVisualIntentFor(title, note)
+    val toneColor = intent.adminIntentColor()
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .scale(if (pressed) 0.986f else 1f)
             .pediloCardDepth(RoundedCornerShape(15.dp))
-            .background(PediloCardBrush, RoundedCornerShape(15.dp))
-            .border(1.dp, PediloLine, RoundedCornerShape(15.dp))
-            .clickable(role = Role.Button, onClick = onClick)
+            .background(
+                Brush.linearGradient(listOf(toneColor.copy(alpha = if (pressed) 0.20f else 0.12f), PediloPanelSoft, PediloPanel)),
+                RoundedCornerShape(15.dp),
+            )
+            .border(1.dp, if (pressed) toneColor.copy(alpha = 0.78f) else toneColor.copy(alpha = 0.34f), RoundedCornerShape(15.dp))
+            .clickable(interactionSource = interactionSource, indication = null, role = Role.Button, onClick = onClick)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(7.dp),
     ) {
-        Text(title, color = PediloText, fontSize = 19.sp, lineHeight = 23.sp, fontWeight = FontWeight.ExtraBold)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            AdminStatusChip(label = intent.adminIntentLabel(), toneColor = toneColor)
+            Text(title, color = PediloText, fontSize = 19.sp, lineHeight = 23.sp, fontWeight = FontWeight.ExtraBold)
+        }
         Text(note, color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp)
     }
 }
+
+private fun adminVisualIntentFor(title: String, note: String): AdminVisualIntent {
+    val text = "$title $note"
+    return when {
+        text.contains("Auditor", ignoreCase = true) || text.contains("registro", ignoreCase = true) -> AdminVisualIntent.Audit
+        text.contains("Confirm", ignoreCase = true) || text.contains("sensible", ignoreCase = true) -> AdminVisualIntent.Confirm
+        text.contains("Impacto", ignoreCase = true) || text.contains("Emergencia", ignoreCase = true) -> AdminVisualIntent.Impact
+        text.contains("Vista previa", ignoreCase = true) || text.contains("preview", ignoreCase = true) -> AdminVisualIntent.Preview
+        text.contains("Editar", ignoreCase = true) || text.contains("borrador", ignoreCase = true) || text.contains("prepar", ignoreCase = true) -> AdminVisualIntent.Edit
+        text.contains("Problema", ignoreCase = true) || text.contains("bloque", ignoreCase = true) || text.contains("detenido", ignoreCase = true) -> AdminVisualIntent.Problem
+        text.contains("revisión", ignoreCase = true) || text.contains("pendiente", ignoreCase = true) || text.contains("incompleto", ignoreCase = true) -> AdminVisualIntent.Warning
+        text.contains("cuenta", ignoreCase = true) || text.contains("rol", ignoreCase = true) || text.contains("víncul", ignoreCase = true) || text.contains("acceso", ignoreCase = true) -> AdminVisualIntent.Access
+        text.contains("activo", ignoreCase = true) || text.contains("publicable", ignoreCase = true) || text.contains("listo", ignoreCase = true) -> AdminVisualIntent.Success
+        else -> AdminVisualIntent.Info
+    }
+}
+
+private fun AdminVisualIntent.adminIntentColor(): Color =
+    when (this) {
+        AdminVisualIntent.Info -> PediloMuted
+        AdminVisualIntent.Success -> PediloGreen
+        AdminVisualIntent.Warning -> PediloWarning
+        AdminVisualIntent.Problem -> PediloPink
+        AdminVisualIntent.Emergency -> PediloWarning
+        AdminVisualIntent.Audit -> PediloPink
+        AdminVisualIntent.Edit -> PediloOrange
+        AdminVisualIntent.Preview -> PediloCyan
+        AdminVisualIntent.Impact -> PediloWarning
+        AdminVisualIntent.Confirm -> PediloOrange
+        AdminVisualIntent.Access -> PediloPink
+    }
+
+private fun AdminVisualIntent.adminIntentLabel(): String =
+    when (this) {
+        AdminVisualIntent.Info -> "Lectura"
+        AdminVisualIntent.Success -> "Listo"
+        AdminVisualIntent.Warning -> "Revisar"
+        AdminVisualIntent.Problem -> "Bloqueo"
+        AdminVisualIntent.Emergency -> "Emergencia"
+        AdminVisualIntent.Audit -> "Auditoría"
+        AdminVisualIntent.Edit -> "Editable"
+        AdminVisualIntent.Preview -> "Vista previa"
+        AdminVisualIntent.Impact -> "Impacto"
+        AdminVisualIntent.Confirm -> "Confirmación"
+        AdminVisualIntent.Access -> "Acceso"
+    }
 
 private fun AdminRoute.root(): AdminRoot = when (this) {
     AdminRoute.Operation -> AdminRoot.Operation

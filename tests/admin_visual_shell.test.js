@@ -47,6 +47,11 @@ test("admin has separated root navigation and no public bottom labels", () => {
   assert.match(source, /RoleAccess\("Alta de roles"\)/);
   assert.match(source, /AdminBottomBar/);
   assert.doesNotMatch(bottomBar, /"Inicio"|"\\+"|"Tienda"|"Casa"|"Salir de Pedilo"/);
+  assert.match(bottomBar, /AdminOperationTone/);
+  assert.match(bottomBar, /AdminConfigurationTone/);
+  assert.match(bottomBar, /AdminRoleAccessTone/);
+  assert.match(bottomBar, /toneColor: Color/);
+  assert.match(bottomBar, /selected \|\| pressed/);
 });
 
 test("admin operation root exposes visual operation cards only", () => {
@@ -73,7 +78,7 @@ test("admin operation root exposes visual operation cards only", () => {
   assert.match(source, /onOpenList/);
   assert.match(source, /Sin datos/);
   assert.doesNotMatch(source, /Mesa Operativa Viva|Necesitan atención|Finalizados recientes|Capas de lectura/);
-  assert.match(source, /AdminBottomItem\(Icons\.Outlined\.Dashboard, "Operación"/);
+  assert.match(source, /AdminBottomItem\(AdminOperationTone\.icon, "Operación", AdminOperationTone\.primary/);
   assert.doesNotMatch(source, /"Moto"|"Cfg"|"Rol"/);
 });
 
@@ -600,6 +605,7 @@ test("admin order detail exposes Pedido #____ read-only ficha with real-data fal
 test("admin operation uses real icons chips and tactile feedback", () => {
   const source = readAdminSourceTree();
   const adminSource = fs.readFileSync(admin, "utf8");
+  const components = fs.readFileSync("app/src/main/java/com/pedilo/app/ui/admin/components/AdminComponents.kt", "utf8");
   const operationIcons = adminSource.slice(
     adminSource.indexOf("private fun operationIconFor"),
     adminSource.indexOf("private fun operationCompactTitle"),
@@ -611,12 +617,47 @@ test("admin operation uses real icons chips and tactile feedback", () => {
   assert.match(source, /MutableInteractionSource/);
   assert.match(source, /collectIsPressedAsState/);
   assert.match(source, /AdminStatusChip/);
+  assert.match(source, /AdminVisualIntent/);
+  assert.match(source, /adminIntentColor/);
+  assert.match(source, /adminIntentLabel/);
+  assert.match(components, /AdminIntentTone/);
+  assert.match(components, /AdminIntentChip/);
+  assert.match(components, /adminUniverseToneFor/);
+  assert.match(components, /Mesa viva/);
+  assert.match(components, /Preparación/);
+  assert.match(components, /Accesos/);
   assert.match(source, /Buscando repartidor/);
   assert.match(source, /En camino/);
   assert.match(source, /Entregado/);
   assert.doesNotMatch(operationIcons, /-> "[#>!+xLPRC?•]"/);
   assert.doesNotMatch(source, /Text\("[#>!+xLPRC?•]"/);
   assert.doesNotMatch(source, /Aún no hay información real|Sin acciones disponibles por ahora|Pedido read-only/);
+});
+
+test("admin visual polish separates universe tones and action intentions", () => {
+  const source = readAdminSourceTree();
+  const components = fs.readFileSync("app/src/main/java/com/pedilo/app/ui/admin/components/AdminComponents.kt", "utf8");
+
+  [
+    "Mesa viva",
+    "Preparación",
+    "Accesos",
+    "Auditoría",
+    "Impacto",
+    "Editable",
+    "Vista previa",
+    "Confirmación",
+    "Bloqueo",
+    "Listo",
+    "Lectura",
+  ].forEach((label) => assert.match(source, new RegExp(label)));
+
+  assert.match(components, /Brush\.linearGradient/);
+  assert.match(components, /AdminEntryCard[\s\S]*AdminIntentChip/);
+  assert.match(components, /AdminInfoPanel[\s\S]*adminIntentToneFor/);
+  assert.match(source, /AdminConfigurationRootCard[\s\S]*adminVisualIntentFor/);
+  assert.match(source, /AdminActionCard[\s\S]*collectIsPressedAsState/);
+  assert.doesNotMatch(source, /Subsección de acceso lista|Sección preparada/);
 });
 
 test("admin order detail keeps shell rules and visual entry paths", () => {
