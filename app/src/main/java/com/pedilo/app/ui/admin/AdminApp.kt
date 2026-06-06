@@ -2166,15 +2166,24 @@ private fun AdminSectionScreen(
             }
         }
         if (root == AdminRoot.RoleAccess) {
+            val isAccessAudit = panelTitle == "Auditoría de accesos"
             val initialStep = when (title) {
                 "Altas pendientes" -> AdminRoleAccessConvergenceStep.CreateAccount
                 "Usuarios inactivos" -> AdminRoleAccessConvergenceStep.ToggleAccess
                 "Vinculaciones pendientes" -> AdminRoleAccessConvergenceStep.LinkEntity
-                else -> AdminRoleAccessConvergenceStep.Account
+                else -> if (isAccessAudit) {
+                    AdminRoleAccessConvergenceStep.Audit
+                } else {
+                    AdminRoleAccessConvergenceStep.Account
+                }
             }
             item {
                 AdminEntryCard(
-                    entry = AdminEntry("Cuenta concreta", "Abrir detalle de cuenta y acciones disponibles"),
+                    entry = if (isAccessAudit) {
+                        AdminEntry("Detalle de registro", "Consulta de accesos sin edición")
+                    } else {
+                        AdminEntry("Cuenta concreta", "Abrir detalle de cuenta y acciones disponibles")
+                    },
                     onClick = { onRoleAccessConvergence(initialStep) },
                 )
             }
@@ -2235,7 +2244,7 @@ private fun AdminRoleAccessConvergenceScreen(
         AdminRoleAccessConvergenceStep.Impact -> AdminRoleAccessConvergenceStep.SensitiveConfirmation
         AdminRoleAccessConvergenceStep.SensitiveConfirmation -> AdminRoleAccessConvergenceStep.Result
         AdminRoleAccessConvergenceStep.Result -> AdminRoleAccessConvergenceStep.Audit
-        AdminRoleAccessConvergenceStep.Audit -> AdminRoleAccessConvergenceStep.Account
+        AdminRoleAccessConvergenceStep.Audit -> AdminRoleAccessConvergenceStep.Audit
     }
     val actionLabel = when (step) {
         AdminRoleAccessConvergenceStep.Account -> "Abrir editor de acceso"
@@ -2247,7 +2256,7 @@ private fun AdminRoleAccessConvergenceScreen(
         AdminRoleAccessConvergenceStep.Impact -> "Ir a confirmación"
         AdminRoleAccessConvergenceStep.SensitiveConfirmation -> "Confirmar de forma visual"
         AdminRoleAccessConvergenceStep.Result -> "Consultar auditoría de accesos"
-        AdminRoleAccessConvergenceStep.Audit -> "Reiniciar revisión"
+        AdminRoleAccessConvergenceStep.Audit -> "Revisar registro"
     }
 
     LazyColumn(

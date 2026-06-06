@@ -524,6 +524,9 @@ test("admin role access convergence flow is available and restricted to visual m
   assert.match(source, /AdminRoleAccessConvergenceScreen/);
   assert.match(source, /AdminRoleAccessConvergenceStep/);
   assert.match(source, /onRoleAccessConvergence/);
+  assert.match(source, /isAccessAudit = panelTitle == "Auditoría de accesos"/);
+  assert.match(source, /AdminRoleAccessConvergenceStep\.Audit -> AdminRoleAccessConvergenceStep\.Audit/);
+  assert.match(source, /Detalle de registro", "Consulta de accesos sin edición"/);
   assert.doesNotMatch(source, /supervisor|soporte|cajero|operador|owner|manager/);
 });
 
