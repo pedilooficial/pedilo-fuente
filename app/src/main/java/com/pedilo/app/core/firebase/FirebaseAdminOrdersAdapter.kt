@@ -74,6 +74,16 @@ class FirebaseAdminOrdersAdapter(
                 total = doc.get(TOTAL)?.toString().orEmpty(),
                 itemsSummary = itemsSummary,
                 lastEventSummary = lastEvent[EVENT_SUMMARY].orEmptyText(),
+                orderType = doc.getString(ORDER_TYPE).orEmpty(),
+                financialStatus = doc.getString(FINANCIAL_STATUS).orEmpty(),
+                communicationStatus = doc.getString(COMMUNICATION_STATUS).orEmpty(),
+                incidentStatus = doc.getString(INCIDENT_STATUS).orEmpty(),
+                archiveStatus = doc.getString(ARCHIVE_STATUS).orEmpty(),
+                currentResponsibleRole = doc.getString(CURRENT_RESPONSIBLE_ROLE).orEmpty(),
+                assignedActorId = doc.getString(ASSIGNED_ACTOR_ID).orEmpty(),
+                assignedActorRole = doc.getString(ASSIGNED_ACTOR_ROLE).orEmpty(),
+                version = doc.version(),
+                idempotencyKey = doc.getString(IDEMPOTENCY_KEY).orEmpty(),
             )
         }.fold(
             onSuccess = { CoreResult.Success(it) },
@@ -127,6 +137,16 @@ class FirebaseAdminOrdersAdapter(
             storeName = getString(STORE_NAME).orEmpty(),
             createdAtMillis = (get(CREATED_AT) as? Timestamp)?.toDate()?.time,
             total = get(TOTAL)?.toString().orEmpty(),
+            orderType = getString(ORDER_TYPE).orEmpty(),
+            financialStatus = getString(FINANCIAL_STATUS).orEmpty(),
+            communicationStatus = getString(COMMUNICATION_STATUS).orEmpty(),
+            incidentStatus = getString(INCIDENT_STATUS).orEmpty(),
+            archiveStatus = getString(ARCHIVE_STATUS).orEmpty(),
+            currentResponsibleRole = getString(CURRENT_RESPONSIBLE_ROLE).orEmpty(),
+            assignedActorId = getString(ASSIGNED_ACTOR_ID).orEmpty(),
+            assignedActorRole = getString(ASSIGNED_ACTOR_ROLE).orEmpty(),
+            version = version(),
+            idempotencyKey = getString(IDEMPOTENCY_KEY).orEmpty(),
         )
 
     private fun com.google.firebase.firestore.DocumentSnapshot.operationalStatus(): String =
@@ -136,6 +156,9 @@ class FirebaseAdminOrdersAdapter(
         getString(PRIORITY).orEmpty().ifBlank {
             if (getBoolean(ACTIVE_INCIDENT) == true || getBoolean(NEEDS_ATTENTION) == true) "high" else "normal"
         }
+
+    private fun com.google.firebase.firestore.DocumentSnapshot.version(): Int =
+        (get(VERSION) as? Number)?.toInt() ?: 0
 
     private fun com.google.firebase.firestore.DocumentSnapshot.nextAllowedActions(): List<AdminOrderAction> =
         (get(NEXT_ALLOWED_ACTIONS) as? List<*>)
@@ -194,5 +217,15 @@ class FirebaseAdminOrdersAdapter(
         const val ITEM_QTY = "quantity"
         const val CUSTOMER = "customer"
         const val NAME = "name"
+        const val ORDER_TYPE = "orderType"
+        const val FINANCIAL_STATUS = "financialStatus"
+        const val COMMUNICATION_STATUS = "communicationStatus"
+        const val INCIDENT_STATUS = "incidentStatus"
+        const val ARCHIVE_STATUS = "archiveStatus"
+        const val CURRENT_RESPONSIBLE_ROLE = "currentResponsibleRole"
+        const val ASSIGNED_ACTOR_ID = "assignedActorId"
+        const val ASSIGNED_ACTOR_ROLE = "assignedActorRole"
+        const val VERSION = "version"
+        const val IDEMPOTENCY_KEY = "idempotencyKey"
     }
 }

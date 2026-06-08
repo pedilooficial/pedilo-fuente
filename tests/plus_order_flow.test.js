@@ -107,7 +107,7 @@ test("createPlusOrder validates and writes only orders", () => {
   assert.match(source, /cleanPlusOrderPayload/);
   assert.match(source, /public_plus_buy/);
   assert.match(source, /public_plus_pickup_shipping/);
-  assert.match(createPlusOrder, /collection\(ORDERS\)\.doc\(\)/);
+  assert.match(createPlusOrder, /collection\(ORDERS\)\.doc\(idempotencyKey\)/);
   assert.match(createPlusOrder, /plusOrderData/);
   assert.match(createPlusOrder, /trackingNumber/);
   assert.doesNotMatch(createPlusOrder, /collection\("(users|roles|payments|order_tracking)"\)|driverId|WhatsApp|whatsapp/);

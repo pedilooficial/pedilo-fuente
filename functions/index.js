@@ -2,6 +2,7 @@
 
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const crypto = require("node:crypto");
 
 admin.initializeApp();
 
@@ -15,6 +16,24 @@ const PLUS_BUY_SOURCE = "public_plus_buy";
 const PLUS_PICKUP_SHIPPING_SOURCE = "public_plus_pickup_shipping";
 const STATUS = "created";
 const PUBLIC_STATUS = "Pedido recibido";
+const LIVE_ORDER_VERSION = 1;
+const FINANCIAL_STATUS_PENDING = "pending_review";
+const COMMUNICATION_STATUS_RECEIVED = "received";
+const INCIDENT_STATUS_NONE = "none";
+const ARCHIVE_STATUS_LIVE = "live";
+const RESPONSIBLE_ADMIN = "admin";
+const ASSIGNED_ACTOR_UNASSIGNED = "";
+const INITIAL_TIMEOUT_POLICY = {
+  code: "initial_admin_review",
+  mode: "declarative",
+  duration: "",
+  nextFallback: "admin_review_required",
+};
+const INITIAL_FALLBACK_POLICY = {
+  code: "admin_review_required",
+  responsibleRole: RESPONSIBLE_ADMIN,
+  publicStatus: PUBLIC_STATUS,
+};
 const ADMIN_ACTIONS = {
   MARK_ADMIN_REVIEWED: "mark_admin_reviewed",
   CONFIRM_INTERVENTION: "confirm_intervention",
@@ -76,14 +95,34 @@ exports.createLocalOrder = onCall({region: REGION}, async (request) => {
   }
 
   const subtotal = items.reduce((sum, item) => sum + (item.total || 0), 0);
-  const orderRef = db.collection(ORDERS).doc();
+  const idempotencyKey = publicIdempotencyKey(LOCAL_SOURCE, clean);
+  const orderRef = db.collection(ORDERS).doc(idempotencyKey);
   const trackingNumber = publicNumberFor(orderRef.id);
   const now = admin.firestore.FieldValue.serverTimestamp();
-
-  await orderRef.set({
+  const liveContract = liveBirthContract({
+    orderType: "local_order",
     source: LOCAL_SOURCE,
-    status: STATUS,
-    publicStatus: PUBLIC_STATUS,
+    idempotencyKey,
+    trackingNumber,
+    snapshot: {
+      orderType: "local_order",
+      source: LOCAL_SOURCE,
+      store: {
+        id: clean.storeId,
+        name: storeName,
+      },
+      items,
+      pricing: {
+        subtotal,
+        total: subtotal,
+        paymentMethod: clean.paymentMethod,
+      },
+      note: clean.note,
+    },
+  });
+
+  await createOrderWithInitialEvent(orderRef, {
+    ...liveContract,
     storeId: clean.storeId,
     storeName,
     customer: clean.customer,
@@ -92,24 +131,9 @@ exports.createLocalOrder = onCall({region: REGION}, async (request) => {
     paymentMethod: clean.paymentMethod,
     subtotal,
     total: subtotal,
-    trackingNumber,
-    publicOrderNumber: trackingNumber,
-    isPublicCreated: true,
-    operationalStatus: STATUS,
-    responsibleRole: "",
-    priority: "normal",
-    needsAttention: true,
-    activeIncident: false,
-    adminReviewed: false,
-    nextAllowedActions: allowedAdminActions({
-      status: STATUS,
-      adminReviewed: false,
-      activeIncident: false,
-      responsibleRole: "",
-    }),
     createdAt: now,
     updatedAt: now,
-  });
+  }, now);
 
   return {
     orderId: orderRef.id,
@@ -125,12 +149,13 @@ exports.createLocalOrder = onCall({region: REGION}, async (request) => {
 exports.createPlusOrder = onCall({region: REGION}, async (request) => {
   const payload = request.data || {};
   const clean = cleanPlusOrderPayload(payload);
-  const orderRef = db.collection(ORDERS).doc();
+  const idempotencyKey = publicIdempotencyKey(clean.source, clean);
+  const orderRef = db.collection(ORDERS).doc(idempotencyKey);
   const trackingNumber = publicNumberFor(orderRef.id);
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const orderData = plusOrderData(clean, trackingNumber, now);
+  const orderData = plusOrderData(clean, trackingNumber, now, idempotencyKey);
 
-  await orderRef.set(orderData);
+  await createOrderWithInitialEvent(orderRef, orderData, now);
 
   return {
     orderId: orderRef.id,
@@ -194,6 +219,9 @@ exports.adminOrderAction = onCall({region: REGION}, async (request) => {
     }
 
     const current = operationalOrderState(orderSnap.data() || {});
+    if (clean.expectedVersion !== null && current.version !== clean.expectedVersion) {
+      throw new HttpsError("failed-precondition", "El pedido cambió. Actualizá la vista antes de operar.");
+    }
     const allowed = allowedAdminActions(current);
     if (!allowed.includes(clean.action)) {
       throw new HttpsError("failed-precondition", "Esta acción no está disponible para el estado actual del pedido.");
@@ -219,6 +247,7 @@ exports.adminOrderAction = onCall({region: REGION}, async (request) => {
 
     tx.update(orderRef, {
       ...effect.patch,
+      version: current.version + 1,
       nextAllowedActions: next.nextAllowedActions,
       lastOperationEvent: {
         type: clean.action,
@@ -264,6 +293,7 @@ function cleanAdminActionPayload(payload) {
   const reason = cleanText(payload.reason);
   const forcedStatus = cleanText(payload.forcedStatus).toLowerCase();
   const responsibleRole = cleanText(payload.responsibleRole);
+  const expectedVersion = Number.isInteger(payload.expectedVersion) ? payload.expectedVersion : null;
 
   if (!orderId || !Object.values(ADMIN_ACTIONS).includes(action)) {
     throw new HttpsError("invalid-argument", "Elegí una acción válida para este pedido.");
@@ -289,6 +319,7 @@ function cleanAdminActionPayload(payload) {
     reason,
     forcedStatus,
     responsibleRole: responsibleRole || "admin",
+    expectedVersion,
   };
 }
 
@@ -303,6 +334,7 @@ function operationalOrderState(order) {
     needsAttention: order.needsAttention === true,
     activeIncident: order.activeIncident === true,
     adminReviewed: order.adminReviewed === true,
+    version: Number.isInteger(order.version) ? order.version : LIVE_ORDER_VERSION,
   };
 }
 
@@ -512,39 +544,43 @@ function cleanPlusItem(item) {
   };
 }
 
-function plusOrderData(clean, trackingNumber, now) {
-  const base = {
+function plusOrderData(clean, trackingNumber, now, idempotencyKey) {
+  const orderType = clean.requestType === "buy" ? "direct_purchase" : "pickup_shipping";
+  const base = liveBirthContract({
+    orderType,
     source: clean.source,
-    status: STATUS,
-    publicStatus: PUBLIC_STATUS,
+    idempotencyKey,
+    trackingNumber,
+    snapshot: {
+      orderType,
+      source: clean.source,
+      requestType: clean.requestType,
+      items: clean.items,
+      sourceReference: clean.sourceReference,
+      destination: clean.destination,
+      paymentMethod: clean.paymentMethod,
+      amount: clean.amount,
+      schedule: clean.schedule,
+      note: clean.note,
+    },
+  });
+
+  const plusBase = {
+    ...base,
+    source: clean.source,
     requestType: clean.requestType,
     customer: clean.customer,
     note: clean.note,
     paymentMethod: clean.paymentMethod,
     amount: clean.amount,
     schedule: clean.schedule,
-    trackingNumber,
-    publicOrderNumber: trackingNumber,
-    isPublicCreated: true,
-    operationalStatus: STATUS,
-    responsibleRole: "",
-    priority: "normal",
-    needsAttention: true,
-    activeIncident: false,
-    adminReviewed: false,
-    nextAllowedActions: allowedAdminActions({
-      status: STATUS,
-      adminReviewed: false,
-      activeIncident: false,
-      responsibleRole: "",
-    }),
     createdAt: now,
     updatedAt: now,
   };
 
   if (clean.requestType === "buy") {
     return {
-      ...base,
+      ...plusBase,
       purchase: {
         itemsText: clean.items.map((item) => `${item.name} - ${item.detail}`).join("\n"),
         items: clean.items,
@@ -559,7 +595,7 @@ function plusOrderData(clean, trackingNumber, now) {
   }
 
   return {
-    ...base,
+    ...plusBase,
     pickupShipping: {
       pickupAddress: clean.sourceReference,
       deliveryAddress: clean.destination,
@@ -568,6 +604,94 @@ function plusOrderData(clean, trackingNumber, now) {
       referenceName: clean.items[0].detail,
     },
   };
+}
+
+function liveBirthContract({orderType, source, idempotencyKey, trackingNumber, snapshot}) {
+  const responsibleRole = RESPONSIBLE_ADMIN;
+  const nextAllowedActions = allowedAdminActions({
+    status: STATUS,
+    adminReviewed: false,
+    activeIncident: false,
+    responsibleRole,
+  });
+
+  return {
+    orderType,
+    source,
+    status: STATUS,
+    publicStatus: PUBLIC_STATUS,
+    operationalStatus: "waiting_admin_review",
+    financialStatus: FINANCIAL_STATUS_PENDING,
+    communicationStatus: COMMUNICATION_STATUS_RECEIVED,
+    incidentStatus: INCIDENT_STATUS_NONE,
+    archiveStatus: ARCHIVE_STATUS_LIVE,
+    currentResponsibleRole: responsibleRole,
+    responsibleRole,
+    assignedActorId: ASSIGNED_ACTOR_UNASSIGNED,
+    assignedActorRole: ASSIGNED_ACTOR_UNASSIGNED,
+    priority: "normal",
+    needsAttention: true,
+    activeIncident: false,
+    adminReviewed: false,
+    nextAllowedActions,
+    liveSnapshot: snapshot,
+    initialSnapshot: snapshot,
+    timeoutPolicy: INITIAL_TIMEOUT_POLICY,
+    fallbackPolicy: INITIAL_FALLBACK_POLICY,
+    version: LIVE_ORDER_VERSION,
+    idempotencyKey,
+    trackingNumber,
+    publicOrderNumber: trackingNumber,
+    isPublicCreated: true,
+  };
+}
+
+async function createOrderWithInitialEvent(orderRef, orderData, now) {
+  const eventRef = orderRef.collection("events").doc("initial");
+  await db.runTransaction(async (tx) => {
+    const existing = await tx.get(orderRef);
+    if (existing.exists) return;
+
+    tx.create(orderRef, orderData);
+    tx.create(eventRef, {
+      type: "order_created",
+      summary: "Pedido Vivo Universal creado desde canal público.",
+      actorRole: "public_user",
+      actorUid: "",
+      source: orderData.source,
+      orderType: orderData.orderType,
+      previousStatus: "",
+      nextStatus: orderData.status,
+      previousOperationalStatus: "",
+      nextOperationalStatus: orderData.operationalStatus,
+      version: orderData.version,
+      idempotencyKey: orderData.idempotencyKey,
+      createdAt: now,
+    });
+  });
+}
+
+function publicIdempotencyKey(source, payload) {
+  const hash = crypto
+    .createHash("sha256")
+    .update(stableStringify({source, payload: publicIdempotencyPayload(payload)}))
+    .digest("hex")
+    .slice(0, 24);
+  return `ord_${hash}`;
+}
+
+function publicIdempotencyPayload(payload) {
+  return JSON.parse(stableStringify(payload));
+}
+
+function stableStringify(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
 
 function cleanItem(item) {
@@ -581,7 +705,8 @@ function cleanItem(item) {
 }
 
 function publicNumberFor(orderId) {
-  const suffix = orderId.replace(/[^a-z0-9]/gi, "").slice(0, 6).toUpperCase();
+  const clean = orderId.replace(/^ord_/i, "").replace(/[^a-z0-9]/gi, "");
+  const suffix = clean.slice(-6).toUpperCase();
   return `PDL-${suffix}`;
 }
 

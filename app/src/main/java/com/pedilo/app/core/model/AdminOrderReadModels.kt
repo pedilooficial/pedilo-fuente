@@ -17,6 +17,16 @@ data class AdminOrderSummary(
     val storeName: String,
     val createdAtMillis: Long?,
     val total: String,
+    val orderType: String = "",
+    val financialStatus: String = "",
+    val communicationStatus: String = "",
+    val incidentStatus: String = "",
+    val archiveStatus: String = "",
+    val currentResponsibleRole: String = "",
+    val assignedActorId: String = "",
+    val assignedActorRole: String = "",
+    val version: Int = 0,
+    val idempotencyKey: String = "",
 )
 
 data class AdminOrderDetail(
@@ -40,6 +50,16 @@ data class AdminOrderDetail(
     val total: String,
     val itemsSummary: List<String>,
     val lastEventSummary: String,
+    val orderType: String = "",
+    val financialStatus: String = "",
+    val communicationStatus: String = "",
+    val incidentStatus: String = "",
+    val archiveStatus: String = "",
+    val currentResponsibleRole: String = "",
+    val assignedActorId: String = "",
+    val assignedActorRole: String = "",
+    val version: Int = 0,
+    val idempotencyKey: String = "",
 )
 
 enum class AdminOrderAction(
