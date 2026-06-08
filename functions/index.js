@@ -581,6 +581,8 @@ function liveActionEffect(clean, current, actor) {
         cancelledByRole: "store",
         responsibleRole: "",
         currentResponsibleRole: "",
+        assignedActorId: "",
+        assignedActorRole: "",
       });
     case LIVE_ACTIONS.LOCAL_MARK_PREPARING:
       return livePatch("Local marcó el pedido en preparación.", "Pedido en preparación.", {
@@ -601,6 +603,7 @@ function liveActionEffect(clean, current, actor) {
         currentResponsibleRole: "driver",
         assignedActorId: "",
         assignedActorRole: "",
+        driverId: "",
       });
     case LIVE_ACTIONS.DRIVER_TAKE:
       return livePatch("Repartidor tomó el pedido.", "Pedido asignado a repartidor.", {
@@ -630,6 +633,8 @@ function liveActionEffect(clean, current, actor) {
         archiveStatus: "archived",
         responsibleRole: "",
         currentResponsibleRole: "",
+        assignedActorId: "",
+        assignedActorRole: "",
         activeIncident: false,
         incidentStatus: INCIDENT_STATUS_NONE,
         needsAttention: false,
@@ -649,6 +654,8 @@ function liveActionEffect(clean, current, actor) {
         cancelledByRole: actor.role,
         responsibleRole: "",
         currentResponsibleRole: "",
+        assignedActorId: "",
+        assignedActorRole: "",
       });
     case LIVE_ACTIONS.OPEN_INCIDENT:
       return livePatch(`${actor.role} abrió incidencia: ${clean.reason}`, "Incidencia abierta.", {
@@ -1162,9 +1169,9 @@ function publicTrackingResponse(order, requestedTrackingNumber) {
 
 function publicStatusCode(status) {
   const clean = cleanText(status).toLowerCase();
-  if (["accepted", "ready_for_pickup", "assigned_to_driver", "picked_up"].includes(clean)) return "RECEIVED";
+  if (["accepted", "ready_for_pickup", "assigned_to_driver"].includes(clean)) return "RECEIVED";
   if (["preparing", "in_preparation"].includes(clean)) return "PREPARING";
-  if (["on_the_way", "shipping", "delivering"].includes(clean)) return "ON_THE_WAY";
+  if (["picked_up", "on_the_way", "shipping", "delivering"].includes(clean)) return "ON_THE_WAY";
   if (["delivered", "closed", "archived"].includes(clean)) return "DELIVERED";
   if (["cancelled", "canceled"].includes(clean)) return "CANCELLED";
   if (["under_review", "review"].includes(clean)) return "UNDER_REVIEW";
