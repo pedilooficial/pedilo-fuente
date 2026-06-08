@@ -1,4 +1,5 @@
 .gradle/
+.kotlin/
 build/
 node_modules/
 local.properties
@@ -9,5 +10,6 @@ functions/lib/
 functions/node_modules/
 functions/.runtimeconfig.json
 tools/node_modules/
-reports/
+reports/*
+!reports/*.md
 firebase-debug.log

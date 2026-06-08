@@ -79,4 +79,4 @@ bash tools/guards/check_architecture.sh
 ## Configuración local
 
 - `app/google-services.json` no está en Git (ver `.gitignore`); debe colocarse localmente para compilar/ejecutar.
-- Documentación conceptual en `design/00-master/`; el código + tests mandan sobre documentos viejos.
+- Los reports `.md` vigentes de `reports/` pueden servir como bitácora técnica; la fuente de verdad sigue siendo código + tests + validaciones reales.
