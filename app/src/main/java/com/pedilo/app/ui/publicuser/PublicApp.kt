@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pedilo.app.R
 import com.pedilo.app.ui.admin.AdminApp
+import com.pedilo.app.ui.driver.DriverApp
 import com.pedilo.app.ui.store.StoreApp
 import com.pedilo.app.core.model.TeamLoginRequest
 import com.pedilo.app.core.model.TeamLoginResult
@@ -306,10 +307,7 @@ fun PublicApp() {
                     when (role) {
                         TeamRole.Admin -> AdminApp(onSignOutConfirmed = onSignOutConfirmed)
                         TeamRole.Local -> StoreApp(onSignOutConfirmed = onSignOutConfirmed)
-                        TeamRole.Driver -> TeamRolePlaceholderScreen(
-                            role = role,
-                            onSignOutConfirmed = onSignOutConfirmed,
-                        )
+                        TeamRole.Driver -> DriverApp(onSignOutConfirmed = onSignOutConfirmed)
                     }
                 }
             }

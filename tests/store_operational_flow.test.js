@@ -18,8 +18,7 @@ test("store role opens operational StoreApp without touching driver UI", () => {
 
   assert.match(source, /import com\.pedilo\.app\.ui\.store\.StoreApp/);
   assert.match(source, /TeamRole\.Local -> StoreApp\(onSignOutConfirmed = onSignOutConfirmed\)/);
-  assert.match(source, /TeamRole\.Driver -> TeamRolePlaceholderScreen/);
-  assert.doesNotMatch(source, /DriverApp|RepartidorApp/);
+  assert.match(source, /TeamRole\.Driver -> DriverApp\(onSignOutConfirmed = onSignOutConfirmed\)/);
 });
 
 test("store adapter reads only own orders by auth uid", () => {

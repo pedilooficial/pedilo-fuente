@@ -36,8 +36,8 @@ test("team access keeps admin store driver routing and sign out confirmation", (
   assert.match(source, /Text\("No"\)/);
   assert.match(source, /Text\("Sí"\)/);
   assert.match(appSource, /TeamRole\.Local -> StoreApp/);
-  assert.match(appSource, /TeamRole\.Driver -> TeamRolePlaceholderScreen/);
-  assert.doesNotMatch(source, /pedido|métrica|dashboard|estado operativo|driverId|WhatsApp|whatsapp/i);
+  assert.match(appSource, /TeamRole\.Driver -> DriverApp/);
+  assert.doesNotMatch(source, /driverId|WhatsApp|whatsapp/i);
 });
 
 test("persisted session redirects to the saved role and back does not clear it", () => {

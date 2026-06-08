@@ -25,7 +25,10 @@ service cloud.firestore {
         && isOperator()
         && (isAdmin()
           || order.storeId == request.auth.uid
-          || order.driverId == request.auth.uid);
+          || order.driverId == request.auth.uid
+          || (operatorRole() == "driver"
+            && order.responsibleRole == "driver"
+            && order.assignedActorId == ""));
     }
 
     function storeVisible(storeId) {

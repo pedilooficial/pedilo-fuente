@@ -17,6 +17,8 @@ test("rules protect operator data and reject direct order writes", () => {
   assert.match(rules, /match \/users\/\{userId\}/);
   assert.match(rules, /operatorRole\(\) in \["store", "driver", "admin"\]/);
   assert.match(rules, /match \/orders\/\{orderId\}/);
+  assert.match(rules, /order\.responsibleRole == "driver"/);
+  assert.match(rules, /order\.assignedActorId == ""/);
   assert.match(rules, /allow create, update, delete: if false/);
   assert.doesNotMatch(rules, /isOwner/);
   assert.doesNotMatch(rules, new RegExp("cust" + "omer", "i"));

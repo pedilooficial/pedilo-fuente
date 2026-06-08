@@ -1,0 +1,379 @@
+package com.pedilo.app.ui.driver
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.pedilo.app.core.model.AdminLiveOrderActionRequest
+import com.pedilo.app.core.model.DriverOrderDetail
+import com.pedilo.app.core.model.DriverOrderSummary
+import com.pedilo.app.core.model.LiveOrderAction
+import com.pedilo.app.core.result.CoreError
+import com.pedilo.app.core.result.CoreResult
+import com.pedilo.app.core.runtime.driverOrdersUseCase
+import com.pedilo.app.ui.components.PediloTextField
+import com.pedilo.app.ui.publicuser.PediloBg
+import com.pedilo.app.ui.publicuser.PediloGreen
+import com.pedilo.app.ui.publicuser.PediloLine
+import com.pedilo.app.ui.publicuser.PediloMuted
+import com.pedilo.app.ui.publicuser.PediloOrange
+import com.pedilo.app.ui.publicuser.PediloPanel
+import com.pedilo.app.ui.publicuser.PediloPanelSoft
+import com.pedilo.app.ui.publicuser.PediloText
+import com.pedilo.app.ui.publicuser.PediloWarning
+import kotlinx.coroutines.launch
+
+private data class PendingDriverAction(
+    val orderId: String,
+    val action: LiveOrderAction,
+    val expectedVersion: Int,
+)
+
+@Composable
+fun DriverApp(onSignOutConfirmed: () -> Unit) {
+    val driverOrders = remember { driverOrdersUseCase() }
+    val scope = rememberCoroutineScope()
+    var orders by remember { mutableStateOf<List<DriverOrderSummary>>(emptyList()) }
+    var selectedOrderId by remember { mutableStateOf<String?>(null) }
+    var detail by remember { mutableStateOf<DriverOrderDetail?>(null) }
+    var message by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf("") }
+    var pendingAction by remember { mutableStateOf<PendingDriverAction?>(null) }
+    var pendingReason by remember { mutableStateOf("") }
+
+    fun refreshDetail(orderId: String) {
+        scope.launch {
+            when (val result = driverOrders.getDetail(orderId)) {
+                is CoreResult.Success -> detail = result.value
+                is CoreResult.Failure -> {
+                    detail = null
+                    error = result.error.driverErrorMessage()
+                }
+            }
+        }
+    }
+
+    fun executeAction(pending: PendingDriverAction, reason: String) {
+        scope.launch {
+            message = ""
+            error = ""
+            when (val result = driverOrders.execute(
+                AdminLiveOrderActionRequest(
+                    orderId = pending.orderId,
+                    action = pending.action,
+                    expectedVersion = pending.expectedVersion,
+                    reason = reason,
+                ),
+            )) {
+                is CoreResult.Success -> {
+                    message = result.value.humanMessage.ifBlank { result.value.eventSummary }
+                    pendingAction = null
+                    pendingReason = ""
+                    refreshDetail(pending.orderId)
+                }
+                is CoreResult.Failure -> {
+                    error = result.error.driverErrorMessage()
+                    pendingAction = null
+                    pendingReason = ""
+                    refreshDetail(pending.orderId)
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        driverOrders.observe().collect { result ->
+            when (result) {
+                is CoreResult.Success -> orders = result.value
+                is CoreResult.Failure -> {
+                    orders = emptyList()
+                    error = result.error.driverErrorMessage()
+                }
+            }
+        }
+    }
+
+    selectedOrderId?.let { LaunchedEffect(it) { refreshDetail(it) } }
+
+    val availableOrders = orders.filter { !it.isAssignedToCurrentDriver }
+    val assignedOrders = orders.filter { it.isAssignedToCurrentDriver }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(PediloBg)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(top = 18.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            DriverHeader(
+                title = "Repartidor",
+                subtitle = "Pedidos disponibles y asignados a tu cuenta",
+                action = "Cerrar sesión",
+                onAction = onSignOutConfirmed,
+            )
+        }
+        if (message.isNotBlank()) item { DriverInfoCard("Resultado", message, PediloGreen) }
+        if (error.isNotBlank()) item { DriverInfoCard("Error", error, PediloWarning) }
+        if (selectedOrderId == null) {
+            if (orders.isEmpty()) {
+                item { DriverInfoCard("Pedidos", "No hay pedidos visibles para operar.", PediloMuted) }
+            } else {
+                if (availableOrders.isNotEmpty()) {
+                    item { DriverInfoCard("Disponibles", "Listos para tomar por el repartidor activo.", PediloOrange) }
+                    items(availableOrders) { order ->
+                        DriverOrderCard(order = order, onClick = {
+                            selectedOrderId = order.id
+                            message = ""
+                            error = ""
+                        })
+                    }
+                }
+                if (assignedOrders.isNotEmpty()) {
+                    item { DriverInfoCard("Asignados", "Pedidos ya tomados por tu cuenta.", PediloOrange) }
+                    items(assignedOrders) { order ->
+                        DriverOrderCard(order = order, onClick = {
+                            selectedOrderId = order.id
+                            message = ""
+                            error = ""
+                        })
+                    }
+                }
+            }
+        } else {
+            item {
+                TextButton(onClick = {
+                    selectedOrderId = null
+                    detail = null
+                    message = ""
+                    error = ""
+                }) {
+                    Text("Volver")
+                }
+            }
+            val current = detail
+            if (current == null) {
+                item { DriverInfoCard("Pedido", "Cargando pedido.", PediloMuted) }
+            } else {
+                item { DriverOrderDetailCard(current) }
+                item {
+                    DriverInfoCard(
+                        "Estado operativo",
+                        "Real: ${current.operationalStatus.ifBlank { "No informado" }}\nVersión: ${current.version}\nAcciones permitidas: ${current.nextAllowedActions.joinToString { it.driverLabel() }.ifBlank { "Ninguna" }}",
+                        PediloOrange,
+                    )
+                }
+                if (current.nextAllowedActions.isEmpty()) {
+                    item { DriverInfoCard("Acciones", "No hay acciones disponibles para este estado.", PediloMuted) }
+                } else {
+                    items(current.nextAllowedActions) { action ->
+                        DriverActionCard(action = action, onClick = {
+                            pendingAction = PendingDriverAction(current.id, action, current.version)
+                            pendingReason = ""
+                        })
+                    }
+                }
+            }
+        }
+    }
+
+    pendingAction?.let { pending ->
+        val requiresReason = pending.action.requiresDriverReason()
+        AlertDialog(
+            onDismissRequest = {
+                pendingAction = null
+                pendingReason = ""
+            },
+            title = { Text("Confirmar acción") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(pending.action.driverLabel())
+                    Text(pending.action.driverImpact())
+                    if (requiresReason) {
+                        PediloTextField(
+                            value = pendingReason,
+                            onValueChange = { pendingReason = it },
+                            label = "Motivo operativo",
+                            singleLine = false,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !requiresReason || pendingReason.trim().length >= 4,
+                    onClick = { executeAction(pending, pendingReason.trim()) },
+                ) {
+                    Text("Confirmar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    pendingAction = null
+                    pendingReason = ""
+                }) {
+                    Text("Cancelar")
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun DriverHeader(title: String, subtitle: String, action: String, onAction: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(PediloPanel, RoundedCornerShape(14.dp))
+            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
+            Text(title, color = PediloText, fontSize = 26.sp, lineHeight = 30.sp, fontWeight = FontWeight.ExtraBold)
+            Text(subtitle, color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp)
+        }
+        TextButton(onClick = onAction) { Text(action) }
+    }
+}
+
+@Composable
+private fun DriverOrderCard(order: DriverOrderSummary, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(PediloPanelSoft, RoundedCornerShape(14.dp))
+            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("Pedido #${order.visibleNumber}", color = PediloText, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+        Text(order.publicStatus.ifBlank { order.operationalStatus }, color = PediloOrange, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Text(order.storeLabel.ifBlank { "Local no informado" }, color = PediloMuted, fontSize = 13.sp)
+        Text(order.itemsSummary.joinToString(" · ").ifBlank { "Productos no informados" }, color = PediloMuted, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(if (order.isAssignedToCurrentDriver) "Asignado a tu cuenta" else "Disponible para tomar", color = PediloText, fontSize = 12.sp)
+        Text("${order.nextAllowedActions.size} acciones disponibles", color = PediloMuted, fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun DriverOrderDetailCard(order: DriverOrderDetail) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(PediloPanelSoft, RoundedCornerShape(14.dp))
+            .border(1.dp, PediloLine, RoundedCornerShape(14.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("Pedido #${order.visibleNumber}", color = PediloText, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+        Text(order.publicStatus.ifBlank { order.operationalStatus }, color = PediloOrange, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Text("Local: ${order.storeLabel.ifBlank { "No informado" }}", color = PediloMuted, fontSize = 13.sp)
+        Text("Persona: ${order.contactName.ifBlank { "No informado" }}", color = PediloMuted, fontSize = 13.sp)
+        Text("Teléfono: ${order.contactPhone.ifBlank { "No informado" }}", color = PediloMuted, fontSize = 13.sp)
+        Text("Entrega: ${order.deliveryAddress.ifBlank { "No informado" }}", color = PediloMuted, fontSize = 13.sp)
+        order.itemsSummary.forEach {
+            Text(it, color = PediloText, fontSize = 14.sp, lineHeight = 18.sp)
+        }
+        Text("Total: ${order.total.ifBlank { "No informado" }}", color = PediloMuted, fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun DriverActionCard(action: LiveOrderAction, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(PediloPanel, RoundedCornerShape(14.dp))
+            .border(1.dp, PediloOrange.copy(alpha = 0.42f), RoundedCornerShape(14.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(action.driverLabel(), color = PediloText, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+        Text(action.driverImpact(), color = PediloMuted, fontSize = 13.sp, lineHeight = 17.sp)
+    }
+}
+
+@Composable
+private fun DriverInfoCard(title: String, message: String, tone: androidx.compose.ui.graphics.Color) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(tone.copy(alpha = 0.10f), RoundedCornerShape(14.dp))
+            .border(1.dp, tone.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(title, color = tone, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+        Text(message, color = PediloText, fontSize = 14.sp, lineHeight = 18.sp)
+    }
+}
+
+private fun LiveOrderAction.driverLabel(): String =
+    when (this) {
+        LiveOrderAction.DriverTake -> "Tomar pedido"
+        LiveOrderAction.DriverMarkPickedUp -> "Marcar retirado"
+        LiveOrderAction.DriverMarkDelivered -> "Marcar entregado"
+        LiveOrderAction.OpenIncident -> "Reportar incidencia"
+        LiveOrderAction.CancelOrder -> "Cancelar pedido"
+        else -> "Acción no disponible"
+    }
+
+private fun LiveOrderAction.driverImpact(): String =
+    when (this) {
+        LiveOrderAction.DriverTake -> "Asigna el pedido a tu cuenta operativa."
+        LiveOrderAction.DriverMarkPickedUp -> "Confirma que retiraste el pedido del local."
+        LiveOrderAction.DriverMarkDelivered -> "Cierra la entrega como completada."
+        LiveOrderAction.OpenIncident -> "Manda el pedido a revisión operativa."
+        LiveOrderAction.CancelOrder -> "Cierra el pedido con motivo auditado."
+        else -> "Backend no habilitó esta acción para el repartidor."
+    }
+
+private fun LiveOrderAction.requiresDriverReason(): Boolean =
+    this in setOf(LiveOrderAction.OpenIncident, LiveOrderAction.CancelOrder)
+
+private fun CoreError.driverErrorMessage(): String =
+    when (this) {
+        is CoreError.Operational -> humanMessage
+        CoreError.NotAvailable -> "No pudimos cargar tus pedidos."
+        CoreError.IncompleteData -> "Faltan datos para operar el pedido."
+        is CoreError.Validation -> "Revisá los datos antes de confirmar."
+        CoreError.Unknown -> "No pudimos completar la operación."
+    }
