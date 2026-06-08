@@ -29,6 +29,8 @@ test("driver adapter reads available and assigned orders without direct writes",
   assert.match(source, /whereEqualTo\(ASSIGNED_ACTOR_ID, ""\)/);
   assert.match(source, /whereEqualTo\(DRIVER_ID, uid\)/);
   assert.match(source, /isVisibleToDriver\(uid\)/);
+  assert.match(source, /val fallbackAddress = customer\?\.get\(ADDRESS\)\?\.toString\(\)\.orEmpty\(\)/);
+  assert.match(source, /else if \(fallbackAddress\.isNotBlank\(\)\)/);
   assert.doesNotMatch(source, /collection\("orders"\)\.add|\.set\(|\.update\(|\.delete\(|writeBatch|runTransaction/);
 });
 

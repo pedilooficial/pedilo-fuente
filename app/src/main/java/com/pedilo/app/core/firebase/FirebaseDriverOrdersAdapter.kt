@@ -178,10 +178,16 @@ class FirebaseDriverOrdersAdapter(
 
     private fun com.google.firebase.firestore.DocumentSnapshot.deliveryAddress(): String =
         buildList {
-            val address = get(DELIVERY) as? Map<*, *>
-            val addressLine = address?.get(ADDRESS_LINE)?.toString().orEmpty()
-            val locality = address?.get(LOCALITY)?.toString().orEmpty()
-            if (addressLine.isNotBlank()) add(addressLine)
+            val delivery = get(DELIVERY) as? Map<*, *>
+            val addressLine = delivery?.get(ADDRESS_LINE)?.toString().orEmpty()
+            val locality = delivery?.get(LOCALITY)?.toString().orEmpty()
+            val customer = get(CUSTOMER) as? Map<*, *>
+            val fallbackAddress = customer?.get(ADDRESS)?.toString().orEmpty()
+            if (addressLine.isNotBlank()) {
+                add(addressLine)
+            } else if (fallbackAddress.isNotBlank()) {
+                add(fallbackAddress)
+            }
             if (locality.isNotBlank()) add(locality)
         }.joinToString(" · ")
 
@@ -247,6 +253,7 @@ class FirebaseDriverOrdersAdapter(
         const val CUSTOMER = "customer"
         const val NAME = "name"
         const val PHONE = "phone"
+        const val ADDRESS = "address"
         const val DELIVERY = "delivery"
         const val ADDRESS_LINE = "addressLine"
         const val LOCALITY = "locality"

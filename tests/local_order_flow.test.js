@@ -89,6 +89,9 @@ test("createLocalOrder validates and writes only orders", () => {
   assert.match(createLocalOrder, /collection\(ORDERS\)\.doc\(idempotencyKey\)/);
   assert.match(createLocalOrder, /source: LOCAL_SOURCE/);
   assert.match(createLocalOrder, /liveBirthContract/);
+  assert.match(createLocalOrder, /const delivery = \{\s*addressLine: clean\.customer\.address,\s*locality: "",\s*\}/);
+  assert.match(createLocalOrder, /snapshot: \{[\s\S]*delivery,/);
+  assert.match(createLocalOrder, /customer: clean\.customer,[\s\S]*delivery,/);
   assert.match(createLocalOrder, /trackingNumber/);
   assert.doesNotMatch(createLocalOrder, /collection\("(users|roles|payments|order_tracking)"\)|driverId|WhatsApp|whatsapp/);
 });

@@ -112,6 +112,10 @@ exports.createLocalOrder = onCall({region: REGION}, async (request) => {
   const orderRef = db.collection(ORDERS).doc(idempotencyKey);
   const trackingNumber = publicNumberFor(orderRef.id);
   const now = admin.firestore.FieldValue.serverTimestamp();
+  const delivery = {
+    addressLine: clean.customer.address,
+    locality: "",
+  };
   const liveContract = liveBirthContract({
     orderType: "local_order",
     source: LOCAL_SOURCE,
@@ -125,6 +129,7 @@ exports.createLocalOrder = onCall({region: REGION}, async (request) => {
         name: storeName,
       },
       items,
+      delivery,
       pricing: {
         subtotal,
         total: subtotal,
@@ -139,6 +144,7 @@ exports.createLocalOrder = onCall({region: REGION}, async (request) => {
     storeId: clean.storeId,
     storeName,
     customer: clean.customer,
+    delivery,
     items,
     note: clean.note,
     paymentMethod: clean.paymentMethod,
