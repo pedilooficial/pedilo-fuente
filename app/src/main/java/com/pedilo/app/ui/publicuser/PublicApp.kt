@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pedilo.app.R
 import com.pedilo.app.ui.admin.AdminApp
+import com.pedilo.app.ui.store.StoreApp
 import com.pedilo.app.core.model.TeamLoginRequest
 import com.pedilo.app.core.model.TeamLoginResult
 import com.pedilo.app.core.model.TeamRole
@@ -302,10 +303,14 @@ fun PublicApp() {
                 if (role == TeamRole.Admin) {
                     AdminApp(onSignOutConfirmed = onSignOutConfirmed)
                 } else {
-                    TeamRolePlaceholderScreen(
-                        role = role,
-                        onSignOutConfirmed = onSignOutConfirmed,
-                    )
+                    when (role) {
+                        TeamRole.Admin -> AdminApp(onSignOutConfirmed = onSignOutConfirmed)
+                        TeamRole.Local -> StoreApp(onSignOutConfirmed = onSignOutConfirmed)
+                        TeamRole.Driver -> TeamRolePlaceholderScreen(
+                            role = role,
+                            onSignOutConfirmed = onSignOutConfirmed,
+                        )
+                    }
                 }
             }
             PublicRoute.Plus -> PublicPlusChoiceScreen(

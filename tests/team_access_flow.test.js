@@ -20,9 +20,10 @@ test("team button opens login without changing public home navigation", () => {
   assert.match(appSource, /navigateTo\(PublicRoute\.TeamLogin\)/);
 });
 
-test("team access has role placeholders only and sign out confirmation", () => {
+test("team access keeps admin store driver routing and sign out confirmation", () => {
   const source = fs.readFileSync(screen, "utf8");
   const modelSource = fs.readFileSync(model, "utf8");
+  const appSource = fs.readFileSync(app, "utf8");
 
   assert.match(modelSource, /Admin\("admin", "Pantalla Admin"\)/);
   assert.match(modelSource, /Local\("store", "Pantalla Local"\)/);
@@ -34,6 +35,8 @@ test("team access has role placeholders only and sign out confirmation", () => {
   assert.match(source, /"¿Querés cerrar sesión\?"/);
   assert.match(source, /Text\("No"\)/);
   assert.match(source, /Text\("Sí"\)/);
+  assert.match(appSource, /TeamRole\.Local -> StoreApp/);
+  assert.match(appSource, /TeamRole\.Driver -> TeamRolePlaceholderScreen/);
   assert.doesNotMatch(source, /pedido|métrica|dashboard|estado operativo|driverId|WhatsApp|whatsapp/i);
 });
 
