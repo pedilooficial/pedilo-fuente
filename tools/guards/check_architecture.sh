@@ -130,7 +130,30 @@ if [ -d functions ]; then
   if ! search_regex_quiet "exports[.]getPublicOrderTracking" functions/index.js; then
     fail "functions must expose the getPublicOrderTracking callable"
   fi
-  if search_regex "collection[(][\"'](roles|payments|order_tracking)[\"'][)]|whatsapp|WhatsApp|driverId" functions >/tmp/pedilo_guard_match.txt; then
+  if ! node <<'NODE' >/tmp/pedilo_guard_match.txt 2>&1
+const fs = require("node:fs");
+const source = fs.readFileSync("functions/index.js", "utf8");
+const forbidden = /collection[(]["'](roles|payments|order_tracking)["'][)]|whatsapp|WhatsApp|driverId/;
+const slices = [
+  ["createLocalOrder", "exports.createLocalOrder", "exports.createPlusOrder"],
+  ["createPlusOrder", "exports.createPlusOrder", "exports.getPublicOrderTracking"],
+  ["getPublicOrderTracking", "exports.getPublicOrderTracking", "exports.adminOrderAction"],
+];
+for (const [name, startNeedle, endNeedle] of slices) {
+  const start = source.indexOf(startNeedle);
+  const end = source.indexOf(endNeedle);
+  if (start === -1 || end === -1 || end <= start) {
+    console.error(`missing public function slice: ${name}`);
+    process.exit(1);
+  }
+  const match = source.slice(start, end).match(forbidden);
+  if (match) {
+    console.error(`${name}: forbidden public function pattern ${match[0]}`);
+    process.exit(1);
+  }
+}
+NODE
+  then
     cat /tmp/pedilo_guard_match.txt >&2
     fail "public order functions must not touch roles, payments, WhatsApp or tracking collections"
   fi

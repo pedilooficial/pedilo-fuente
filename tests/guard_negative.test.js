@@ -47,6 +47,22 @@ test("architecture guard fails if functions config is missing", () => {
   assert.match(result.stderr, /functions deploy config/);
 });
 
+test("architecture guard fails if public order functions touch operational internals", () => {
+  const root = copyProjectForGuard();
+  const target = path.join(root, "functions/index.js");
+  const source = fs.readFileSync(target, "utf8");
+  fs.writeFileSync(
+    target,
+    source.replace(
+      "const clean = cleanOrderPayload(payload);",
+      "const clean = cleanOrderPayload(payload);\n  const forbiddenPublicDriver = \"driverId\";",
+    ),
+  );
+  const result = runGuard(root);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /public order functions/);
+});
+
 test("architecture guard fails if clean core imports platform code", () => {
   const root = copyProjectForGuard();
   const coreDir = path.join(root, "app/src/main/java/com/pedilo/app/core/model");

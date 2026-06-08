@@ -8,6 +8,12 @@ enum class LiveOrderType(val wireName: String) {
 
 enum class LiveOrderOperationalStatus(val wireName: String) {
     WaitingAdminReview("waiting_admin_review"),
+    LocalAccepted("local_accepted"),
+    Preparing("preparing"),
+    ReadyForPickup("ready_for_pickup"),
+    DriverAssigned("driver_assigned"),
+    PickedUp("picked_up"),
+    Delivered("delivered"),
     AdminReviewed("admin_reviewed"),
     AdminIntervention("admin_intervention"),
     IncidentOpen("incident_open"),
@@ -28,6 +34,21 @@ enum class LiveOrderIncidentStatus(val wireName: String) {
 
 enum class LiveOrderArchiveStatus(val wireName: String) {
     Live("live"),
+    Archived("archived"),
+}
+
+enum class LiveOrderAction(val wireName: String) {
+    LocalAccept("local_accept"),
+    LocalReject("local_reject"),
+    LocalMarkPreparing("local_mark_preparing"),
+    LocalMarkReady("local_mark_ready"),
+    DriverTake("driver_take"),
+    DriverMarkPickedUp("driver_mark_picked_up"),
+    DriverMarkDelivered("driver_mark_delivered"),
+    CancelOrder("cancel_order"),
+    OpenIncident("open_incident"),
+    ResolveIncident("resolve_incident"),
+    AdminIntervene("admin_intervene"),
 }
 
 data class LiveOrderBirthState(

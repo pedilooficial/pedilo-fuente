@@ -44,6 +44,19 @@ const ADMIN_ACTIONS = {
   ASSIGN_RESPONSIBLE: "assign_responsible",
   CLEAR_RESPONSIBLE: "clear_responsible",
 };
+const LIVE_ACTIONS = {
+  LOCAL_ACCEPT: "local_accept",
+  LOCAL_REJECT: "local_reject",
+  LOCAL_MARK_PREPARING: "local_mark_preparing",
+  LOCAL_MARK_READY: "local_mark_ready",
+  DRIVER_TAKE: "driver_take",
+  DRIVER_MARK_PICKED_UP: "driver_mark_picked_up",
+  DRIVER_MARK_DELIVERED: "driver_mark_delivered",
+  CANCEL_ORDER: "cancel_order",
+  OPEN_INCIDENT: "open_incident",
+  RESOLVE_INCIDENT: "resolve_incident",
+  ADMIN_INTERVENE: "admin_intervene",
+};
 const TERMINAL_STATUSES = ["cancelled", "canceled", "delivered", "closed", "archived"];
 const FORCEABLE_STATUSES = {
   created: "Pedido recibido",
@@ -286,6 +299,405 @@ exports.adminOrderAction = onCall({region: REGION}, async (request) => {
 
   return result;
 });
+
+exports.operateLiveOrder = onCall({region: REGION}, async (request) => {
+  const actor = await requireOperationalActor(request);
+  const clean = cleanLiveActionPayload(request.data || {}, actor.uid);
+  const orderRef = db.collection(ORDERS).doc(clean.orderId);
+  const eventRef = orderRef.collection("events").doc(clean.actionId);
+  const incidentRef = clean.action === LIVE_ACTIONS.OPEN_INCIDENT ? orderRef.collection("incidents").doc(clean.actionId) : null;
+
+  return db.runTransaction(async (tx) => {
+    const eventSnap = await tx.get(eventRef);
+    if (eventSnap.exists) {
+      const savedResult = eventSnap.get("result");
+      return savedResult ? {...savedResult, idempotent: true} : {
+        orderId: clean.orderId,
+        action: clean.action,
+        idempotent: true,
+      };
+    }
+
+    const orderSnap = await tx.get(orderRef);
+    if (!orderSnap.exists) {
+      throw new HttpsError("not-found", "No encontramos ese pedido.");
+    }
+
+    const current = liveOrderState(orderSnap.data() || {});
+    validateLiveActor(actor, current, clean.action);
+    validateExpectedVersion(clean, current);
+
+    const allowed = allowedLiveActions(current);
+    if (!allowed.includes(clean.action)) {
+      throw new HttpsError("failed-precondition", "Esta acción no está disponible para el estado actual del pedido.");
+    }
+
+    const effect = liveActionEffect(clean, current, actor);
+    const next = liveOrderState({...current, ...effect.patch, version: current.version + 1});
+    const nextAllowedActions = allowedLiveActions(next);
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    const nextCurrentResponsibleRole = patchValue(
+      effect.patch,
+      "currentResponsibleRole",
+      patchValue(effect.patch, "responsibleRole", current.currentResponsibleRole),
+    );
+    const patch = {
+      ...effect.patch,
+      currentResponsibleRole: nextCurrentResponsibleRole,
+      version: current.version + 1,
+      nextAllowedActions,
+      lastOperationEvent: {
+        type: clean.action,
+        summary: effect.eventSummary,
+        actorRole: actor.role,
+        actionId: clean.actionId,
+        createdAt: now,
+      },
+      updatedAt: now,
+    };
+    const result = {
+      orderId: clean.orderId,
+      action: clean.action,
+      status: patchValue(patch, "status", current.status),
+      publicStatus: patchValue(patch, "publicStatus", current.publicStatus),
+      operationalStatus: patchValue(patch, "operationalStatus", current.operationalStatus),
+      responsibleRole: patchValue(patch, "responsibleRole", current.responsibleRole),
+      currentResponsibleRole: patch.currentResponsibleRole,
+      assignedActorId: patchValue(patch, "assignedActorId", current.assignedActorId),
+      assignedActorRole: patchValue(patch, "assignedActorRole", current.assignedActorRole),
+      activeIncident: patchValue(patch, "activeIncident", current.activeIncident),
+      incidentStatus: patchValue(patch, "incidentStatus", current.incidentStatus),
+      archiveStatus: patchValue(patch, "archiveStatus", current.archiveStatus),
+      version: current.version + 1,
+      nextAllowedActions,
+      eventSummary: effect.eventSummary,
+      humanMessage: effect.humanMessage,
+      idempotent: false,
+    };
+
+    tx.update(orderRef, patch);
+    tx.create(eventRef, {
+      type: clean.action,
+      summary: effect.eventSummary,
+      reason: clean.reason,
+      actorUid: actor.uid,
+      actorRole: actor.role,
+      previousStatus: current.status,
+      nextStatus: result.status,
+      previousOperationalStatus: current.operationalStatus,
+      nextOperationalStatus: result.operationalStatus,
+      previousVersion: current.version,
+      nextVersion: result.version,
+      actionId: clean.actionId,
+      result,
+      createdAt: now,
+    });
+    if (incidentRef) {
+      tx.create(incidentRef, {
+        status: "open",
+        reason: clean.reason,
+        actorUid: actor.uid,
+        actorRole: actor.role,
+        actionId: clean.actionId,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    return result;
+  });
+});
+
+async function requireOperationalActor(request) {
+  const uid = request.auth && request.auth.uid;
+  if (!uid) {
+    throw new HttpsError("unauthenticated", "Iniciá sesión para operar pedidos.");
+  }
+
+  const userSnap = await db.collection("users").doc(uid).get();
+  const role = userSnap.exists ? cleanText(userSnap.get("role")).toLowerCase() : "";
+  if (!["admin", "store", "driver"].includes(role) || userSnap.get("active") === false) {
+    throw new HttpsError("permission-denied", "No tenés un rol operativo activo.");
+  }
+
+  return {uid, role};
+}
+
+function cleanLiveActionPayload(payload, uid) {
+  const orderId = cleanText(payload.orderId);
+  const action = cleanText(payload.action);
+  const reason = cleanText(payload.reason);
+  const expectedVersion = Number.isInteger(payload.expectedVersion) ? payload.expectedVersion : null;
+  const actionId = cleanText(payload.actionId) || liveActionId({uid, orderId, action, expectedVersion, reason});
+
+  if (!orderId || !Object.values(LIVE_ACTIONS).includes(action)) {
+    throw new HttpsError("invalid-argument", "Elegí una acción operativa válida.");
+  }
+  if ([
+    LIVE_ACTIONS.LOCAL_REJECT,
+    LIVE_ACTIONS.CANCEL_ORDER,
+    LIVE_ACTIONS.OPEN_INCIDENT,
+    LIVE_ACTIONS.RESOLVE_INCIDENT,
+    LIVE_ACTIONS.ADMIN_INTERVENE,
+  ].includes(action) && reason.length < 4) {
+    throw new HttpsError("invalid-argument", "Ingresá un motivo operativo claro.");
+  }
+  if (expectedVersion === null) {
+    throw new HttpsError("invalid-argument", "Falta la versión esperada del pedido.");
+  }
+  if (!isSafeDocumentId(actionId)) {
+    throw new HttpsError("invalid-argument", "El identificador de acción no es válido.");
+  }
+
+  return {orderId, action, reason, expectedVersion, actionId};
+}
+
+function liveActionId(payload) {
+  return `act_${crypto.createHash("sha256").update(stableStringify(payload)).digest("hex").slice(0, 24)}`;
+}
+
+function patchValue(patch, field, fallback) {
+  return Object.hasOwn(patch, field) ? patch[field] : fallback;
+}
+
+function isSafeDocumentId(value) {
+  return /^[A-Za-z0-9_-]{8,80}$/.test(value);
+}
+
+function validateExpectedVersion(clean, current) {
+  if (current.version !== clean.expectedVersion) {
+    throw new HttpsError("failed-precondition", "El pedido cambió. Actualizá la vista antes de operar.");
+  }
+}
+
+function validateLiveActor(actor, current, action) {
+  if (actor.role === "admin") return;
+  if (actor.role === "store") {
+    if (![
+      LIVE_ACTIONS.LOCAL_ACCEPT,
+      LIVE_ACTIONS.LOCAL_REJECT,
+      LIVE_ACTIONS.LOCAL_MARK_PREPARING,
+      LIVE_ACTIONS.LOCAL_MARK_READY,
+      LIVE_ACTIONS.CANCEL_ORDER,
+      LIVE_ACTIONS.OPEN_INCIDENT,
+    ].includes(action)) {
+      throw new HttpsError("permission-denied", "El local no puede ejecutar esta acción.");
+    }
+    if (current.storeId !== actor.uid) {
+      throw new HttpsError("permission-denied", "El local no corresponde a este pedido.");
+    }
+    return;
+  }
+  if (actor.role === "driver") {
+    if (![
+      LIVE_ACTIONS.DRIVER_TAKE,
+      LIVE_ACTIONS.DRIVER_MARK_PICKED_UP,
+      LIVE_ACTIONS.DRIVER_MARK_DELIVERED,
+      LIVE_ACTIONS.CANCEL_ORDER,
+      LIVE_ACTIONS.OPEN_INCIDENT,
+    ].includes(action)) {
+      throw new HttpsError("permission-denied", "El repartidor no puede ejecutar esta acción.");
+    }
+    if (action !== LIVE_ACTIONS.DRIVER_TAKE && current.assignedActorId !== actor.uid && current.driverId !== actor.uid) {
+      throw new HttpsError("permission-denied", "El repartidor no está asignado a este pedido.");
+    }
+    if (action === LIVE_ACTIONS.DRIVER_TAKE && current.assignedActorId && current.assignedActorId !== actor.uid) {
+      throw new HttpsError("failed-precondition", "El pedido ya fue tomado por otro repartidor.");
+    }
+  }
+}
+
+function liveOrderState(order) {
+  const status = cleanText(order.status) || STATUS;
+  return {
+    status,
+    publicStatus: cleanText(order.publicStatus) || PUBLIC_STATUS,
+    operationalStatus: cleanText(order.operationalStatus) || status,
+    financialStatus: cleanText(order.financialStatus) || FINANCIAL_STATUS_PENDING,
+    communicationStatus: cleanText(order.communicationStatus) || COMMUNICATION_STATUS_RECEIVED,
+    incidentStatus: cleanText(order.incidentStatus) || INCIDENT_STATUS_NONE,
+    archiveStatus: cleanText(order.archiveStatus) || ARCHIVE_STATUS_LIVE,
+    responsibleRole: cleanText(order.responsibleRole),
+    currentResponsibleRole: cleanText(order.currentResponsibleRole || order.responsibleRole),
+    assignedActorId: cleanText(order.assignedActorId),
+    assignedActorRole: cleanText(order.assignedActorRole),
+    driverId: cleanText(order.driverId),
+    storeId: cleanText(order.storeId),
+    source: cleanText(order.source),
+    priority: cleanText(order.priority) || (order.activeIncident || order.needsAttention ? "high" : "normal"),
+    needsAttention: order.needsAttention === true,
+    activeIncident: order.activeIncident === true,
+    adminReviewed: order.adminReviewed === true,
+    version: Number.isInteger(order.version) ? order.version : LIVE_ORDER_VERSION,
+  };
+}
+
+function allowedLiveActions(order) {
+  const state = liveOrderState(order);
+  const status = cleanText(state.status).toLowerCase();
+  if (TERMINAL_STATUSES.includes(status)) return [];
+  if (state.activeIncident) {
+    return [LIVE_ACTIONS.RESOLVE_INCIDENT, LIVE_ACTIONS.CANCEL_ORDER, LIVE_ACTIONS.ADMIN_INTERVENE];
+  }
+
+  const actions = [LIVE_ACTIONS.OPEN_INCIDENT, LIVE_ACTIONS.CANCEL_ORDER, LIVE_ACTIONS.ADMIN_INTERVENE];
+  if (status === STATUS && state.source === LOCAL_SOURCE) {
+    return [LIVE_ACTIONS.LOCAL_ACCEPT, LIVE_ACTIONS.LOCAL_REJECT, ...actions];
+  }
+  if (status === STATUS) return actions;
+  if (status === "accepted") return [LIVE_ACTIONS.LOCAL_MARK_PREPARING, ...actions];
+  if (status === "preparing") return [LIVE_ACTIONS.LOCAL_MARK_READY, ...actions];
+  if (status === "ready_for_pickup") return [LIVE_ACTIONS.DRIVER_TAKE, ...actions];
+  if (status === "assigned_to_driver") return [LIVE_ACTIONS.DRIVER_MARK_PICKED_UP, ...actions];
+  if (status === "picked_up") return [LIVE_ACTIONS.DRIVER_MARK_DELIVERED, ...actions];
+  return actions;
+}
+
+function liveActionEffect(clean, current, actor) {
+  switch (clean.action) {
+    case LIVE_ACTIONS.LOCAL_ACCEPT:
+      return livePatch("Pedido aceptado por el local.", "Pedido aceptado.", {
+        status: "accepted",
+        publicStatus: "Pedido aceptado por el local",
+        operationalStatus: "local_accepted",
+        responsibleRole: "store",
+        currentResponsibleRole: "store",
+        assignedActorId: actor.uid,
+        assignedActorRole: "store",
+        needsAttention: false,
+        priority: "normal",
+      });
+    case LIVE_ACTIONS.LOCAL_REJECT:
+      return livePatch(`Local rechazó el pedido: ${clean.reason}`, "Pedido rechazado por el local.", {
+        status: "cancelled",
+        publicStatus: "Pedido cerrado",
+        operationalStatus: "rejected_by_store",
+        archiveStatus: "archived",
+        activeIncident: false,
+        incidentStatus: INCIDENT_STATUS_NONE,
+        needsAttention: false,
+        priority: "closed",
+        cancellationReason: clean.reason,
+        cancelledByRole: "store",
+        responsibleRole: "",
+        currentResponsibleRole: "",
+      });
+    case LIVE_ACTIONS.LOCAL_MARK_PREPARING:
+      return livePatch("Local marcó el pedido en preparación.", "Pedido en preparación.", {
+        status: "preparing",
+        publicStatus: "Pedido en preparación",
+        operationalStatus: "preparing",
+        responsibleRole: "store",
+        currentResponsibleRole: "store",
+        assignedActorId: actor.uid,
+        assignedActorRole: "store",
+      });
+    case LIVE_ACTIONS.LOCAL_MARK_READY:
+      return livePatch("Local marcó el pedido listo.", "Pedido listo para retirar.", {
+        status: "ready_for_pickup",
+        publicStatus: "Pedido listo para retirar",
+        operationalStatus: "ready_for_pickup",
+        responsibleRole: "driver",
+        currentResponsibleRole: "driver",
+        assignedActorId: "",
+        assignedActorRole: "",
+      });
+    case LIVE_ACTIONS.DRIVER_TAKE:
+      return livePatch("Repartidor tomó el pedido.", "Pedido asignado a repartidor.", {
+        status: "assigned_to_driver",
+        publicStatus: "Pedido asignado a repartidor",
+        operationalStatus: "driver_assigned",
+        responsibleRole: "driver",
+        currentResponsibleRole: "driver",
+        assignedActorId: actor.uid,
+        assignedActorRole: "driver",
+        driverId: actor.uid,
+      });
+    case LIVE_ACTIONS.DRIVER_MARK_PICKED_UP:
+      return livePatch("Repartidor marcó pedido retirado.", "Pedido retirado.", {
+        status: "picked_up",
+        publicStatus: "Pedido retirado",
+        operationalStatus: "picked_up",
+        responsibleRole: "driver",
+        currentResponsibleRole: "driver",
+      });
+    case LIVE_ACTIONS.DRIVER_MARK_DELIVERED:
+      return livePatch("Repartidor marcó pedido entregado.", "Pedido entregado.", {
+        status: "delivered",
+        publicStatus: "Pedido cerrado",
+        operationalStatus: "delivered",
+        communicationStatus: "closed",
+        archiveStatus: "archived",
+        responsibleRole: "",
+        currentResponsibleRole: "",
+        activeIncident: false,
+        incidentStatus: INCIDENT_STATUS_NONE,
+        needsAttention: false,
+        priority: "closed",
+      });
+    case LIVE_ACTIONS.CANCEL_ORDER:
+      return livePatch(`${actor.role} canceló el pedido: ${clean.reason}`, "Pedido cancelado.", {
+        status: "cancelled",
+        publicStatus: "Pedido cerrado",
+        operationalStatus: `cancelled_by_${actor.role}`,
+        archiveStatus: "archived",
+        activeIncident: false,
+        incidentStatus: INCIDENT_STATUS_NONE,
+        needsAttention: false,
+        priority: "closed",
+        cancellationReason: clean.reason,
+        cancelledByRole: actor.role,
+        responsibleRole: "",
+        currentResponsibleRole: "",
+      });
+    case LIVE_ACTIONS.OPEN_INCIDENT:
+      return livePatch(`${actor.role} abrió incidencia: ${clean.reason}`, "Incidencia abierta.", {
+        publicStatus: "Pedido en revisión operativa",
+        operationalStatus: "incident_open",
+        activeIncident: true,
+        incidentStatus: "open",
+        needsAttention: true,
+        priority: "high",
+        responsibleRole: "admin",
+        currentResponsibleRole: "admin",
+      });
+    case LIVE_ACTIONS.RESOLVE_INCIDENT:
+      return livePatch(`Admin resolvió incidencia: ${clean.reason}`, "Incidencia resuelta.", {
+        publicStatus: publicStatusForLiveStatus(current.status),
+        operationalStatus: "incident_resolved",
+        activeIncident: false,
+        incidentStatus: "resolved",
+        needsAttention: false,
+        priority: "normal",
+      });
+    case LIVE_ACTIONS.ADMIN_INTERVENE:
+      return livePatch(`Admin intervino el pedido: ${clean.reason}`, "Intervención Admin registrada.", {
+        publicStatus: "Pedido en revisión operativa",
+        operationalStatus: "admin_intervention",
+        needsAttention: true,
+        priority: current.activeIncident ? "high" : "medium",
+        responsibleRole: "admin",
+        currentResponsibleRole: "admin",
+      });
+    default:
+      throw new HttpsError("invalid-argument", "Acción operativa inválida.");
+  }
+}
+
+function livePatch(eventSummary, humanMessage, patch) {
+  return {eventSummary, humanMessage, patch};
+}
+
+function publicStatusForLiveStatus(status) {
+  const clean = cleanText(status).toLowerCase();
+  if (clean === "accepted") return "Pedido aceptado por el local";
+  if (clean === "preparing") return "Pedido en preparación";
+  if (clean === "ready_for_pickup") return "Pedido listo para retirar";
+  if (clean === "assigned_to_driver") return "Pedido asignado a repartidor";
+  if (clean === "picked_up") return "Pedido retirado";
+  if (clean === "delivered") return "Pedido cerrado";
+  return PUBLIC_STATUS;
+}
 
 function cleanAdminActionPayload(payload) {
   const orderId = cleanText(payload.orderId);
@@ -608,7 +1020,8 @@ function plusOrderData(clean, trackingNumber, now, idempotencyKey) {
 
 function liveBirthContract({orderType, source, idempotencyKey, trackingNumber, snapshot}) {
   const responsibleRole = RESPONSIBLE_ADMIN;
-  const nextAllowedActions = allowedAdminActions({
+  const nextAllowedActions = allowedLiveActions({
+    source,
     status: STATUS,
     adminReviewed: false,
     activeIncident: false,
@@ -749,6 +1162,7 @@ function publicTrackingResponse(order, requestedTrackingNumber) {
 
 function publicStatusCode(status) {
   const clean = cleanText(status).toLowerCase();
+  if (["accepted", "ready_for_pickup", "assigned_to_driver", "picked_up"].includes(clean)) return "RECEIVED";
   if (["preparing", "in_preparation"].includes(clean)) return "PREPARING";
   if (["on_the_way", "shipping", "delivering"].includes(clean)) return "ON_THE_WAY";
   if (["delivered", "closed", "archived"].includes(clean)) return "DELIVERED";
