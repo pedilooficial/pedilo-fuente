@@ -91,7 +91,8 @@ test("admin action path carries version concurrency without opening UI operation
   assert.match(adminCallable, /version: current\.version \+ 1/);
 
   const adminUi = read("app/src/main/java/com/pedilo/app/ui/admin/AdminApp.kt");
-  assert.doesNotMatch(adminUi, /executeAdminOrderAction|AdminOrderActionRequest|adminOrders\.execute/);
+  assert.match(adminUi, /adminOrders\.executeLive/);
+  assert.doesNotMatch(adminUi, /executeAdminOrderAction|AdminOrderActionRequest|adminOrders\.execute\(/);
 });
 
 test("core and admin adapter expose live order birth vocabulary read-only", () => {

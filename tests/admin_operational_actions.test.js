@@ -60,30 +60,40 @@ test("admin adapter observes orders and calls backend for mutations only", () =>
   const source = read(adapterPath);
 
   assert.match(source, /addSnapshotListener/);
-  assert.match(source, /getHttpsCallable\(ADMIN_ORDER_ACTION\)/);
+  assert.match(source, /getHttpsCallable\(OPERATE_LIVE_ORDER\)/);
+  assert.match(source, /OPERATE_LIVE_ORDER = "operateLiveOrder"/);
+  assert.match(source, /getOrderEventsReadOnly/);
+  assert.match(source, /collection\(EVENTS\)/);
+  assert.match(source, /LiveOrderAction\.fromWire/);
+  assert.doesNotMatch(source, /AdminOrderOperations\.allowedActions/);
   assert.match(source, /ADMIN_ORDER_ACTION = "adminOrderAction"/);
   assert.doesNotMatch(source, /\.set\(|\.update\(|\.delete\(|writeBatch|runTransaction/);
 });
 
-test("admin UI keeps order detail read-only without direct order writes", () => {
+test("admin UI executes only backend-provided operational actions with confirmation", () => {
   const source = read(adminUiPath);
   const detailScreen = source.slice(
     source.indexOf("private fun AdminOrderDetailScreen"),
     source.indexOf("private fun AdminOrderSectionScreen"),
   );
 
-  assert.doesNotMatch(source, /AdminOrderActionRequest/);
-  assert.doesNotMatch(source, /action\.impact/);
-  assert.doesNotMatch(source, /Motivo operativo/);
-  assert.doesNotMatch(source, /adminOrders\.execute/);
+  assert.match(source, /AdminLiveOrderActionRequest/);
+  assert.match(source, /adminOrders\.executeLive/);
+  assert.match(source, /pendingLiveAction/);
+  assert.match(source, /Confirmar acción/);
+  assert.match(source, /Motivo operativo/);
+  assert.match(source, /loadOrderDetail\(pending\.orderId, force = true\)/);
   assert.match(detailScreen, /AdminOperationOrderClassification\.operationalIdentity/);
   assert.match(detailScreen, /AdminOperationOrderClassification\.operationalFunction/);
-  assert.match(detailScreen, /Sin datos/);
-  assert.match(detailScreen, /Opciones/);
-  assert.match(detailScreen, /Sin acciones/);
+  assert.match(detailScreen, /allowedActions/);
+  assert.match(detailScreen, /nextAllowedActions/);
+  assert.match(detailScreen, /Acciones disponibles/);
+  assert.match(detailScreen, /onLiveAction\(action, expectedVersion\)/);
   assert.match(detailScreen, /AdminOrderNavigationCard/);
   assert.match(source, /AdminOrderSectionScreen/);
-  assert.doesNotMatch(detailScreen, /AdminActionCard|onAction\(|Acciones disponibles|action\.label|action\.impact/);
+  assert.match(source, /AdminOrderSection\.History -> listOf/);
+  assert.match(source, /detail\?\.events\.orEmpty\(\)/);
+  assert.doesNotMatch(detailScreen, /local_accept|driver_take|driver_mark_delivered/);
   assert.doesNotMatch(source, /collection\("orders"\)|\.set\(|\.add\(|\.update\(|\.delete\(|runTransaction|writeBatch/);
 });
 

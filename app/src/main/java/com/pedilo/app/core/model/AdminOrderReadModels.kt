@@ -11,7 +11,7 @@ data class AdminOrderSummary(
     val priority: String,
     val needsAttention: Boolean,
     val activeIncident: Boolean,
-    val nextAllowedActions: List<AdminOrderAction>,
+    val nextAllowedActions: List<LiveOrderAction>,
     val source: String,
     val requestType: String,
     val storeName: String,
@@ -40,7 +40,7 @@ data class AdminOrderDetail(
     val priority: String,
     val needsAttention: Boolean,
     val activeIncident: Boolean,
-    val nextAllowedActions: List<AdminOrderAction>,
+    val nextAllowedActions: List<LiveOrderAction>,
     val source: String,
     val requestType: String,
     val storeName: String,
@@ -60,6 +60,7 @@ data class AdminOrderDetail(
     val assignedActorRole: String = "",
     val version: Int = 0,
     val idempotencyKey: String = "",
+    val events: List<AdminOrderEvent> = emptyList(),
 )
 
 enum class AdminOrderAction(

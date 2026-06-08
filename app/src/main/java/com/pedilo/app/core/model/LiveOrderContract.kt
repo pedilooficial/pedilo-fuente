@@ -49,6 +49,12 @@ enum class LiveOrderAction(val wireName: String) {
     OpenIncident("open_incident"),
     ResolveIncident("resolve_incident"),
     AdminIntervene("admin_intervene"),
+    ;
+
+    companion object {
+        fun fromWire(value: String): LiveOrderAction? =
+            entries.firstOrNull { it.wireName == value.trim() }
+    }
 }
 
 data class LiveOrderBirthState(
@@ -62,4 +68,30 @@ data class LiveOrderBirthState(
     val assignedActorId: String,
     val version: Int,
     val idempotencyKey: String,
+)
+
+data class AdminLiveOrderActionRequest(
+    val orderId: String,
+    val action: LiveOrderAction,
+    val expectedVersion: Int,
+    val reason: String = "",
+)
+
+data class AdminLiveOrderActionResult(
+    val orderId: String,
+    val action: String,
+    val publicStatus: String,
+    val operationalStatus: String,
+    val version: Int,
+    val eventSummary: String,
+    val humanMessage: String,
+)
+
+data class AdminOrderEvent(
+    val id: String,
+    val type: String,
+    val summary: String,
+    val actorRole: String,
+    val reason: String,
+    val createdAtMillis: Long?,
 )

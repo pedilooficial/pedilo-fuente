@@ -80,18 +80,22 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pedilo.app.core.model.AdminActiveOrdersBucket
+import com.pedilo.app.core.model.AdminLiveOrderActionRequest
 import com.pedilo.app.core.model.AdminOrderPrimaryPlacement
 import com.pedilo.app.core.model.AdminOperationOrderClassification
 import com.pedilo.app.core.model.AdminOperationOrderSignals
 import com.pedilo.app.core.model.AdminOrderDetail
 import com.pedilo.app.core.model.AdminOrderSummary
 import com.pedilo.app.core.model.AdminProblemOrdersBucket
+import com.pedilo.app.core.model.LiveOrderAction
+import com.pedilo.app.core.result.CoreError
 import com.pedilo.app.core.result.CoreResult
 import com.pedilo.app.core.runtime.adminOrdersUseCase
 import com.pedilo.app.ui.admin.components.AdminBottomBar
 import com.pedilo.app.ui.admin.components.AdminEntryCard
 import com.pedilo.app.ui.admin.components.AdminHeader
 import com.pedilo.app.ui.admin.components.AdminInfoPanel
+import com.pedilo.app.ui.components.PediloTextField
 import com.pedilo.app.ui.publicuser.PediloBg
 import com.pedilo.app.ui.publicuser.PediloCardBrush
 import com.pedilo.app.ui.publicuser.PediloCyan
@@ -266,6 +270,12 @@ internal data class AdminOrderDetailEntry(
     val note: String,
     val variant: OperationOrderVariant,
     val realOrderId: String? = null,
+)
+
+private data class AdminPendingLiveAction(
+    val orderId: String,
+    val action: LiveOrderAction,
+    val expectedVersion: Int,
 )
 
 private data class AdminConfigurationSection(
@@ -764,8 +774,48 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
     var readOnlyOrderDetails by remember { mutableStateOf<Map<String, AdminOrderDetail>>(emptyMap()) }
     var operationMessage by remember { mutableStateOf("") }
     var operationError by remember { mutableStateOf("") }
+    var pendingLiveAction by remember { mutableStateOf<AdminPendingLiveAction?>(null) }
+    var pendingLiveActionReason by remember { mutableStateOf("") }
     val adminOrders = remember { adminOrdersUseCase() }
     val scope = rememberCoroutineScope()
+
+    fun loadOrderDetail(orderId: String, force: Boolean = false) {
+        if (!force && readOnlyOrderDetails.containsKey(orderId)) return
+        scope.launch {
+            when (val result = adminOrders.getDetail(orderId)) {
+                is CoreResult.Success -> readOnlyOrderDetails = readOnlyOrderDetails + (orderId to result.value)
+                is CoreResult.Failure -> operationError = "No pudimos actualizar el pedido."
+            }
+        }
+    }
+
+    fun executePendingLiveAction(pending: AdminPendingLiveAction, reason: String) {
+        scope.launch {
+            operationMessage = ""
+            operationError = ""
+            when (val result = adminOrders.executeLive(
+                AdminLiveOrderActionRequest(
+                    orderId = pending.orderId,
+                    action = pending.action,
+                    expectedVersion = pending.expectedVersion,
+                    reason = reason,
+                ),
+            )) {
+                is CoreResult.Success -> {
+                    operationMessage = result.value.humanMessage.ifBlank { result.value.eventSummary }
+                    pendingLiveAction = null
+                    pendingLiveActionReason = ""
+                    loadOrderDetail(pending.orderId, force = true)
+                }
+                is CoreResult.Failure -> {
+                    operationError = result.error.adminHumanError()
+                    pendingLiveAction = null
+                    pendingLiveActionReason = ""
+                    loadOrderDetail(pending.orderId, force = true)
+                }
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         adminOrders.observe().collect { result ->
@@ -921,13 +971,11 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 detail = current.realOrderId?.let { readOnlyOrderDetails[it] },
                 operationMessage = operationMessage,
                 operationError = operationError,
-                onLoadDetail = { orderId ->
-                    if (readOnlyOrderDetails.containsKey(orderId)) return@AdminOrderDetailScreen
-                    scope.launch {
-                        when (val result = adminOrders.getDetail(orderId)) {
-                            is CoreResult.Success -> readOnlyOrderDetails = readOnlyOrderDetails + (orderId to result.value)
-                            is CoreResult.Failure -> Unit
-                        }
+                onLoadDetail = { orderId -> loadOrderDetail(orderId) },
+                onLiveAction = { action, version ->
+                    current.realOrderId?.let { orderId ->
+                        pendingLiveAction = AdminPendingLiveAction(orderId, action, version)
+                        pendingLiveActionReason = ""
                     }
                 },
                 onSection = { section ->
@@ -1058,6 +1106,47 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             dismissButton = {
                 TextButton(onClick = { showSignOut = false }) {
                     Text("No")
+                }
+            },
+        )
+    }
+
+    pendingLiveAction?.let { pending ->
+        val requiresReason = pending.action.requiresAdminReason()
+        AlertDialog(
+            onDismissRequest = {
+                pendingLiveAction = null
+                pendingLiveActionReason = ""
+            },
+            title = { Text("Confirmar acción") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(pending.action.adminActionLabel())
+                    Text(pending.action.adminActionImpact())
+                    if (requiresReason) {
+                        PediloTextField(
+                            value = pendingLiveActionReason,
+                            onValueChange = { pendingLiveActionReason = it },
+                            label = "Motivo operativo",
+                            singleLine = false,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !requiresReason || pendingLiveActionReason.trim().length >= 4,
+                    onClick = { executePendingLiveAction(pending, pendingLiveActionReason.trim()) },
+                ) {
+                    Text("Confirmar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    pendingLiveAction = null
+                    pendingLiveActionReason = ""
+                }) {
+                    Text("Cancelar")
                 }
             },
         )
@@ -2419,6 +2508,7 @@ private fun AdminOrderDetailScreen(
     operationMessage: String,
     operationError: String,
     onLoadDetail: (String) -> Unit,
+    onLiveAction: (LiveOrderAction, Int) -> Unit,
     onSection: (AdminOrderSection) -> Unit,
 ) {
     orderId?.let { LaunchedEffect(it) { onLoadDetail(it) } }
@@ -2463,6 +2553,8 @@ private fun AdminOrderDetailScreen(
         )
     }
     val operationTitle = adminOrderOperationSectionTitle(identity)
+    val allowedActions = detail?.nextAllowedActions ?: summary?.nextAllowedActions.orEmpty()
+    val expectedVersion = detail?.version ?: summary?.version ?: 0
     val operationNote = when (identity) {
         AdminOperationOrderClassification.IDENTITY_LOCAL_PICKUP -> storeName.adminDisplayValue("Información de retiro")
         AdminOperationOrderClassification.IDENTITY_PLUS_BUY -> detail?.itemsSummary.adminItemsSummary()
@@ -2475,7 +2567,7 @@ private fun AdminOrderDetailScreen(
         AdminOrderNavigationEntry(AdminOrderSection.Payment, Icons.Outlined.Payments, "Pago", (detail?.total ?: summary?.total).adminDisplayValue("Sin datos")),
         AdminOrderNavigationEntry(AdminOrderSection.Problems, Icons.Outlined.ReportProblem, "Problemas", problemFocus?.first ?: "Sin problemas"),
         AdminOrderNavigationEntry(AdminOrderSection.History, Icons.Outlined.History, "Historial", detail?.lastEventSummary.adminDisplayValue("Sin datos")),
-        AdminOrderNavigationEntry(AdminOrderSection.Options, Icons.Outlined.Tune, "Opciones", "Sin acciones"),
+        AdminOrderNavigationEntry(AdminOrderSection.Options, Icons.Outlined.Tune, "Opciones", adminActionsSummary(allowedActions)),
     )
     LazyColumn(
         modifier = Modifier
@@ -2512,6 +2604,16 @@ private fun AdminOrderDetailScreen(
         }
         items(navigationEntries) { entry ->
             AdminOrderNavigationCard(entry = entry, onClick = { onSection(entry.section) })
+        }
+        if (allowedActions.isNotEmpty() && orderId != null) {
+            item { AdminInfoPanel(title = "Acciones disponibles", text = "Solo se muestran acciones permitidas por backend para la versión $expectedVersion.") }
+            items(allowedActions) { action ->
+                AdminActionCard(
+                    title = action.adminActionLabel(),
+                    note = action.adminActionImpact(),
+                    onClick = { onLiveAction(action, expectedVersion) },
+                )
+            }
         }
     }
 }
@@ -2588,8 +2690,17 @@ private fun AdminOrderSectionScreen(
         )
         AdminOrderSection.History -> listOf(
             "Último movimiento" to detail?.lastEventSummary.adminDisplayValue("Sin datos"),
-        )
-        AdminOrderSection.Options -> listOf("Opciones" to "Sin acciones")
+        ) + detail?.events.orEmpty().mapIndexed { index, event ->
+            val actor = event.actorRole.adminDisplayValue("sistema")
+            "Evento ${index + 1}" to listOf(
+                event.summary.adminDisplayValue(event.type.adminDisplayValue("Movimiento")),
+                actor,
+                event.reason.takeIf { it.isNotBlank() },
+            ).filterNotNull().joinToString(" · ")
+        }
+        AdminOrderSection.Options -> (detail?.nextAllowedActions ?: summary?.nextAllowedActions.orEmpty())
+            .map { it.adminActionLabel() to it.adminActionImpact() }
+            .ifEmpty { listOf("Opciones" to "Sin acciones") }
     }
     LazyColumn(
         modifier = Modifier
@@ -2634,6 +2745,57 @@ private fun adminOrderOperationFacts(
             "Retiro" to "Sin datos",
         )
         else -> listOf("Lugar de retiro" to storeName.adminDisplayValue("Sin datos"))
+    }
+
+private fun adminActionsSummary(actions: List<LiveOrderAction>): String =
+    if (actions.isEmpty()) "Sin acciones" else "${actions.size} permitidas"
+
+private fun LiveOrderAction.adminActionLabel(): String =
+    when (this) {
+        LiveOrderAction.LocalAccept -> "Aceptar pedido"
+        LiveOrderAction.LocalReject -> "Rechazar pedido"
+        LiveOrderAction.LocalMarkPreparing -> "Marcar en preparación"
+        LiveOrderAction.LocalMarkReady -> "Marcar listo"
+        LiveOrderAction.DriverTake -> "Tomar pedido"
+        LiveOrderAction.DriverMarkPickedUp -> "Marcar retirado"
+        LiveOrderAction.DriverMarkDelivered -> "Marcar entregado"
+        LiveOrderAction.CancelOrder -> "Cancelar pedido"
+        LiveOrderAction.OpenIncident -> "Abrir incidencia"
+        LiveOrderAction.ResolveIncident -> "Resolver incidencia"
+        LiveOrderAction.AdminIntervene -> "Intervención Admin"
+    }
+
+private fun LiveOrderAction.adminActionImpact(): String =
+    when (this) {
+        LiveOrderAction.LocalAccept -> "Avanza el pedido y deja constancia operativa."
+        LiveOrderAction.LocalReject -> "Cierra el pedido con motivo auditado."
+        LiveOrderAction.LocalMarkPreparing -> "Actualiza el estado visible y operativo."
+        LiveOrderAction.LocalMarkReady -> "Deriva la responsabilidad al reparto."
+        LiveOrderAction.DriverTake -> "Asigna el pedido al actor que ejecuta la acción."
+        LiveOrderAction.DriverMarkPickedUp -> "Marca el retiro y mantiene seguimiento de entrega."
+        LiveOrderAction.DriverMarkDelivered -> "Cierra el pedido como entregado."
+        LiveOrderAction.CancelOrder -> "Cancela el pedido con motivo auditado."
+        LiveOrderAction.OpenIncident -> "Pasa el pedido a revisión operativa."
+        LiveOrderAction.ResolveIncident -> "Cierra la incidencia activa."
+        LiveOrderAction.AdminIntervene -> "Registra intervención Admin y toma responsabilidad."
+    }
+
+private fun LiveOrderAction.requiresAdminReason(): Boolean =
+    this in setOf(
+        LiveOrderAction.LocalReject,
+        LiveOrderAction.CancelOrder,
+        LiveOrderAction.OpenIncident,
+        LiveOrderAction.ResolveIncident,
+        LiveOrderAction.AdminIntervene,
+    )
+
+private fun CoreError.adminHumanError(): String =
+    when (this) {
+        is CoreError.Operational -> humanMessage
+        CoreError.NotAvailable -> "No pudimos conectar con el backend operativo."
+        CoreError.IncompleteData -> "Faltan datos para ejecutar la acción."
+        is CoreError.Validation -> "Revisá los datos antes de confirmar."
+        CoreError.Unknown -> "No pudimos ejecutar la acción."
     }
 
 @Composable

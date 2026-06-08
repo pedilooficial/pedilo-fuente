@@ -2,6 +2,7 @@ package com.pedilo.app.core.firebase
 
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
@@ -10,9 +11,12 @@ import com.google.firebase.ktx.Firebase
 import com.pedilo.app.core.model.AdminOrderAction
 import com.pedilo.app.core.model.AdminOrderActionRequest
 import com.pedilo.app.core.model.AdminOrderActionResult
-import com.pedilo.app.core.model.AdminOrderOperations
+import com.pedilo.app.core.model.AdminLiveOrderActionRequest
+import com.pedilo.app.core.model.AdminLiveOrderActionResult
+import com.pedilo.app.core.model.AdminOrderEvent
 import com.pedilo.app.core.model.AdminOrderDetail
 import com.pedilo.app.core.model.AdminOrderSummary
+import com.pedilo.app.core.model.LiveOrderAction
 import com.pedilo.app.core.port.AdminOrdersPort
 import com.pedilo.app.core.result.CoreError
 import com.pedilo.app.core.result.CoreResult
@@ -53,6 +57,12 @@ class FirebaseAdminOrdersAdapter(
             }
             val customer = doc.get(CUSTOMER) as? Map<String, Any?>
             val lastEvent = (doc.get(LAST_OPERATION_EVENT) as? Map<String, Any?>).orEmpty()
+            val events = getOrderEventsReadOnly(orderId).let {
+                when (it) {
+                    is CoreResult.Success -> it.value
+                    is CoreResult.Failure -> emptyList()
+                }
+            }
             AdminOrderDetail(
                 id = doc.id,
                 trackingNumber = doc.getString(TRACKING).orEmpty(),
@@ -84,6 +94,7 @@ class FirebaseAdminOrdersAdapter(
                 assignedActorRole = doc.getString(ASSIGNED_ACTOR_ROLE).orEmpty(),
                 version = doc.version(),
                 idempotencyKey = doc.getString(IDEMPOTENCY_KEY).orEmpty(),
+                events = events,
             )
         }.fold(
             onSuccess = { CoreResult.Success(it) },
@@ -117,6 +128,56 @@ class FirebaseAdminOrdersAdapter(
         }.fold(
             onSuccess = { CoreResult.Success(it) },
             onFailure = { CoreResult.Failure(CoreError.Operational((it as? FirebaseFunctionsException)?.message ?: "No pudimos ejecutar la acción.")) },
+        )
+
+    override suspend fun executeLiveOrderAction(request: AdminLiveOrderActionRequest): CoreResult<AdminLiveOrderActionResult> =
+        runCatching {
+            val result = functions
+                .getHttpsCallable(OPERATE_LIVE_ORDER)
+                .call(request.toCallablePayload())
+                .await()
+
+            @Suppress("UNCHECKED_CAST")
+            val data = result.getData() as? Map<String, Any?>
+                ?: error("Unexpected operateLiveOrder response")
+
+            AdminLiveOrderActionResult(
+                orderId = data["orderId"].asText(),
+                action = data["action"].asText(),
+                publicStatus = data["publicStatus"].asText(),
+                operationalStatus = data["operationalStatus"].asText(),
+                version = (data["version"] as? Number)?.toInt() ?: 0,
+                eventSummary = data["eventSummary"].asText(),
+                humanMessage = data["humanMessage"].asText(),
+            )
+        }.fold(
+            onSuccess = { CoreResult.Success(it) },
+            onFailure = { CoreResult.Failure(CoreError.Operational((it as? FirebaseFunctionsException)?.message ?: "No pudimos ejecutar la acción.")) },
+        )
+
+    override suspend fun getOrderEventsReadOnly(orderId: String): CoreResult<List<AdminOrderEvent>> =
+        runCatching {
+            db.collection(ORDERS)
+                .document(orderId)
+                .collection(EVENTS)
+                .orderBy(CREATED_AT, Query.Direction.DESCENDING)
+                .limit(8)
+                .get()
+                .await()
+                .documents
+                .map { doc ->
+                    AdminOrderEvent(
+                        id = doc.id,
+                        type = doc.getString(EVENT_TYPE).orEmpty(),
+                        summary = doc.getString(EVENT_SUMMARY).orEmpty(),
+                        actorRole = doc.getString(ACTOR_ROLE).orEmpty(),
+                        reason = doc.getString(REASON).orEmpty(),
+                        createdAtMillis = (doc.get(CREATED_AT) as? Timestamp)?.toDate()?.time,
+                    )
+                }
+        }.fold(
+            onSuccess = { CoreResult.Success(it) },
+            onFailure = { CoreResult.Failure(CoreError.NotAvailable) },
         )
 
     private fun com.google.firebase.firestore.DocumentSnapshot.toSummary(): AdminOrderSummary =
@@ -160,17 +221,12 @@ class FirebaseAdminOrdersAdapter(
     private fun com.google.firebase.firestore.DocumentSnapshot.version(): Int =
         (get(VERSION) as? Number)?.toInt() ?: 0
 
-    private fun com.google.firebase.firestore.DocumentSnapshot.nextAllowedActions(): List<AdminOrderAction> =
+    private fun com.google.firebase.firestore.DocumentSnapshot.nextAllowedActions(): List<LiveOrderAction> =
         (get(NEXT_ALLOWED_ACTIONS) as? List<*>)
             .orEmpty()
-            .mapNotNull { AdminOrderAction.fromWire(it.orEmptyText()) }
+            .mapNotNull { LiveOrderAction.fromWire(it.orEmptyText()) }
             .ifEmpty {
-                AdminOrderOperations.allowedActions(
-                    status = getString(STATUS).orEmpty(),
-                    adminReviewed = getBoolean(ADMIN_REVIEWED) ?: false,
-                    activeIncident = getBoolean(ACTIVE_INCIDENT) ?: false,
-                    responsibleRole = getString(RESPONSIBLE_ROLE).orEmpty(),
-                )
+                emptyList()
             }
 
     private fun AdminOrderActionRequest.toCallablePayload(): Map<String, Any?> =
@@ -180,6 +236,14 @@ class FirebaseAdminOrdersAdapter(
             "reason" to reason,
             "forcedStatus" to forcedStatus,
             "responsibleRole" to responsibleRole,
+        )
+
+    private fun AdminLiveOrderActionRequest.toCallablePayload(): Map<String, Any?> =
+        mapOf(
+            "orderId" to orderId,
+            "action" to action.wireName,
+            "expectedVersion" to expectedVersion,
+            "reason" to reason,
         )
 
     private fun Any?.asText(): String = this as? String ?: ""
@@ -193,6 +257,7 @@ class FirebaseAdminOrdersAdapter(
         const val REGION = "southamerica-east1"
         const val ORDERS = "orders"
         const val ADMIN_ORDER_ACTION = "adminOrderAction"
+        const val OPERATE_LIVE_ORDER = "operateLiveOrder"
         const val TRACKING = "trackingNumber"
         const val PUBLIC_NUMBER = "publicOrderNumber"
         const val STATUS = "status"
@@ -205,7 +270,11 @@ class FirebaseAdminOrdersAdapter(
         const val ADMIN_REVIEWED = "adminReviewed"
         const val NEXT_ALLOWED_ACTIONS = "nextAllowedActions"
         const val LAST_OPERATION_EVENT = "lastOperationEvent"
+        const val EVENTS = "events"
+        const val EVENT_TYPE = "type"
         const val EVENT_SUMMARY = "summary"
+        const val ACTOR_ROLE = "actorRole"
+        const val REASON = "reason"
         const val SOURCE = "source"
         const val REQUEST_TYPE = "requestType"
         const val STORE_NAME = "storeName"

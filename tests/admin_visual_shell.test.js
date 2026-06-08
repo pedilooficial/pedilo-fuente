@@ -677,7 +677,8 @@ test("admin order detail keeps shell rules and visual entry paths", () => {
   assert.match(source, /adminDisplayValue/);
   assert.match(source, /adminItemsSummary/);
   assert.match(source, /component15\(\)\.adminDisplayValue/);
-  assert.doesNotMatch(source, /Acciones disponibles/);
+  assert.match(source, /Acciones disponibles/);
+  assert.match(source, /pendingLiveAction/);
   forbiddenReturnLabels.forEach((label) => assert.doesNotMatch(source, new RegExp(`"${label}"`)));
   assert.match(source, /private fun AdminOrderDetailScreen[\s\S]*showSignOut = false/);
 });
