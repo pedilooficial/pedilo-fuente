@@ -78,6 +78,8 @@ const FORCEABLE_STATUSES = {
   delivered: "Pedido cerrado",
   under_review: "Pedido en revisión operativa",
 };
+const OPERATIONAL_ROLES = ["admin", "store", "driver"];
+const PUBLIC_TRACKING_PATTERN = /^PDL-[A-Z0-9]{4,10}$/;
 
 exports.createLocalOrder = onCall({region: REGION}, async (request) => {
   const payload = request.data || {};
@@ -202,7 +204,7 @@ exports.createPlusOrder = onCall({region: REGION}, async (request) => {
 
 exports.getPublicOrderTracking = onCall({region: REGION}, async (request) => {
   const trackingNumber = normalizeTrackingNumber(request.data && request.data.trackingNumber);
-  if (!trackingNumber || isPlaceholder(trackingNumber)) {
+  if (!isValidTrackingNumber(trackingNumber)) {
     throw new HttpsError("invalid-argument", "Ingresá un número de pedido válido.");
   }
 
@@ -229,15 +231,7 @@ exports.getPublicOrderTracking = onCall({region: REGION}, async (request) => {
 });
 
 exports.adminOrderAction = onCall({region: REGION}, async (request) => {
-  const uid = request.auth && request.auth.uid;
-  if (!uid) {
-    throw new HttpsError("unauthenticated", "Iniciá sesión como Admin para operar pedidos.");
-  }
-
-  const userSnap = await db.collection("users").doc(uid).get();
-  if (!userSnap.exists || userSnap.get("role") !== "admin") {
-    throw new HttpsError("permission-denied", "Solo Admin puede ejecutar esta acción.");
-  }
+  const actor = await requireAdminActor(request);
 
   const clean = cleanAdminActionPayload(request.data || {});
   const orderRef = db.collection(ORDERS).doc(clean.orderId);
@@ -268,7 +262,7 @@ exports.adminOrderAction = onCall({region: REGION}, async (request) => {
       type: clean.action,
       summary: effect.eventSummary,
       reason: clean.reason,
-      actorUid: uid,
+      actorUid: actor.uid,
       actorRole: "admin",
       previousStatus: current.status,
       nextStatus: next.status,
@@ -294,7 +288,7 @@ exports.adminOrderAction = onCall({region: REGION}, async (request) => {
       tx.set(incidentRef, {
         status: "open",
         reason: clean.reason,
-        actorUid: uid,
+        actorUid: actor.uid,
         actorRole: "admin",
         createdAt: now,
         updatedAt: now,
@@ -421,6 +415,21 @@ exports.operateLiveOrder = onCall({region: REGION}, async (request) => {
   });
 });
 
+async function requireAdminActor(request) {
+  const uid = request.auth && request.auth.uid;
+  if (!uid) {
+    throw new HttpsError("unauthenticated", "Iniciá sesión como Admin para operar pedidos.");
+  }
+
+  const userSnap = await db.collection("users").doc(uid).get();
+  const role = userSnap.exists ? cleanText(userSnap.get("role")).toLowerCase() : "";
+  if (!userSnap.exists || role !== "admin" || userSnap.get("active") !== true) {
+    throw new HttpsError("permission-denied", "Solo Admin activo puede ejecutar esta acción.");
+  }
+
+  return {uid, role};
+}
+
 async function requireOperationalActor(request) {
   const uid = request.auth && request.auth.uid;
   if (!uid) {
@@ -429,7 +438,7 @@ async function requireOperationalActor(request) {
 
   const userSnap = await db.collection("users").doc(uid).get();
   const role = userSnap.exists ? cleanText(userSnap.get("role")).toLowerCase() : "";
-  if (!["admin", "store", "driver"].includes(role) || userSnap.get("active") === false) {
+  if (!userSnap.exists || !OPERATIONAL_ROLES.includes(role) || userSnap.get("active") !== true) {
     throw new HttpsError("permission-denied", "No tenés un rol operativo activo.");
   }
 
@@ -443,7 +452,7 @@ function cleanLiveActionPayload(payload, uid) {
   const expectedVersion = Number.isInteger(payload.expectedVersion) ? payload.expectedVersion : null;
   const actionId = cleanText(payload.actionId) || liveActionId({uid, orderId, action, expectedVersion, reason});
 
-  if (!orderId || !Object.values(LIVE_ACTIONS).includes(action)) {
+  if (!isSafeDocumentId(orderId) || !Object.values(LIVE_ACTIONS).includes(action)) {
     throw new HttpsError("invalid-argument", "Elegí una acción operativa válida.");
   }
   if ([
@@ -799,7 +808,7 @@ function cleanAdminActionPayload(payload) {
   const responsibleRole = cleanText(payload.responsibleRole);
   const expectedVersion = Number.isInteger(payload.expectedVersion) ? payload.expectedVersion : null;
 
-  if (!orderId || !Object.values(ADMIN_ACTIONS).includes(action)) {
+  if (!isSafeDocumentId(orderId) || !Object.values(ADMIN_ACTIONS).includes(action)) {
     throw new HttpsError("invalid-argument", "Elegí una acción válida para este pedido.");
   }
   if ([
@@ -975,7 +984,7 @@ function cleanOrderPayload(payload) {
   }
 
   const items = rawItems.map(cleanItem);
-  if (items.some((item) => !item.productId || !item.name || item.quantity <= 0 || isPlaceholder(item.name))) {
+  if (items.some((item) => !item.productId || isPlaceholder(item.productId) || !item.name || item.quantity <= 0 || isPlaceholder(item.name))) {
     throw new HttpsError("invalid-argument", "El carrito no es válido.");
   }
 
@@ -1266,6 +1275,10 @@ function normalizeTrackingNumber(value) {
   return cleanText(value).replace(/\s+/g, "").toUpperCase();
 }
 
+function isValidTrackingNumber(value) {
+  return PUBLIC_TRACKING_PATTERN.test(cleanText(value)) && !isPlaceholder(value);
+}
+
 function publicTrackingResponse(order, requestedTrackingNumber) {
   const status = publicStatusCode(order.status);
   const terminal = isTerminalStatus(order.status);
@@ -1343,7 +1356,9 @@ function numberOrNull(value) {
 }
 
 function isValidPhone(value) {
-  return cleanText(value).replace(/\D/g, "").length >= 6;
+  const phone = cleanText(value);
+  const digits = phone.replace(/\D/g, "").length;
+  return digits >= 8 && digits <= 15 && (phone.match(/\+/g) || []).length <= 1 && (!phone.includes("+") || phone.startsWith("+"));
 }
 
 function isPlaceholder(value) {

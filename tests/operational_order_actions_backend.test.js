@@ -71,8 +71,8 @@ test("operational callable validates auth role active profile and action payload
 
   assert.match(actor, /request\.auth && request\.auth\.uid/);
   assert.match(actor, /collection\("users"\)\.doc\(uid\)\.get\(\)/);
-  assert.match(actor, /\["admin", "store", "driver"\]\.includes\(role\)/);
-  assert.match(actor, /userSnap\.get\("active"\) === false/);
+  assert.match(actor, /OPERATIONAL_ROLES\.includes\(role\)/);
+  assert.match(actor, /userSnap\.get\("active"\) !== true/);
 
   assert.match(payload, /Object\.values\(LIVE_ACTIONS\)\.includes\(action\)/);
   assert.match(payload, /expectedVersion === null/);

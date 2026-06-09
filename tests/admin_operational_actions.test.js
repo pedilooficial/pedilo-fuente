@@ -48,7 +48,9 @@ test("admin callable validates auth role state action and writes audit events", 
   assert.match(callable, /exports\.adminOrderAction/);
   assert.match(callable, /request\.auth/);
   assert.match(callable, /collection\("users"\)\.doc\(uid\)/);
-  assert.match(callable, /get\("role"\) !== "admin"/);
+  assert.match(callable, /requireAdminActor\(request\)/);
+  assert.match(callable, /role !== "admin"/);
+  assert.match(callable, /userSnap\.get\("active"\) !== true/);
   assert.match(callable, /db\.runTransaction/);
   assert.match(callable, /allowedAdminActions\(current\)/);
   assert.match(callable, /orderRef\.collection\("events"\)/);

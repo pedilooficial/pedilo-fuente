@@ -12,12 +12,18 @@ service cloud.firestore {
         : null;
     }
 
+    function operatorActive() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.active == true;
+    }
+
     function isAdmin() {
-      return operatorRole() == "admin";
+      return operatorRole() == "admin" && operatorActive();
     }
 
     function isOperator() {
-      return operatorRole() in ["store", "driver", "admin"];
+      return operatorRole() in ["store", "driver", "admin"] && operatorActive();
     }
 
     function canReadOrder(order) {
