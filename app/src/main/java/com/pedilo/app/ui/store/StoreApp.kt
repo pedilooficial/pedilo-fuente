@@ -135,7 +135,7 @@ fun StoreApp(onSignOutConfirmed: () -> Unit) {
         item {
             StoreHeader(
                 title = "Local",
-                subtitle = "Pedidos asignados a tu cuenta",
+                subtitle = "Pedidos propios asignados a tu cuenta",
                 action = "Cerrar sesión",
                 onAction = onSignOutConfirmed,
             )
@@ -153,6 +153,9 @@ fun StoreApp(onSignOutConfirmed: () -> Unit) {
                         error = ""
                     })
                 }
+                item { StoreInfoCard("Productos y stock", "Gestión visual no disponible en este bloque. No se guardan cambios de catálogo ni disponibilidad.", PediloMuted) }
+                item { StoreInfoCard("Solicitud de repartidor", "La asignación real queda a cargo del flujo operativo seguro. El local no solicita repartidor desde esta pantalla.", PediloMuted) }
+                item { StoreInfoCard("Finanzas", "Sin caja, deuda, liquidaciones ni pagos reales en este bloque.", PediloMuted) }
             }
         } else {
             item {
@@ -170,8 +173,11 @@ fun StoreApp(onSignOutConfirmed: () -> Unit) {
                 item { StoreInfoCard("Pedido", "Cargando pedido.", PediloMuted) }
             } else {
                 item { StoreOrderDetailCard(current) }
+                if (current.activeIncident) {
+                    item { StoreInfoCard("Incidencia activa", "El pedido está bajo revisión operativa.", PediloWarning) }
+                }
                 if (current.nextAllowedActions.isEmpty()) {
-                    item { StoreInfoCard("Acciones", "No hay acciones disponibles para este estado.", PediloMuted) }
+                    item { StoreInfoCard("Sin acciones disponibles", "El backend no habilita acciones para este pedido o versión. Si el pedido está cerrado, no hay acciones normales.", PediloMuted) }
                 } else {
                     item { StoreInfoCard("Acciones", "Permitidas por backend para la versión ${current.version}.", PediloOrange) }
                     items(current.nextAllowedActions) { action ->
@@ -277,6 +283,7 @@ private fun StoreOrderDetailCard(order: StoreOrderDetail) {
     ) {
         Text("Pedido #${order.visibleNumber}", color = PediloText, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
         Text(order.publicStatus.ifBlank { order.operationalStatus }, color = PediloOrange, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Text("Estado operativo: ${order.operationalStatus.ifBlank { "No informado" }}", color = PediloMuted, fontSize = 13.sp)
         Text("Persona: ${order.contactName.ifBlank { "No informado" }}", color = PediloMuted, fontSize = 13.sp)
         order.itemsSummary.forEach {
             Text(it, color = PediloText, fontSize = 14.sp, lineHeight = 18.sp)
@@ -323,6 +330,7 @@ private fun LiveOrderAction.storeLabel(): String =
         LiveOrderAction.LocalReject -> "Rechazar pedido"
         LiveOrderAction.LocalMarkPreparing -> "Marcar en preparación"
         LiveOrderAction.LocalMarkReady -> "Marcar listo"
+        LiveOrderAction.CancelOrder -> "Cancelar pedido"
         LiveOrderAction.OpenIncident -> "Reportar problema"
         else -> "Acción no disponible"
     }
@@ -333,12 +341,13 @@ private fun LiveOrderAction.storeImpact(): String =
         LiveOrderAction.LocalReject -> "Cierra el pedido con motivo auditado."
         LiveOrderAction.LocalMarkPreparing -> "Informa que el pedido está en preparación."
         LiveOrderAction.LocalMarkReady -> "Deja el pedido listo para retiro."
-        LiveOrderAction.OpenIncident -> "Envía el pedido a revisión operativa."
+        LiveOrderAction.CancelOrder -> "Cancela el pedido con motivo auditado si el backend lo permite."
+        LiveOrderAction.OpenIncident -> "Usalo para producto no disponible, demora o problema operativo con motivo claro."
         else -> "Backend no habilitó esta acción para el local."
     }
 
 private fun LiveOrderAction.requiresStoreReason(): Boolean =
-    this in setOf(LiveOrderAction.LocalReject, LiveOrderAction.OpenIncident)
+    this in setOf(LiveOrderAction.LocalReject, LiveOrderAction.CancelOrder, LiveOrderAction.OpenIncident)
 
 private fun CoreError.storeErrorMessage(): String =
     when (this) {

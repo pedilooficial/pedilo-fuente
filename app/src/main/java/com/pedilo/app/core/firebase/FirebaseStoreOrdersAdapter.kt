@@ -140,6 +140,7 @@ class FirebaseStoreOrdersAdapter(
                 LiveOrderAction.LocalReject,
                 LiveOrderAction.LocalMarkPreparing,
                 LiveOrderAction.LocalMarkReady,
+                LiveOrderAction.CancelOrder,
                 LiveOrderAction.OpenIncident,
             )
         }

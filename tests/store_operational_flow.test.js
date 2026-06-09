@@ -67,6 +67,7 @@ test("store UI connects accept reject preparation ready and incident through ope
     "LiveOrderAction.LocalReject",
     "LiveOrderAction.LocalMarkPreparing",
     "LiveOrderAction.LocalMarkReady",
+    "LiveOrderAction.CancelOrder",
     "LiveOrderAction.OpenIncident",
   ]) {
     assert.match(source, new RegExp(action.replace(".", "\\.")));
