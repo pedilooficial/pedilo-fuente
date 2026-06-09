@@ -13,6 +13,7 @@ data class DriverOrderSummary(
     val version: Int,
     val activeIncident: Boolean,
     val isAssignedToCurrentDriver: Boolean,
+    val communicationStatus: String = "",
 )
 
 data class DriverOrderDetail(
@@ -36,4 +37,5 @@ data class DriverOrderDetail(
     val version: Int,
     val activeIncident: Boolean,
     val isAssignedToCurrentDriver: Boolean,
+    val communicationStatus: String = "",
 )

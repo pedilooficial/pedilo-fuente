@@ -95,6 +95,7 @@ class FirebaseStoreOrdersAdapter(
             nextAllowedActions = nextAllowedActions().storeAllowedOnly(),
             version = version(),
             activeIncident = getBoolean(ACTIVE_INCIDENT) ?: false,
+            communicationStatus = getString(COMMUNICATION_STATUS).orEmpty(),
         )
 
     private fun com.google.firebase.firestore.DocumentSnapshot.toStoreDetail(): StoreOrderDetail =
@@ -113,6 +114,7 @@ class FirebaseStoreOrdersAdapter(
             nextAllowedActions = nextAllowedActions().storeAllowedOnly(),
             version = version(),
             activeIncident = getBoolean(ACTIVE_INCIDENT) ?: false,
+            communicationStatus = getString(COMMUNICATION_STATUS).orEmpty(),
         )
 
     private fun com.google.firebase.firestore.DocumentSnapshot.visibleNumber(): String =
@@ -179,6 +181,7 @@ class FirebaseStoreOrdersAdapter(
         const val TOTAL = "total"
         const val PAYMENT_METHOD = "paymentMethod"
         const val FINANCIAL_STATUS = "financialStatus"
+        const val COMMUNICATION_STATUS = "communicationStatus"
         const val AMOUNT_TO_COLLECT = "amountToCollect"
         const val COLLECTION_REQUIRED = "collectionRequired"
         const val ITEMS = "items"

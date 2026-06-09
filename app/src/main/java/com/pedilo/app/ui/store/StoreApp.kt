@@ -173,6 +173,13 @@ fun StoreApp(onSignOutConfirmed: () -> Unit) {
                 item { StoreInfoCard("Pedido", "Cargando pedido.", PediloMuted) }
             } else {
                 item { StoreOrderDetailCard(current) }
+                item {
+                    StoreInfoCard(
+                        "Comunicación",
+                        current.communicationStatus.storeCommunicationLabel(),
+                        if (current.communicationStatus == "disabled") PediloMuted else PediloOrange,
+                    )
+                }
                 if (current.activeIncident) {
                     item { StoreInfoCard("Incidencia activa", "El pedido está bajo revisión operativa.", PediloWarning) }
                 }
@@ -290,6 +297,7 @@ private fun StoreOrderDetailCard(order: StoreOrderDetail) {
         }
         Text("Total: ${order.total.ifBlank { "No informado" }}", color = PediloMuted, fontSize = 13.sp)
         Text("Pago: ${order.paymentMethod.storePaymentLabel()} · ${order.financialStatus.storeFinancialLabel()}", color = PediloMuted, fontSize = 13.sp)
+        Text("Comunicación: ${order.communicationStatus.storeCommunicationLabel()}", color = PediloMuted, fontSize = 13.sp)
         if (order.collectionRequired) {
             Text("Cobro al recibir: ${order.amountToCollect.storeMoneyLabel()}", color = PediloOrange, fontSize = 13.sp)
         }
@@ -368,6 +376,18 @@ private fun String.storeFinancialLabel(): String =
         "paid_declared" -> "Pago declarado"
         "pending_review" -> "Revisión financiera"
         else -> ifBlank { "Estado financiero no informado" }
+    }
+
+private fun String.storeCommunicationLabel(): String =
+    when (trim()) {
+        "received" -> "Recibida"
+        "pending" -> "Pendiente"
+        "prepared" -> "Preparada, sin envío externo real"
+        "sent" -> "Enviada por canal real"
+        "failed" -> "Fallida"
+        "closed" -> "Cerrada"
+        "disabled" -> "Canal externo deshabilitado"
+        else -> ifBlank { "Sin estado de comunicación" }
     }
 
 private fun String.storeMoneyLabel(): String {

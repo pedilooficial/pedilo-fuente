@@ -10,6 +10,7 @@ data class StoreOrderSummary(
     val nextAllowedActions: List<LiveOrderAction>,
     val version: Int,
     val activeIncident: Boolean,
+    val communicationStatus: String = "",
 )
 
 data class StoreOrderDetail(
@@ -27,4 +28,5 @@ data class StoreOrderDetail(
     val nextAllowedActions: List<LiveOrderAction>,
     val version: Int,
     val activeIncident: Boolean,
+    val communicationStatus: String = "",
 )

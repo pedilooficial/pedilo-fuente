@@ -204,6 +204,13 @@ fun DriverApp(onSignOutConfirmed: () -> Unit) {
                 }
                 item {
                     DriverInfoCard(
+                        "Comunicación",
+                        current.communicationStatus.driverCommunicationLabel(),
+                        if (current.communicationStatus == "disabled") PediloMuted else PediloOrange,
+                    )
+                }
+                item {
+                    DriverInfoCard(
                         "Capacidad",
                         "Preparación: no hay motor seguro de cupos o disponibilidad avanzada. Esta pantalla no bloquea ni asigna por capacidad.",
                         PediloMuted,
@@ -341,6 +348,7 @@ private fun DriverOrderDetailCard(order: DriverOrderDetail) {
         }
         Text("Total: ${order.total.asMoneyLabel()}", color = PediloMuted, fontSize = 13.sp)
         Text("Pago: ${order.paymentMethod.paymentMethodLabel()} · ${order.financialStatus.financialStatusLabel()}", color = PediloMuted, fontSize = 13.sp)
+        Text("Comunicación: ${order.communicationStatus.driverCommunicationLabel()}", color = PediloMuted, fontSize = 13.sp)
         if (order.collectionRequired) {
             Text("A cobrar: ${order.amountToCollect.asMoneyLabel()} · responsable ${order.cashResponsibleRole.ifBlank { "no asignado" }}", color = PediloOrange, fontSize = 13.sp)
         }
@@ -443,6 +451,18 @@ private fun String.financialStatusLabel(): String =
         "paid_declared" -> "Pago declarado"
         "pending_review" -> "Revisión financiera"
         else -> ifBlank { "Estado financiero no informado" }
+    }
+
+private fun String.driverCommunicationLabel(): String =
+    when (trim()) {
+        "received" -> "Recibida"
+        "pending" -> "Pendiente"
+        "prepared" -> "Preparada, sin envío externo real"
+        "sent" -> "Enviada por canal real"
+        "failed" -> "Fallida"
+        "closed" -> "Cerrada"
+        "disabled" -> "Canal externo deshabilitado"
+        else -> ifBlank { "Sin estado de comunicación" }
     }
 
 private fun String.asMoneyLabel(): String {

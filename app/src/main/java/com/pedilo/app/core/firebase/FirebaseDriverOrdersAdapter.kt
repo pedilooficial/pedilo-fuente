@@ -136,6 +136,7 @@ class FirebaseDriverOrdersAdapter(
             version = version(),
             activeIncident = getBoolean(ACTIVE_INCIDENT) ?: false,
             isAssignedToCurrentDriver = isAssignedToDriver(uid),
+            communicationStatus = getString(COMMUNICATION_STATUS).orEmpty(),
         )
 
     private fun com.google.firebase.firestore.DocumentSnapshot.toDriverDetail(uid: String): DriverOrderDetail =
@@ -160,6 +161,7 @@ class FirebaseDriverOrdersAdapter(
             version = version(),
             activeIncident = getBoolean(ACTIVE_INCIDENT) ?: false,
             isAssignedToCurrentDriver = isAssignedToDriver(uid),
+            communicationStatus = getString(COMMUNICATION_STATUS).orEmpty(),
         )
 
     private fun com.google.firebase.firestore.DocumentSnapshot.isVisibleToDriver(uid: String): Boolean =
@@ -274,6 +276,7 @@ class FirebaseDriverOrdersAdapter(
         const val TOTAL = "total"
         const val PAYMENT_METHOD = "paymentMethod"
         const val FINANCIAL_STATUS = "financialStatus"
+        const val COMMUNICATION_STATUS = "communicationStatus"
         const val AMOUNT_TO_COLLECT = "amountToCollect"
         const val COLLECTION_REQUIRED = "collectionRequired"
         const val CASH_RESPONSIBLE_ROLE = "cashResponsibleRole"

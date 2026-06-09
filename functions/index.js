@@ -32,6 +32,9 @@ const PAYMENT_METHOD_TRANSFER = "transfer";
 const PAYMENT_METHOD_CARD = "card";
 const PAYMENT_METHOD_ALREADY_PAID = "already_paid";
 const COMMUNICATION_STATUS_RECEIVED = "received";
+const COMMUNICATION_STATUS_PREPARED = "prepared";
+const COMMUNICATION_STATUS_DISABLED = "disabled";
+const COMMUNICATION_STATUS_CLOSED = "closed";
 const INCIDENT_STATUS_NONE = "none";
 const CLAIM_STATUS_RECEIVED = "received";
 const ARCHIVE_STATUS_LIVE = "live";
@@ -92,7 +95,15 @@ const LIVE_ORDER_STATES = {
     FINANCIAL_STATUS_SETTLEMENT_PENDING,
     FINANCIAL_STATUS_SETTLED,
   ],
-  communication: [COMMUNICATION_STATUS_RECEIVED, "closed"],
+  communication: [
+    COMMUNICATION_STATUS_RECEIVED,
+    "pending",
+    COMMUNICATION_STATUS_PREPARED,
+    "sent",
+    "failed",
+    COMMUNICATION_STATUS_CLOSED,
+    COMMUNICATION_STATUS_DISABLED,
+  ],
   incident: [INCIDENT_STATUS_NONE, "open", "in_review", "resolved", "cancelled", "dismissed"],
   archive: [ARCHIVE_STATUS_LIVE, "archived"],
 };
@@ -117,6 +128,39 @@ const FORCEABLE_STATUSES = {
 };
 const OPERATIONAL_ROLES = ["admin", "store", "driver"];
 const PUBLIC_TRACKING_PATTERN = /^PDL-[A-Z0-9]{4,10}$/;
+const COMMUNICATION_CHANNELS = {
+  INTERNAL: "internal",
+  WHATSAPP: "whatsapp",
+  PUSH: "push",
+  PUBLIC_TRACKING: "public_tracking",
+};
+const COMMUNICATION_STATUSES = {
+  PENDING: "pending",
+  PREPARED: COMMUNICATION_STATUS_PREPARED,
+  SENT: "sent",
+  FAILED: "failed",
+  SKIPPED: "skipped",
+  DISABLED: COMMUNICATION_STATUS_DISABLED,
+};
+const COMMUNICATION_TEMPLATES = {
+  order_created: "Tu pedido fue recibido y queda en revisión operativa.",
+  local_accept: "Tu pedido fue aceptado por el local.",
+  local_mark_preparing: "Tu pedido está en preparación.",
+  local_mark_ready: "Tu pedido está listo para retirar.",
+  driver_take: "Tu pedido fue asignado para reparto.",
+  driver_mark_picked_up: "Tu pedido está en camino.",
+  driver_mark_delivered: "Tu pedido fue cerrado.",
+  cancel_order: "Tu pedido fue cancelado. El seguimiento queda cerrado.",
+  local_reject: "Tu pedido fue cerrado por operación.",
+  open_incident: "Tu pedido está en revisión operativa.",
+  resolve_incident: "La revisión operativa fue registrada.",
+  admin_intervene: "Tu pedido está en revisión operativa.",
+  public_claim_received: "Reclamo recibido. Queda registrado para revisión.",
+  cancel_by_admin: "Tu pedido fue cancelado. El seguimiento queda cerrado.",
+  mark_incident: "Tu pedido está en revisión operativa.",
+  communication_failed: "La comunicación no pudo completarse y quedó registrada.",
+  phone_validation_prepared: "Teléfono recibido; validación real no ejecutada.",
+};
 
 exports.createLocalOrder = onCall({region: REGION}, async (request) => {
   const payload = request.data || {};
@@ -319,10 +363,56 @@ exports.submitPublicClaim = onCall({region: REGION}, async (request) => {
     nextIncidentStatus: "",
     createdAt: now,
   };
+  const claimCommunicationRecords = [{
+    communicationId: safeCommunicationId({sourceEventId: eventRef.id, channel: COMMUNICATION_CHANNELS.PUBLIC_TRACKING, claimId: claimRef.id}),
+    orderId: linkedOrderId,
+    claimId: claimRef.id,
+    incidentId: "",
+    eventType: "public_claim_received",
+    channel: COMMUNICATION_CHANNELS.PUBLIC_TRACKING,
+    targetRole: "public_user",
+    targetUserId: "",
+    targetPhone: clean.contact,
+    status: COMMUNICATION_STATUSES.PREPARED,
+    messageType: "public_claim_received",
+    templateKey: "public_claim_received",
+    messageBody: COMMUNICATION_TEMPLATES.public_claim_received,
+    createdAt: now,
+    sentAt: null,
+    failedAt: null,
+    failureReason: "",
+    triggeredByRole: "public_user",
+    triggeredByActorId: "",
+    sourceEventId: eventRef.id,
+    publicSafe: true,
+  }, {
+    communicationId: safeCommunicationId({sourceEventId: eventRef.id, channel: COMMUNICATION_CHANNELS.WHATSAPP, claimId: claimRef.id}),
+    orderId: linkedOrderId,
+    claimId: claimRef.id,
+    incidentId: "",
+    eventType: "public_claim_received",
+    channel: COMMUNICATION_CHANNELS.WHATSAPP,
+    targetRole: "public_user",
+    targetUserId: "",
+    targetPhone: clean.contact,
+    status: COMMUNICATION_STATUSES.DISABLED,
+    messageType: "public_claim_received",
+    templateKey: "public_claim_received",
+    messageBody: COMMUNICATION_TEMPLATES.public_claim_received,
+    createdAt: now,
+    sentAt: null,
+    failedAt: null,
+    failureReason: communicationFailureReason(COMMUNICATION_CHANNELS.WHATSAPP),
+    triggeredByRole: "public_user",
+    triggeredByActorId: "",
+    sourceEventId: eventRef.id,
+    publicSafe: true,
+  }];
 
   await db.runTransaction(async (tx) => {
     tx.create(claimRef, claim);
     tx.create(eventRef, event);
+    writeClaimCommunications(tx, claimRef, claimCommunicationRecords);
     if (orderClaimRef) {
       tx.create(orderClaimRef, {
         claimId: claimRef.id,
@@ -335,6 +425,7 @@ exports.submitPublicClaim = onCall({region: REGION}, async (request) => {
         createdAt: now,
         updatedAt: now,
       });
+      writeOrderCommunications(tx, db.collection(ORDERS).doc(linkedOrderId), claimCommunicationRecords);
     }
   });
 
@@ -389,8 +480,20 @@ exports.adminOrderAction = onCall({region: REGION}, async (request) => {
       nextOperationalStatus: next.operationalStatus,
       previousIncidentStatus: current.incidentStatus,
       nextIncidentStatus: next.incidentStatus || current.incidentStatus,
+      previousCommunicationStatus: current.communicationStatus,
+      nextCommunicationStatus: next.communicationStatus || current.communicationStatus,
       createdAt: now,
     };
+    const communicationRecords = communicationRecordsForOrder({
+      orderId: clean.orderId,
+      order: {...(orderSnap.data() || {}), ...effect.patch},
+      eventType: clean.action,
+      triggeredByRole: "admin",
+      triggeredByActorId: actor.uid,
+      sourceEventId: eventRef.id,
+      incidentId: clean.action === ADMIN_ACTIONS.MARK_INCIDENT ? incidentRef.id : current.activeIncidentId,
+      now,
+    });
 
     tx.update(orderRef, {
       ...effect.patch,
@@ -405,6 +508,7 @@ exports.adminOrderAction = onCall({region: REGION}, async (request) => {
       updatedAt: now,
     });
     tx.set(eventRef, event);
+    writeOrderCommunications(tx, orderRef, communicationRecords);
     if (incidentRef) {
       tx.set(incidentRef, incidentDocument({
         incidentId: incidentRef.id,
@@ -516,6 +620,7 @@ exports.operateLiveOrder = onCall({region: REGION}, async (request) => {
       assignedActorRole: patchValue(patch, "assignedActorRole", current.assignedActorRole),
       activeIncident: patchValue(patch, "activeIncident", current.activeIncident),
       incidentStatus: patchValue(patch, "incidentStatus", current.incidentStatus),
+      communicationStatus: patchValue(patch, "communicationStatus", current.communicationStatus),
       archiveStatus: patchValue(patch, "archiveStatus", current.archiveStatus),
       version: current.version + 1,
       nextAllowedActions,
@@ -531,9 +636,20 @@ exports.operateLiveOrder = onCall({region: REGION}, async (request) => {
       summary: effect.eventSummary,
       now,
     });
+    const communicationRecords = communicationRecordsForOrder({
+      orderId: clean.orderId,
+      order: {...(orderSnap.data() || {}), ...patch},
+      eventType: clean.action,
+      triggeredByRole: actor.role,
+      triggeredByActorId: actor.uid,
+      sourceEventId: clean.actionId,
+      incidentId: clean.action === LIVE_ACTIONS.OPEN_INCIDENT ? clean.actionId : current.activeIncidentId,
+      now,
+    });
 
     tx.update(orderRef, patch);
     tx.create(eventRef, event);
+    writeOrderCommunications(tx, orderRef, communicationRecords);
     if (incidentRef) {
       tx.create(incidentRef, incidentDocument({
         incidentId: clean.actionId,
@@ -635,6 +751,8 @@ function liveOrderEvent({clean, actor, current, result, summary, now}) {
     nextOperationalStatus: result.operationalStatus,
     previousIncidentStatus: current.incidentStatus,
     nextIncidentStatus: result.incidentStatus,
+    previousCommunicationStatus: current.communicationStatus,
+    nextCommunicationStatus: result.communicationStatus,
     previousVersion: current.version,
     nextVersion: result.version,
     actionId: clean.actionId,
@@ -804,6 +922,7 @@ function liveActionEffect(clean, current, actor) {
         status: "accepted",
         publicStatus: "Pedido aceptado por el local",
         operationalStatus: "local_accepted",
+        communicationStatus: COMMUNICATION_STATUS_PREPARED,
         responsibleRole: "store",
         currentResponsibleRole: "store",
         assignedActorId: actor.uid,
@@ -817,6 +936,7 @@ function liveActionEffect(clean, current, actor) {
         status: "cancelled",
         publicStatus: "Pedido cerrado",
         operationalStatus: "rejected_by_store",
+        communicationStatus: COMMUNICATION_STATUS_PREPARED,
         archiveStatus: "archived",
         activeIncident: false,
         incidentStatus: INCIDENT_STATUS_NONE,
@@ -833,6 +953,7 @@ function liveActionEffect(clean, current, actor) {
         status: "preparing",
         publicStatus: "Pedido en preparación",
         operationalStatus: "preparing",
+        communicationStatus: COMMUNICATION_STATUS_PREPARED,
         responsibleRole: "store",
         currentResponsibleRole: "store",
         assignedActorId: actor.uid,
@@ -843,6 +964,7 @@ function liveActionEffect(clean, current, actor) {
         status: "ready_for_pickup",
         publicStatus: "Pedido listo para retirar",
         operationalStatus: "ready_for_pickup",
+        communicationStatus: COMMUNICATION_STATUS_PREPARED,
         responsibleRole: "driver",
         currentResponsibleRole: "driver",
         assignedActorId: "",
@@ -854,6 +976,7 @@ function liveActionEffect(clean, current, actor) {
         status: "assigned_to_driver",
         publicStatus: "Pedido asignado a repartidor",
         operationalStatus: "driver_assigned",
+        communicationStatus: COMMUNICATION_STATUS_PREPARED,
         responsibleRole: "driver",
         currentResponsibleRole: "driver",
         assignedActorId: actor.uid,
@@ -865,6 +988,7 @@ function liveActionEffect(clean, current, actor) {
         status: "picked_up",
         publicStatus: "Pedido retirado",
         operationalStatus: "picked_up",
+        communicationStatus: COMMUNICATION_STATUS_PREPARED,
         responsibleRole: "driver",
         currentResponsibleRole: "driver",
       });
@@ -890,6 +1014,7 @@ function liveActionEffect(clean, current, actor) {
         status: "cancelled",
         publicStatus: "Pedido cerrado",
         operationalStatus: `cancelled_by_${actor.role}`,
+        communicationStatus: COMMUNICATION_STATUS_PREPARED,
         archiveStatus: "archived",
         activeIncident: false,
         incidentStatus: INCIDENT_STATUS_NONE,
@@ -905,6 +1030,7 @@ function liveActionEffect(clean, current, actor) {
       return livePatch(`${actor.role} abrió incidencia: ${clean.reason}`, "Incidencia abierta.", {
         publicStatus: "Pedido en revisión operativa",
         operationalStatus: "incident_open",
+        communicationStatus: COMMUNICATION_STATUS_PREPARED,
         activeIncident: true,
         incidentStatus: "open",
         activeIncidentId: clean.actionId,
@@ -917,6 +1043,7 @@ function liveActionEffect(clean, current, actor) {
       return livePatch(`Admin resolvió incidencia: ${clean.reason}`, "Incidencia resuelta.", {
         publicStatus: publicStatusForLiveStatus(current.status),
         operationalStatus: "incident_resolved",
+        communicationStatus: COMMUNICATION_STATUS_PREPARED,
         activeIncident: false,
         incidentStatus: "resolved",
         activeIncidentId: "",
@@ -927,6 +1054,7 @@ function liveActionEffect(clean, current, actor) {
       return livePatch(`Admin intervino el pedido: ${clean.reason}`, "Intervención Admin registrada.", {
         publicStatus: "Pedido en revisión operativa",
         operationalStatus: "admin_intervention",
+        communicationStatus: COMMUNICATION_STATUS_PREPARED,
         needsAttention: true,
         priority: current.activeIncident ? "high" : "medium",
         responsibleRole: "admin",
@@ -939,6 +1067,97 @@ function liveActionEffect(clean, current, actor) {
 
 function livePatch(eventSummary, humanMessage, patch) {
   return {eventSummary, humanMessage, patch};
+}
+
+function communicationTemplate(eventType) {
+  const key = Object.hasOwn(COMMUNICATION_TEMPLATES, eventType) ? eventType : "communication_failed";
+  return {
+    templateKey: key,
+    messageBody: COMMUNICATION_TEMPLATES[key],
+  };
+}
+
+function communicationStatusForChannel(channel) {
+  if ([COMMUNICATION_CHANNELS.WHATSAPP, COMMUNICATION_CHANNELS.PUSH].includes(channel)) {
+    return COMMUNICATION_STATUSES.DISABLED;
+  }
+  return COMMUNICATION_STATUSES.PREPARED;
+}
+
+function communicationFailureReason(channel) {
+  if (channel === COMMUNICATION_CHANNELS.WHATSAPP) return "No secure WhatsApp provider is configured for this environment.";
+  if (channel === COMMUNICATION_CHANNELS.PUSH) return "No secure push channel is configured for this environment.";
+  return "";
+}
+
+function communicationTargetSpecs(order) {
+  const specs = [
+    {channel: COMMUNICATION_CHANNELS.INTERNAL, targetRole: "admin", targetUserId: "", publicSafe: false},
+    {channel: COMMUNICATION_CHANNELS.PUBLIC_TRACKING, targetRole: "public_user", targetUserId: "", publicSafe: true},
+  ];
+  if (cleanText(order.storeId)) {
+    specs.push({channel: COMMUNICATION_CHANNELS.INTERNAL, targetRole: "store", targetUserId: cleanText(order.storeId), publicSafe: false});
+  }
+  const driverTarget = cleanText(order.driverId || order.assignedActorId);
+  if (driverTarget) {
+    specs.push({channel: COMMUNICATION_CHANNELS.INTERNAL, targetRole: "driver", targetUserId: driverTarget, publicSafe: false});
+  }
+  specs.push({channel: COMMUNICATION_CHANNELS.WHATSAPP, targetRole: "public_user", targetUserId: "", publicSafe: true});
+  specs.push({channel: COMMUNICATION_CHANNELS.PUSH, targetRole: cleanText(order.currentResponsibleRole || order.responsibleRole || "admin"), targetUserId: "", publicSafe: false});
+  return specs;
+}
+
+function communicationRecordsForOrder({orderId, order, eventType, triggeredByRole, triggeredByActorId, sourceEventId, incidentId = "", claimId = "", now}) {
+  const template = communicationTemplate(eventType);
+  return communicationTargetSpecs(order).map((target) => {
+    const status = communicationStatusForChannel(target.channel);
+    const communicationId = safeCommunicationId({sourceEventId, channel: target.channel, targetRole: target.targetRole, claimId, incidentId});
+    return {
+      communicationId,
+      orderId,
+      claimId,
+      incidentId,
+      eventType,
+      channel: target.channel,
+      targetRole: target.targetRole,
+      targetUserId: target.targetUserId,
+      targetPhone: target.channel === COMMUNICATION_CHANNELS.WHATSAPP ? normalizedPublicPhone(order) : "",
+      status,
+      messageType: eventType,
+      templateKey: template.templateKey,
+      messageBody: template.messageBody,
+      createdAt: now,
+      sentAt: null,
+      failedAt: null,
+      failureReason: communicationFailureReason(target.channel),
+      triggeredByRole,
+      triggeredByActorId,
+      sourceEventId,
+      publicSafe: target.publicSafe,
+    };
+  });
+}
+
+function safeCommunicationId(parts) {
+  const raw = stableStringify(parts);
+  return `comm_${crypto.createHash("sha256").update(raw).digest("hex").slice(0, 24)}`;
+}
+
+function normalizedPublicPhone(order) {
+  const customer = order && typeof order.customer === "object" ? order.customer : {};
+  return cleanText(customer.phone || order.contactPhone || order.phone);
+}
+
+function writeOrderCommunications(tx, orderRef, records) {
+  for (const record of records) {
+    tx.set(orderRef.collection("communications").doc(record.communicationId), record, {merge: true});
+  }
+}
+
+function writeClaimCommunications(tx, claimRef, records) {
+  for (const record of records) {
+    tx.set(claimRef.collection("communications").doc(record.communicationId), record, {merge: true});
+  }
 }
 
 function cancellationAuditPatch({clean, current, actor}) {
@@ -1106,6 +1325,7 @@ function operationalOrderState(order) {
     amountToCollect: Number(order.amountToCollect) || 0,
     collectionRequired: order.collectionRequired === true,
     incidentStatus: cleanText(order.incidentStatus) || INCIDENT_STATUS_NONE,
+    communicationStatus: cleanText(order.communicationStatus) || COMMUNICATION_STATUS_RECEIVED,
     archiveStatus: cleanText(order.archiveStatus) || ARCHIVE_STATUS_LIVE,
     responsibleRole: cleanText(order.responsibleRole),
     priority: cleanText(order.priority) || (order.activeIncident || order.needsAttention ? "high" : "normal"),
@@ -1161,6 +1381,7 @@ function adminActionEffect(clean, current, actor) {
         patch: {
           activeIncident: true,
           incidentStatus: "open",
+          communicationStatus: COMMUNICATION_STATUS_PREPARED,
           needsAttention: true,
           responsibleRole: "admin",
           priority: "high",
@@ -1176,6 +1397,7 @@ function adminActionEffect(clean, current, actor) {
           activeIncident: false,
           incidentStatus: "resolved",
           activeIncidentId: "",
+          communicationStatus: COMMUNICATION_STATUS_PREPARED,
           needsAttention: false,
           priority: "normal",
           operationalStatus: "incident_resolved",
@@ -1191,6 +1413,7 @@ function adminActionEffect(clean, current, actor) {
           status: "cancelled",
           publicStatus: "Pedido cerrado",
           operationalStatus: "cancelled_by_admin",
+          communicationStatus: COMMUNICATION_STATUS_PREPARED,
           archiveStatus: "archived",
           activeIncident: false,
           incidentStatus: INCIDENT_STATUS_NONE,
@@ -1523,7 +1746,7 @@ function liveBirthContract({orderType, source, idempotencyKey, trackingNumber, s
     publicStatus: PUBLIC_STATUS,
     operationalStatus: "waiting_admin_review",
     financialStatus: FINANCIAL_STATUS_PENDING,
-    communicationStatus: COMMUNICATION_STATUS_RECEIVED,
+    communicationStatus: COMMUNICATION_STATUS_PREPARED,
     incidentStatus: INCIDENT_STATUS_NONE,
     archiveStatus: ARCHIVE_STATUS_LIVE,
     currentResponsibleRole: responsibleRole,
@@ -1577,6 +1800,15 @@ async function createOrderWithInitialEvent(orderRef, orderData, now) {
   await db.runTransaction(async (tx) => {
     const existing = await tx.get(orderRef);
     if (existing.exists) return;
+    const communicationRecords = communicationRecordsForOrder({
+      orderId: orderRef.id,
+      order: orderData,
+      eventType: "order_created",
+      triggeredByRole: "public_user",
+      triggeredByActorId: "",
+      sourceEventId: "initial",
+      now,
+    });
 
     tx.create(orderRef, orderData);
     tx.create(eventRef, {
@@ -1615,6 +1847,7 @@ async function createOrderWithInitialEvent(orderRef, orderData, now) {
       },
       createdAt: now,
     });
+    writeOrderCommunications(tx, orderRef, communicationRecords);
   });
 }
 
@@ -1667,10 +1900,11 @@ function isValidTrackingNumber(value) {
 
 function publicTrackingResponse(order, requestedTrackingNumber) {
   const hasOperationalProblem = order.activeIncident === true || cleanText(order.incidentStatus) === "open" || order.needsAttention === true;
-  const status = hasOperationalProblem && !isTerminalStatus(order.status) ? "UNDER_REVIEW" : publicStatusCode(order.status);
+  const hasCommunicationIssue = cleanText(order.communicationStatus) === "failed";
+  const status = (hasOperationalProblem || hasCommunicationIssue) && !isTerminalStatus(order.status) ? "UNDER_REVIEW" : publicStatusCode(order.status);
   const terminal = isTerminalStatus(order.status);
   const trackingNumber = cleanText(order.trackingNumber || order.publicOrderNumber || requestedTrackingNumber);
-  const publicStatus = terminal ? "Pedido cerrado" : hasOperationalProblem ? "Pedido en revisión operativa" : cleanText(order.publicStatus) || PUBLIC_STATUS;
+  const publicStatus = terminal ? "Pedido cerrado" : (hasOperationalProblem || hasCommunicationIssue) ? "Pedido en revisión operativa" : cleanText(order.publicStatus) || PUBLIC_STATUS;
 
   if (terminal) {
     return {
@@ -1694,7 +1928,7 @@ function publicTrackingResponse(order, requestedTrackingNumber) {
     trackingNumber,
     publicStatus,
     status,
-    humanMessage: hasOperationalProblem
+    humanMessage: hasOperationalProblem || hasCommunicationIssue
       ? "Estamos revisando el pedido. Te mostramos solo información segura del seguimiento."
       : "Estamos siguiendo tu pedido con el estado actual disponible.",
     orderType: publicOrderType(order),

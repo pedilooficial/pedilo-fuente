@@ -86,6 +86,12 @@ service cloud.firestore {
         allow read: if isAdmin();
         allow write: if false;
       }
+
+      match /communications/{communicationId} {
+        allow read: if exists(/databases/$(database)/documents/orders/$(orderId))
+          && canReadOrder(get(/databases/$(database)/documents/orders/$(orderId)).data);
+        allow write: if false;
+      }
     }
 
     match /public_claims/{claimId} {
@@ -93,6 +99,11 @@ service cloud.firestore {
       allow create, update, delete: if false;
 
       match /events/{eventId} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
+
+      match /communications/{communicationId} {
         allow read: if isAdmin();
         allow write: if false;
       }

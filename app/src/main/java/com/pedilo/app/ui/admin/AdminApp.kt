@@ -2685,6 +2685,7 @@ private fun AdminOrderSectionScreen(
         AdminOrderSection.Summary -> listOf(
             "Tipo" to identity,
             "Estado" to status,
+            "Comunicación" to adminCommunicationStatusLabel(detail?.communicationStatus ?: summary?.communicationStatus.orEmpty()),
             "Función" to operationFunction,
             "Referencia" to (problem?.first ?: storeName.adminDisplayValue(detail?.itemsSummary.adminItemsSummary())),
         )
@@ -2787,6 +2788,18 @@ private fun adminFinancialStatusLabel(value: String): String =
         "disputed" -> "Disputa"
         "rejected" -> "Rechazado"
         else -> value.adminDisplayValue("Estado financiero no informado")
+    }
+
+private fun adminCommunicationStatusLabel(value: String): String =
+    when (value.trim()) {
+        "received" -> "Recibida"
+        "pending" -> "Pendiente"
+        "prepared" -> "Preparada, sin envío externo real"
+        "sent" -> "Enviada por canal real"
+        "failed" -> "Fallida"
+        "closed" -> "Cerrada"
+        "disabled" -> "Canal externo deshabilitado"
+        else -> value.adminDisplayValue("Sin estado")
     }
 
 private fun String?.adminMoneyLabel(): String {

@@ -25,7 +25,7 @@ test("new public orders are born as non-floating Pedido Vivo Universal records",
     "publicStatus: PUBLIC_STATUS",
     "operationalStatus: \"waiting_admin_review\"",
     "financialStatus: FINANCIAL_STATUS_PENDING",
-    "communicationStatus: COMMUNICATION_STATUS_RECEIVED",
+    "communicationStatus: COMMUNICATION_STATUS_PREPARED",
     "incidentStatus: INCIDENT_STATUS_NONE",
     "archiveStatus: ARCHIVE_STATUS_LIVE",
     "currentResponsibleRole: responsibleRole",
@@ -78,6 +78,8 @@ test("order birth is transactional and writes the initial audit event once", () 
   assert.match(birth, /result: \{/);
   assert.match(birth, /audit: \{/);
   assert.match(birth, /idempotencyKey: orderData\.idempotencyKey/);
+  assert.match(birth, /communicationRecordsForOrder/);
+  assert.match(birth, /writeOrderCommunications\(tx, orderRef, communicationRecords\)/);
 });
 
 test("admin action path carries version concurrency without opening UI operation", () => {
@@ -142,5 +144,6 @@ test("rules keep live order and audit subcollections protected from client write
   assert.match(ordersBlock, /allow create, update, delete: if false/);
   assert.match(ordersBlock, /match \/events\/\{eventId\}/);
   assert.match(ordersBlock, /match \/incidents\/\{incidentId\}/);
+  assert.match(ordersBlock, /match \/communications\/\{communicationId\}/);
   assert.match(ordersBlock, /allow write: if false/);
 });
