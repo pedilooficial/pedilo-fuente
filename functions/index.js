@@ -9,6 +9,7 @@ admin.initializeApp();
 const db = admin.firestore();
 const REGION = "southamerica-east1";
 const ORDERS = "orders";
+const PUBLIC_CLAIMS = "public_claims";
 const STORES = "stores";
 const PRODUCTS = "products";
 const LOCAL_SOURCE = "public_local";
@@ -32,6 +33,7 @@ const PAYMENT_METHOD_CARD = "card";
 const PAYMENT_METHOD_ALREADY_PAID = "already_paid";
 const COMMUNICATION_STATUS_RECEIVED = "received";
 const INCIDENT_STATUS_NONE = "none";
+const CLAIM_STATUS_RECEIVED = "received";
 const ARCHIVE_STATUS_LIVE = "live";
 const RESPONSIBLE_ADMIN = "admin";
 const ASSIGNED_ACTOR_UNASSIGNED = "";
@@ -91,9 +93,21 @@ const LIVE_ORDER_STATES = {
     FINANCIAL_STATUS_SETTLED,
   ],
   communication: [COMMUNICATION_STATUS_RECEIVED, "closed"],
-  incident: [INCIDENT_STATUS_NONE, "open", "resolved"],
+  incident: [INCIDENT_STATUS_NONE, "open", "in_review", "resolved", "cancelled", "dismissed"],
   archive: [ARCHIVE_STATUS_LIVE, "archived"],
 };
+const INCIDENT_TYPES = [
+  "delay",
+  "product_unavailable",
+  "customer_unreachable",
+  "address_problem",
+  "driver_problem",
+  "store_problem",
+  "payment_problem",
+  "public_claim",
+  "admin_intervention",
+  "other",
+];
 const FORCEABLE_STATUSES = {
   created: "Pedido recibido",
   preparing: "Pedido en preparación",
@@ -255,6 +269,82 @@ exports.getPublicOrderTracking = onCall({region: REGION}, async (request) => {
   return publicTrackingResponse(snapshot.docs[0].data(), trackingNumber);
 });
 
+exports.submitPublicClaim = onCall({region: REGION}, async (request) => {
+  const clean = cleanPublicClaimPayload(request.data || {});
+  const claimRef = db.collection(PUBLIC_CLAIMS).doc();
+  const eventRef = claimRef.collection("events").doc("received");
+  let linkedOrderId = "";
+  let orderClaimRef = null;
+
+  if (clean.trackingNumber) {
+    const byTracking = await db.collection(ORDERS).where("trackingNumber", "==", clean.trackingNumber).limit(1).get();
+    const snapshot = byTracking.empty
+      ? await db.collection(ORDERS).where("publicOrderNumber", "==", clean.trackingNumber).limit(1).get()
+      : byTracking;
+    if (!snapshot.empty) {
+      linkedOrderId = snapshot.docs[0].id;
+      orderClaimRef = db.collection(ORDERS).doc(linkedOrderId).collection("claims").doc(claimRef.id);
+    }
+  }
+
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const claim = {
+    claimId: claimRef.id,
+    orderId: linkedOrderId,
+    trackingNumber: clean.trackingNumber,
+    status: CLAIM_STATUS_RECEIVED,
+    type: clean.type,
+    reason: clean.reason,
+    description: clean.description,
+    customerName: clean.customerName,
+    contact: clean.contact,
+    sourceRole: "public_user",
+    sourceActorId: "",
+    publicImpact: "claim_received",
+    operationalImpact: "no_live_order_mutation",
+    createdAt: now,
+    updatedAt: now,
+  };
+  const event = {
+    type: "public_claim_received",
+    source: "public_claim",
+    actorRole: "public_user",
+    actorUid: "",
+    orderId: linkedOrderId,
+    trackingNumber: clean.trackingNumber,
+    reason: clean.reason,
+    previousStatus: "",
+    nextStatus: CLAIM_STATUS_RECEIVED,
+    previousIncidentStatus: "",
+    nextIncidentStatus: "",
+    createdAt: now,
+  };
+
+  await db.runTransaction(async (tx) => {
+    tx.create(claimRef, claim);
+    tx.create(eventRef, event);
+    if (orderClaimRef) {
+      tx.create(orderClaimRef, {
+        claimId: claimRef.id,
+        status: CLAIM_STATUS_RECEIVED,
+        type: clean.type,
+        reason: clean.reason,
+        sourceRole: "public_user",
+        publicImpact: "claim_received",
+        operationalImpact: "no_live_order_mutation",
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  });
+
+  return {
+    claimId: claimRef.id,
+    status: CLAIM_STATUS_RECEIVED,
+    publicMessage: "Reclamo recibido. Queda registrado para revisión operativa.",
+  };
+});
+
 exports.adminOrderAction = onCall({region: REGION}, async (request) => {
   const actor = await requireAdminActor(request);
 
@@ -262,6 +352,7 @@ exports.adminOrderAction = onCall({region: REGION}, async (request) => {
   const orderRef = db.collection(ORDERS).doc(clean.orderId);
   const eventRef = orderRef.collection("events").doc();
   const incidentRef = clean.action === ADMIN_ACTIONS.MARK_INCIDENT ? orderRef.collection("incidents").doc() : null;
+  let resolveIncidentRef = null;
 
   const result = await db.runTransaction(async (tx) => {
     const orderSnap = await tx.get(orderRef);
@@ -279,7 +370,10 @@ exports.adminOrderAction = onCall({region: REGION}, async (request) => {
     }
 
     const now = admin.firestore.FieldValue.serverTimestamp();
-    const effect = adminActionEffect(clean, current);
+    const effect = adminActionEffect(clean, current, actor);
+    if (clean.action === ADMIN_ACTIONS.RESOLVE_INCIDENT && current.activeIncidentId) {
+      resolveIncidentRef = orderRef.collection("incidents").doc(current.activeIncidentId);
+    }
     const next = {...current, ...effect.patch};
     next.nextAllowedActions = allowedAdminActions(next);
 
@@ -293,6 +387,8 @@ exports.adminOrderAction = onCall({region: REGION}, async (request) => {
       nextStatus: next.status,
       previousOperationalStatus: current.operationalStatus,
       nextOperationalStatus: next.operationalStatus,
+      previousIncidentStatus: current.incidentStatus,
+      nextIncidentStatus: next.incidentStatus || current.incidentStatus,
       createdAt: now,
     };
 
@@ -310,14 +406,25 @@ exports.adminOrderAction = onCall({region: REGION}, async (request) => {
     });
     tx.set(eventRef, event);
     if (incidentRef) {
-      tx.set(incidentRef, {
-        status: "open",
-        reason: clean.reason,
-        actorUid: actor.uid,
-        actorRole: "admin",
-        createdAt: now,
-        updatedAt: now,
-      });
+      tx.set(incidentRef, incidentDocument({
+        incidentId: incidentRef.id,
+        orderId: clean.orderId,
+        clean,
+        current,
+        actor,
+        now,
+        priority: next.priority,
+        type: "admin_intervention",
+      }));
+      tx.update(orderRef, {activeIncidentId: incidentRef.id});
+    }
+    if (resolveIncidentRef) {
+      tx.set(resolveIncidentRef, incidentResolutionPatch({
+        status: "resolved",
+        clean,
+        actor,
+        now,
+      }), {merge: true});
     }
 
     return {
@@ -372,6 +479,9 @@ exports.operateLiveOrder = onCall({region: REGION}, async (request) => {
     }
 
     const effect = liveActionEffect(clean, current, actor);
+    const resolveIncidentRef = clean.action === LIVE_ACTIONS.RESOLVE_INCIDENT && current.activeIncidentId
+      ? orderRef.collection("incidents").doc(current.activeIncidentId)
+      : null;
     const next = liveOrderState({...current, ...effect.patch, version: current.version + 1});
     const nextAllowedActions = allowedLiveActions(next);
     const now = admin.firestore.FieldValue.serverTimestamp();
@@ -425,15 +535,24 @@ exports.operateLiveOrder = onCall({region: REGION}, async (request) => {
     tx.update(orderRef, patch);
     tx.create(eventRef, event);
     if (incidentRef) {
-      tx.create(incidentRef, {
-        status: "open",
-        reason: clean.reason,
-        actorUid: actor.uid,
-        actorRole: actor.role,
-        actionId: clean.actionId,
-        createdAt: now,
-        updatedAt: now,
-      });
+      tx.create(incidentRef, incidentDocument({
+        incidentId: clean.actionId,
+        orderId: clean.orderId,
+        clean,
+        current,
+        actor,
+        now,
+        priority: result.activeIncident ? "high" : "normal",
+        type: incidentTypeFor(clean, actor),
+      }));
+    }
+    if (resolveIncidentRef) {
+      tx.set(resolveIncidentRef, incidentResolutionPatch({
+        status: "resolved",
+        clean,
+        actor,
+        now,
+      }), {merge: true});
     }
 
     return result;
@@ -514,6 +633,8 @@ function liveOrderEvent({clean, actor, current, result, summary, now}) {
     nextStatus: result.status,
     previousOperationalStatus: current.operationalStatus,
     nextOperationalStatus: result.operationalStatus,
+    previousIncidentStatus: current.incidentStatus,
+    nextIncidentStatus: result.incidentStatus,
     previousVersion: current.version,
     nextVersion: result.version,
     actionId: clean.actionId,
@@ -526,6 +647,7 @@ function liveOrderEvent({clean, actor, current, result, summary, now}) {
       nextResponsibleRole: result.currentResponsibleRole,
       previousArchiveStatus: current.archiveStatus,
       nextArchiveStatus: result.archiveStatus,
+      cancellationReason: clean.action === LIVE_ACTIONS.CANCEL_ORDER ? clean.reason : "",
     },
     createdAt: now,
   };
@@ -623,6 +745,8 @@ function liveOrderState(order) {
     publicStatus: cleanText(order.publicStatus) || PUBLIC_STATUS,
     operationalStatus: cleanText(order.operationalStatus) || status,
     financialStatus: cleanText(order.financialStatus) || FINANCIAL_STATUS_PENDING,
+    amountToCollect: Number(order.amountToCollect) || 0,
+    collectionRequired: order.collectionRequired === true,
     communicationStatus: cleanText(order.communicationStatus) || COMMUNICATION_STATUS_RECEIVED,
     incidentStatus: cleanText(order.incidentStatus) || INCIDENT_STATUS_NONE,
     archiveStatus: cleanText(order.archiveStatus) || ARCHIVE_STATUS_LIVE,
@@ -638,6 +762,7 @@ function liveOrderState(order) {
     priority: cleanText(order.priority) || (order.activeIncident || order.needsAttention ? "high" : "normal"),
     needsAttention: order.needsAttention === true,
     activeIncident: order.activeIncident === true,
+    activeIncidentId: cleanText(order.activeIncidentId),
     adminReviewed: order.adminReviewed === true,
     nextAllowedActions: Array.isArray(order.nextAllowedActions) ? order.nextAllowedActions.map(cleanText).filter(Boolean) : [],
     createdAt: order.createdAt || null,
@@ -688,6 +813,7 @@ function liveActionEffect(clean, current, actor) {
       });
     case LIVE_ACTIONS.LOCAL_REJECT:
       return livePatch(`Local rechazó el pedido: ${clean.reason}`, "Pedido rechazado por el local.", {
+        ...cancellationAuditPatch({clean, current, actor}),
         status: "cancelled",
         publicStatus: "Pedido cerrado",
         operationalStatus: "rejected_by_store",
@@ -696,8 +822,7 @@ function liveActionEffect(clean, current, actor) {
         incidentStatus: INCIDENT_STATUS_NONE,
         needsAttention: false,
         priority: "closed",
-        cancellationReason: clean.reason,
-        cancelledByRole: "store",
+        activeIncidentId: "",
         responsibleRole: "",
         currentResponsibleRole: "",
         assignedActorId: "",
@@ -761,6 +886,7 @@ function liveActionEffect(clean, current, actor) {
       });
     case LIVE_ACTIONS.CANCEL_ORDER:
       return livePatch(`${actor.role} canceló el pedido: ${clean.reason}`, "Pedido cancelado.", {
+        ...cancellationAuditPatch({clean, current, actor}),
         status: "cancelled",
         publicStatus: "Pedido cerrado",
         operationalStatus: `cancelled_by_${actor.role}`,
@@ -769,8 +895,7 @@ function liveActionEffect(clean, current, actor) {
         incidentStatus: INCIDENT_STATUS_NONE,
         needsAttention: false,
         priority: "closed",
-        cancellationReason: clean.reason,
-        cancelledByRole: actor.role,
+        activeIncidentId: "",
         responsibleRole: "",
         currentResponsibleRole: "",
         assignedActorId: "",
@@ -782,6 +907,7 @@ function liveActionEffect(clean, current, actor) {
         operationalStatus: "incident_open",
         activeIncident: true,
         incidentStatus: "open",
+        activeIncidentId: clean.actionId,
         needsAttention: true,
         priority: "high",
         responsibleRole: "admin",
@@ -793,6 +919,7 @@ function liveActionEffect(clean, current, actor) {
         operationalStatus: "incident_resolved",
         activeIncident: false,
         incidentStatus: "resolved",
+        activeIncidentId: "",
         needsAttention: false,
         priority: "normal",
       });
@@ -812,6 +939,83 @@ function liveActionEffect(clean, current, actor) {
 
 function livePatch(eventSummary, humanMessage, patch) {
   return {eventSummary, humanMessage, patch};
+}
+
+function cancellationAuditPatch({clean, current, actor}) {
+  const financialReviewRequired = cancellationNeedsFinancialReview(current);
+  return {
+    cancellationReason: clean.reason,
+    cancelledByRole: actor.role,
+    cancelledByActorId: actor.uid,
+    previousStatus: current.status,
+    previousOperationalStatus: current.operationalStatus,
+    financialStatusAtCancellation: current.financialStatus,
+    publicStatusAtCancellation: current.publicStatus,
+    archiveStatusAtCancellation: current.archiveStatus,
+    financialReviewRequired,
+    financialReviewNote: financialReviewRequired
+      ? "Cancelación con pago/cobro declarado: requiere revisión financiera mínima sin conciliación automática."
+      : "Cancelación sin revisión financiera adicional requerida por el contrato mínimo.",
+  };
+}
+
+function cancellationNeedsFinancialReview(order) {
+  return [
+    FINANCIAL_STATUS_COLLECT_ON_DELIVERY,
+    FINANCIAL_STATUS_TRANSFER_DECLARED,
+    FINANCIAL_STATUS_PAID_DECLARED,
+    FINANCIAL_STATUS_DISPUTED,
+    FINANCIAL_STATUS_SETTLEMENT_PENDING,
+  ].includes(cleanText(order.financialStatus)) ||
+    order.collectionRequired === true ||
+    Number(order.amountToCollect) > 0;
+}
+
+function incidentTypeFor(clean, actor) {
+  const reason = cleanText(clean.reason).toLowerCase();
+  if (reason.includes("demora") || reason.includes("tarde")) return "delay";
+  if (reason.includes("stock") || reason.includes("producto")) return "product_unavailable";
+  if (reason.includes("cliente") || reason.includes("responde")) return "customer_unreachable";
+  if (reason.includes("dirección") || reason.includes("direccion") || reason.includes("address")) return "address_problem";
+  if (reason.includes("pago") || reason.includes("cobro")) return "payment_problem";
+  if (actor.role === "driver") return "driver_problem";
+  if (actor.role === "store") return "store_problem";
+  if (actor.role === "admin") return "admin_intervention";
+  return "other";
+}
+
+function incidentDocument({incidentId, orderId, clean, current, actor, now, priority, type}) {
+  return {
+    incidentId,
+    orderId,
+    status: "open",
+    type: INCIDENT_TYPES.includes(type) ? type : "other",
+    reason: clean.reason,
+    description: clean.reason,
+    sourceRole: actor.role,
+    sourceActorId: actor.uid,
+    actorUid: actor.uid,
+    actorRole: actor.role,
+    createdAt: now,
+    updatedAt: now,
+    publicImpact: "Pedido en revisión operativa",
+    operationalImpact: "requires_admin_review",
+    priority,
+    linkedAction: clean.action,
+    previousStatus: current.status,
+    previousOperationalStatus: current.operationalStatus,
+  };
+}
+
+function incidentResolutionPatch({status, clean, actor, now}) {
+  return {
+    status,
+    updatedAt: now,
+    resolvedAt: now,
+    resolvedByRole: actor.role,
+    resolvedByActorId: actor.uid,
+    resolutionNote: clean.reason,
+  };
 }
 
 function publicStatusForLiveStatus(status) {
@@ -835,6 +1039,9 @@ function cleanAdminActionPayload(payload) {
 
   if (!isSafeDocumentId(orderId) || !Object.values(ADMIN_ACTIONS).includes(action)) {
     throw new HttpsError("invalid-argument", "Elegí una acción válida para este pedido.");
+  }
+  if (expectedVersion === null) {
+    throw new HttpsError("invalid-argument", "Falta la versión esperada del pedido.");
   }
   if ([
     ADMIN_ACTIONS.MARK_INCIDENT,
@@ -861,16 +1068,50 @@ function cleanAdminActionPayload(payload) {
   };
 }
 
+function cleanPublicClaimPayload(payload) {
+  const trackingNumber = normalizeTrackingNumber(payload.trackingNumber);
+  const customerName = cleanText(payload.customerName || payload.name);
+  const contact = cleanText(payload.contact || payload.phone);
+  const reason = cleanText(payload.reason);
+  const description = cleanText(payload.description);
+  const type = cleanText(payload.type).toLowerCase() || "other";
+
+  if (trackingNumber && !isValidTrackingNumber(trackingNumber)) {
+    throw new HttpsError("invalid-argument", "Ingresá un número de pedido válido.");
+  }
+  if (!customerName || isPlaceholder(customerName) || !isValidPhone(contact)) {
+    throw new HttpsError("invalid-argument", "Ingresá nombre y teléfono válidos.");
+  }
+  if (reason.length < 4 || description.length < 8 || hasPlaceholder([reason, description])) {
+    throw new HttpsError("invalid-argument", "Contanos el motivo del reclamo con datos reales.");
+  }
+
+  return {
+    trackingNumber,
+    customerName,
+    contact,
+    reason,
+    description,
+    type: INCIDENT_TYPES.includes(type) ? type : "other",
+  };
+}
+
 function operationalOrderState(order) {
   const status = cleanText(order.status) || STATUS;
   return {
     status,
     publicStatus: cleanText(order.publicStatus) || PUBLIC_STATUS,
     operationalStatus: cleanText(order.operationalStatus) || status,
+    financialStatus: cleanText(order.financialStatus) || FINANCIAL_STATUS_PENDING,
+    amountToCollect: Number(order.amountToCollect) || 0,
+    collectionRequired: order.collectionRequired === true,
+    incidentStatus: cleanText(order.incidentStatus) || INCIDENT_STATUS_NONE,
+    archiveStatus: cleanText(order.archiveStatus) || ARCHIVE_STATUS_LIVE,
     responsibleRole: cleanText(order.responsibleRole),
     priority: cleanText(order.priority) || (order.activeIncident || order.needsAttention ? "high" : "normal"),
     needsAttention: order.needsAttention === true,
     activeIncident: order.activeIncident === true,
+    activeIncidentId: cleanText(order.activeIncidentId),
     adminReviewed: order.adminReviewed === true,
     version: Number.isInteger(order.version) ? order.version : LIVE_ORDER_VERSION,
   };
@@ -890,7 +1131,7 @@ function allowedAdminActions(order) {
   return actions;
 }
 
-function adminActionEffect(clean, current) {
+function adminActionEffect(clean, current, actor) {
   switch (clean.action) {
     case ADMIN_ACTIONS.MARK_ADMIN_REVIEWED:
       return {
@@ -919,6 +1160,7 @@ function adminActionEffect(clean, current) {
       return {
         patch: {
           activeIncident: true,
+          incidentStatus: "open",
           needsAttention: true,
           responsibleRole: "admin",
           priority: "high",
@@ -932,6 +1174,8 @@ function adminActionEffect(clean, current) {
       return {
         patch: {
           activeIncident: false,
+          incidentStatus: "resolved",
+          activeIncidentId: "",
           needsAttention: false,
           priority: "normal",
           operationalStatus: "incident_resolved",
@@ -943,14 +1187,16 @@ function adminActionEffect(clean, current) {
     case ADMIN_ACTIONS.CANCEL_BY_ADMIN:
       return {
         patch: {
+          ...cancellationAuditPatch({clean, current, actor}),
           status: "cancelled",
           publicStatus: "Pedido cerrado",
           operationalStatus: "cancelled_by_admin",
+          archiveStatus: "archived",
           activeIncident: false,
+          incidentStatus: INCIDENT_STATUS_NONE,
+          activeIncidentId: "",
           needsAttention: false,
           priority: "closed",
-          cancellationReason: clean.reason,
-          cancelledByRole: "admin",
         },
         eventSummary: `Admin canceló el pedido: ${clean.reason}`,
         humanMessage: "Pedido cancelado por Admin.",
@@ -1420,10 +1666,11 @@ function isValidTrackingNumber(value) {
 }
 
 function publicTrackingResponse(order, requestedTrackingNumber) {
-  const status = publicStatusCode(order.status);
+  const hasOperationalProblem = order.activeIncident === true || cleanText(order.incidentStatus) === "open" || order.needsAttention === true;
+  const status = hasOperationalProblem && !isTerminalStatus(order.status) ? "UNDER_REVIEW" : publicStatusCode(order.status);
   const terminal = isTerminalStatus(order.status);
   const trackingNumber = cleanText(order.trackingNumber || order.publicOrderNumber || requestedTrackingNumber);
-  const publicStatus = terminal ? "Pedido cerrado" : cleanText(order.publicStatus) || PUBLIC_STATUS;
+  const publicStatus = terminal ? "Pedido cerrado" : hasOperationalProblem ? "Pedido en revisión operativa" : cleanText(order.publicStatus) || PUBLIC_STATUS;
 
   if (terminal) {
     return {
@@ -1447,7 +1694,9 @@ function publicTrackingResponse(order, requestedTrackingNumber) {
     trackingNumber,
     publicStatus,
     status,
-    humanMessage: "Estamos siguiendo tu pedido con el estado actual disponible.",
+    humanMessage: hasOperationalProblem
+      ? "Estamos revisando el pedido. Te mostramos solo información segura del seguimiento."
+      : "Estamos siguiendo tu pedido con el estado actual disponible.",
     orderType: publicOrderType(order),
     storeName: cleanText(order.storeName),
     summary: publicOrderSummary(order),

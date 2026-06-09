@@ -20,6 +20,8 @@ test("core models are pure and define the public base vocabulary", () => {
     "CustomerContact",
     "DeliveryLocation",
     "PaymentMethod",
+    "PublicClaimDraft",
+    "PublicClaimReceipt",
     "PublicOrderDraft",
     "PublicOrderItem",
     "PublicOrderStatus",
@@ -59,6 +61,7 @@ test("core result types represent success and expected error families", () => {
 test("ports are interfaces without implementations or platform dependencies", () => {
   const ports = [
     ["PublicCatalogPort", ["getVisibleStores", "getProductsForStore"]],
+    ["PublicClaimPort", ["submitPublicClaim"]],
     ["PublicOrderPort", ["createPublicOrder"]],
     ["PublicTrackingPort", ["getPublicTracking"]],
   ];
@@ -93,6 +96,11 @@ test("use cases validate drafts and tracking before delegating to ports", () => 
   assert.match(tracking, /trackingNumber\.trim\(\)/);
   assert.match(tracking, /TRACKING_NUMBER/);
   assert.match(tracking, /trackingPort\.getPublicTracking\(cleanTrackingNumber\)/);
+
+  const claim = read(`${coreRoot}/usecase/SubmitPublicClaimUseCase.kt`);
+  assert.match(claim, /publicClaimPort\.submitPublicClaim\(clean\)/);
+  assert.match(claim, /Regex\("\^PDL-\[A-Z0-9\]\{4,10\}\$"\)/);
+  assert.match(claim, /CoreError\.IncompleteData/);
 });
 
 test("pure core source stays free of Firebase, Compose and Android imports", () => {

@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +48,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pedilo.app.core.model.PublicClaimDraft
+import com.pedilo.app.core.result.CoreError
+import com.pedilo.app.core.result.CoreResult
+import com.pedilo.app.core.runtime.publicClaimUseCase
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private enum class ConventionIconKind {
     Info,
@@ -157,11 +165,16 @@ fun PublicConventionsClaimScreen(
     onPlus: () -> Unit,
     onShop: () -> Unit,
 ) {
+    val submitPublicClaim = remember { publicClaimUseCase() }
+    val scope = rememberCoroutineScope()
     var orderNumber by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
+    var reason by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var prepared by remember { mutableStateOf(false) }
+    var isSubmitting by remember { mutableStateOf(false) }
+    var receiptMessage by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf("") }
 
     PublicShell(
         current = PublicBottomDestination.Home,
@@ -178,7 +191,7 @@ fun PublicConventionsClaimScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                ClaimIntroCard(prepared = prepared)
+                ClaimIntroCard(prepared = receiptMessage.isNotBlank())
             }
             item {
                 ConventionInput(
@@ -187,7 +200,8 @@ fun PublicConventionsClaimScreen(
                     placeholder = "PDL-XXXXXX",
                     onValueChange = {
                         orderNumber = normalizePublicTrackingInput(it)
-                        prepared = false
+                        receiptMessage = ""
+                        error = ""
                     },
                 )
             }
@@ -198,7 +212,8 @@ fun PublicConventionsClaimScreen(
                     placeholder = "Tu nombre",
                     onValueChange = {
                         name = it
-                        prepared = false
+                        receiptMessage = ""
+                        error = ""
                     },
                 )
             }
@@ -209,7 +224,20 @@ fun PublicConventionsClaimScreen(
                     placeholder = "11 5555 5555",
                     onValueChange = {
                         phone = it
-                        prepared = false
+                        receiptMessage = ""
+                        error = ""
+                    },
+                )
+            }
+            item {
+                ConventionInput(
+                    label = "Motivo",
+                    value = reason,
+                    placeholder = "Demora, pago, dirección u otro",
+                    onValueChange = {
+                        reason = it
+                        receiptMessage = ""
+                        error = ""
                     },
                 )
             }
@@ -222,26 +250,68 @@ fun PublicConventionsClaimScreen(
                     singleLine = false,
                     onValueChange = {
                         description = it
-                        prepared = false
+                        receiptMessage = ""
+                        error = ""
                     },
                 )
             }
             item {
                 ConventionPrimaryAction(
-                    label = if (prepared) "Aviso preparado" else "Preparar aviso",
-                    icon = if (prepared) ConventionIconKind.Check else ConventionIconKind.Claim,
-                    enabled = !prepared && hasPublicValue(description) && isValidPublicPhone(phone),
-                    onClick = { prepared = true },
+                    label = if (isSubmitting) "Registrando" else "Enviar reclamo",
+                    icon = if (receiptMessage.isNotBlank()) ConventionIconKind.Check else ConventionIconKind.Claim,
+                    enabled = !isSubmitting &&
+                        receiptMessage.isBlank() &&
+                        hasPublicValue(name) &&
+                        isValidPublicPhone(phone) &&
+                        hasPublicValue(reason) &&
+                        hasPublicValue(description) &&
+                        (orderNumber.isBlank() || isValidPublicTrackingNumber(orderNumber)),
+                    onClick = {
+                        scope.launch {
+                            isSubmitting = true
+                            error = ""
+                            val result = withContext(Dispatchers.IO) {
+                                submitPublicClaim(
+                                    PublicClaimDraft(
+                                        orderNumber,
+                                        name,
+                                        phone,
+                                        reason,
+                                        description,
+                                    ),
+                                )
+                            }
+                            isSubmitting = false
+                            when (result) {
+                                is CoreResult.Success -> receiptMessage = result.value.publicMessage
+                                is CoreResult.Failure -> error = result.error.publicClaimMessage()
+                            }
+                        }
+                    },
                 )
             }
-            if (prepared) {
+            if (receiptMessage.isNotBlank()) {
                 item {
-                    ConventionNotice(text = "El aviso quedó listo para que lo tengas a mano. La app todavía no envía reclamos al sistema.")
+                    ConventionNotice(text = receiptMessage)
+                }
+            }
+            if (error.isNotBlank()) {
+                item {
+                    ConventionNotice(text = error)
                 }
             }
         }
     }
 }
+
+private fun CoreError.publicClaimMessage(): String =
+    when (this) {
+        is CoreError.Validation -> "Revisá el número de pedido y los datos del reclamo."
+        CoreError.IncompleteData -> "Completá nombre, teléfono, motivo y descripción."
+        is CoreError.Operational -> humanMessage
+        CoreError.NotAvailable -> "No pudimos registrar el reclamo. Probá de nuevo."
+        CoreError.Unknown -> "No pudimos registrar el reclamo. Probá de nuevo."
+    }
 
 @Composable
 fun PublicConventionsTrackingEntryScreen(

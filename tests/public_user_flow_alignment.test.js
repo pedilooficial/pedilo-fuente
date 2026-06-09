@@ -64,13 +64,13 @@ test("public tracking UI and model stay public-only", () => {
   assert.doesNotMatch(`${screen}\n${model}`, /responsibleRole|currentResponsibleRole|assignedActorId|assignedActorRole|driverId|events|incidents|audit|payload/i);
 });
 
-test("public claim screen does not pretend persistence without a backend", () => {
+test("public claim screen persists through backend callable without direct order writes", () => {
   const source = read(conventions);
 
-  assert.match(source, /Preparar aviso/);
-  assert.match(source, /Aviso preparado/);
-  assert.match(source, /todavía no envía reclamos al sistema/);
-  assert.doesNotMatch(source, /Reclamo registrado|reclamo quedó registrado|Enviar reclamo/);
+  assert.match(source, /publicClaimUseCase\(\)/);
+  assert.match(source, /PublicClaimDraft/);
+  assert.match(source, /Enviar reclamo/);
+  assert.match(source, /receiptMessage/);
   assert.doesNotMatch(source, /createIncident|open_incident|collection\("incidents"\)|collection\("orders"\)/);
 });
 
