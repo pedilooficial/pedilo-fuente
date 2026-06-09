@@ -209,6 +209,15 @@ fun DriverApp(onSignOutConfirmed: () -> Unit) {
                         if (current.communicationStatus == "disabled") PediloMuted else PediloOrange,
                     )
                 }
+                if (current.assistanceSummary.isNotBlank()) {
+                    item {
+                        DriverInfoCard(
+                            "Ayuda operativa",
+                            current.assistanceSummary,
+                            if (current.requiresHumanReview) PediloWarning else PediloMuted,
+                        )
+                    }
+                }
                 item {
                     DriverInfoCard(
                         "Capacidad",
@@ -349,6 +358,9 @@ private fun DriverOrderDetailCard(order: DriverOrderDetail) {
         Text("Total: ${order.total.asMoneyLabel()}", color = PediloMuted, fontSize = 13.sp)
         Text("Pago: ${order.paymentMethod.paymentMethodLabel()} · ${order.financialStatus.financialStatusLabel()}", color = PediloMuted, fontSize = 13.sp)
         Text("Comunicación: ${order.communicationStatus.driverCommunicationLabel()}", color = PediloMuted, fontSize = 13.sp)
+        if (order.assistanceSummary.isNotBlank()) {
+            Text("Ayuda: ${order.assistanceSummary}", color = PediloMuted, fontSize = 13.sp)
+        }
         if (order.collectionRequired) {
             Text("A cobrar: ${order.amountToCollect.asMoneyLabel()} · responsable ${order.cashResponsibleRole.ifBlank { "no asignado" }}", color = PediloOrange, fontSize = 13.sp)
         }

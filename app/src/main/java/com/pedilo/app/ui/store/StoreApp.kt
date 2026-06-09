@@ -180,6 +180,15 @@ fun StoreApp(onSignOutConfirmed: () -> Unit) {
                         if (current.communicationStatus == "disabled") PediloMuted else PediloOrange,
                     )
                 }
+                if (current.assistanceSummary.isNotBlank()) {
+                    item {
+                        StoreInfoCard(
+                            "Ayuda operativa",
+                            current.assistanceSummary,
+                            if (current.requiresHumanReview) PediloWarning else PediloMuted,
+                        )
+                    }
+                }
                 if (current.activeIncident) {
                     item { StoreInfoCard("Incidencia activa", "El pedido está bajo revisión operativa.", PediloWarning) }
                 }
@@ -298,6 +307,9 @@ private fun StoreOrderDetailCard(order: StoreOrderDetail) {
         Text("Total: ${order.total.ifBlank { "No informado" }}", color = PediloMuted, fontSize = 13.sp)
         Text("Pago: ${order.paymentMethod.storePaymentLabel()} · ${order.financialStatus.storeFinancialLabel()}", color = PediloMuted, fontSize = 13.sp)
         Text("Comunicación: ${order.communicationStatus.storeCommunicationLabel()}", color = PediloMuted, fontSize = 13.sp)
+        if (order.assistanceSummary.isNotBlank()) {
+            Text("Ayuda: ${order.assistanceSummary}", color = PediloMuted, fontSize = 13.sp)
+        }
         if (order.collectionRequired) {
             Text("Cobro al recibir: ${order.amountToCollect.storeMoneyLabel()}", color = PediloOrange, fontSize = 13.sp)
         }

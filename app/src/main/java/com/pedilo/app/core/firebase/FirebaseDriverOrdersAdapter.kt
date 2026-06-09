@@ -137,6 +137,8 @@ class FirebaseDriverOrdersAdapter(
             activeIncident = getBoolean(ACTIVE_INCIDENT) ?: false,
             isAssignedToCurrentDriver = isAssignedToDriver(uid),
             communicationStatus = getString(COMMUNICATION_STATUS).orEmpty(),
+            assistanceSummary = safeDriverAssistanceSummary(),
+            requiresHumanReview = getBoolean(AI_REQUIRES_HUMAN_REVIEW) ?: false,
         )
 
     private fun com.google.firebase.firestore.DocumentSnapshot.toDriverDetail(uid: String): DriverOrderDetail =
@@ -162,6 +164,8 @@ class FirebaseDriverOrdersAdapter(
             activeIncident = getBoolean(ACTIVE_INCIDENT) ?: false,
             isAssignedToCurrentDriver = isAssignedToDriver(uid),
             communicationStatus = getString(COMMUNICATION_STATUS).orEmpty(),
+            assistanceSummary = safeDriverAssistanceSummary(),
+            requiresHumanReview = getBoolean(AI_REQUIRES_HUMAN_REVIEW) ?: false,
         )
 
     private fun com.google.firebase.firestore.DocumentSnapshot.isVisibleToDriver(uid: String): Boolean =
@@ -244,6 +248,15 @@ class FirebaseDriverOrdersAdapter(
     private fun com.google.firebase.firestore.DocumentSnapshot.version(): Int =
         (get(VERSION) as? Number)?.toInt() ?: 0
 
+    private fun com.google.firebase.firestore.DocumentSnapshot.safeDriverAssistanceSummary(): String =
+        when (getString(AI_SUGGESTED_ACTION).orEmpty()) {
+            "revisar incidencia" -> "El pedido tiene revisión operativa activa."
+            "revisar comunicación" -> "Revisá la comunicación operativa preparada."
+            "revisar pago declarado" -> "Verificá instrucciones de cobro antes de cerrar."
+            "intervención Admin sugerida" -> "El pedido requiere revisión operativa."
+            else -> if (getBoolean(AI_REQUIRES_HUMAN_REVIEW) == true) "El pedido requiere revisión operativa." else ""
+        }
+
     private fun AdminLiveOrderActionRequest.toCallablePayload(): Map<String, Any?> =
         mapOf(
             "orderId" to orderId,
@@ -277,6 +290,8 @@ class FirebaseDriverOrdersAdapter(
         const val PAYMENT_METHOD = "paymentMethod"
         const val FINANCIAL_STATUS = "financialStatus"
         const val COMMUNICATION_STATUS = "communicationStatus"
+        const val AI_SUGGESTED_ACTION = "aiSuggestedAction"
+        const val AI_REQUIRES_HUMAN_REVIEW = "aiRequiresHumanReview"
         const val AMOUNT_TO_COLLECT = "amountToCollect"
         const val COLLECTION_REQUIRED = "collectionRequired"
         const val CASH_RESPONSIBLE_ROLE = "cashResponsibleRole"

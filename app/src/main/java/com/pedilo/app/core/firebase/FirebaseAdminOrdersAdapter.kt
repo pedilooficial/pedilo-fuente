@@ -93,6 +93,10 @@ class FirebaseAdminOrdersAdapter(
                 orderType = doc.getString(ORDER_TYPE).orEmpty(),
                 financialStatus = doc.getString(FINANCIAL_STATUS).orEmpty(),
                 communicationStatus = doc.getString(COMMUNICATION_STATUS).orEmpty(),
+                aiRiskLevel = doc.getString(AI_RISK_LEVEL).orEmpty(),
+                aiClassification = doc.getString(AI_CLASSIFICATION).orEmpty(),
+                aiSuggestedAction = doc.getString(AI_SUGGESTED_ACTION).orEmpty(),
+                aiRequiresHumanReview = doc.getBoolean(AI_REQUIRES_HUMAN_REVIEW) ?: false,
                 incidentStatus = doc.getString(INCIDENT_STATUS).orEmpty(),
                 archiveStatus = doc.getString(ARCHIVE_STATUS).orEmpty(),
                 currentResponsibleRole = doc.getString(CURRENT_RESPONSIBLE_ROLE).orEmpty(),
@@ -212,6 +216,10 @@ class FirebaseAdminOrdersAdapter(
             orderType = getString(ORDER_TYPE).orEmpty(),
             financialStatus = getString(FINANCIAL_STATUS).orEmpty(),
             communicationStatus = getString(COMMUNICATION_STATUS).orEmpty(),
+            aiRiskLevel = getString(AI_RISK_LEVEL).orEmpty(),
+            aiClassification = getString(AI_CLASSIFICATION).orEmpty(),
+            aiSuggestedAction = getString(AI_SUGGESTED_ACTION).orEmpty(),
+            aiRequiresHumanReview = getBoolean(AI_REQUIRES_HUMAN_REVIEW) ?: false,
             incidentStatus = getString(INCIDENT_STATUS).orEmpty(),
             archiveStatus = getString(ARCHIVE_STATUS).orEmpty(),
             currentResponsibleRole = getString(CURRENT_RESPONSIBLE_ROLE).orEmpty(),
@@ -306,6 +314,10 @@ class FirebaseAdminOrdersAdapter(
         const val ORDER_TYPE = "orderType"
         const val FINANCIAL_STATUS = "financialStatus"
         const val COMMUNICATION_STATUS = "communicationStatus"
+        const val AI_RISK_LEVEL = "aiRiskLevel"
+        const val AI_CLASSIFICATION = "aiClassification"
+        const val AI_SUGGESTED_ACTION = "aiSuggestedAction"
+        const val AI_REQUIRES_HUMAN_REVIEW = "aiRequiresHumanReview"
         const val INCIDENT_STATUS = "incidentStatus"
         const val ARCHIVE_STATUS = "archiveStatus"
         const val CURRENT_RESPONSIBLE_ROLE = "currentResponsibleRole"

@@ -2695,6 +2695,10 @@ private fun AdminOrderSectionScreen(
         AdminOrderSection.Problems -> listOf(
             "Estado" to (problem?.first ?: "Sin problemas"),
             "Seguimiento" to (problem?.second ?: "Sin problemas"),
+            "Clasificación asistida" to adminAssistedClassificationLabel(detail?.aiClassification ?: summary?.aiClassification.orEmpty()),
+            "Riesgo asistido" to adminAssistedRiskLabel(detail?.aiRiskLevel ?: summary?.aiRiskLevel.orEmpty()),
+            "Sugerencia" to (detail?.aiSuggestedAction ?: summary?.aiSuggestedAction.orEmpty()).adminDisplayValue("Sin sugerencia"),
+            "Revisión humana" to if (detail?.aiRequiresHumanReview ?: summary?.aiRequiresHumanReview ?: false) "Requerida" else "No requerida",
         )
         AdminOrderSection.History -> listOf(
             "Último movimiento" to detail?.lastEventSummary.adminDisplayValue("Sin datos"),
@@ -2800,6 +2804,29 @@ private fun adminCommunicationStatusLabel(value: String): String =
         "closed" -> "Cerrada"
         "disabled" -> "Canal externo deshabilitado"
         else -> value.adminDisplayValue("Sin estado")
+    }
+
+private fun adminAssistedRiskLabel(value: String): String =
+    when (value.trim()) {
+        "low" -> "Bajo"
+        "medium" -> "Medio"
+        "high" -> "Alto"
+        "critical" -> "Crítico"
+        else -> value.adminDisplayValue("Sin riesgo")
+    }
+
+private fun adminAssistedClassificationLabel(value: String): String =
+    when (value.trim()) {
+        "normal_order" -> "Pedido normal"
+        "requires_review" -> "Requiere revisión"
+        "incident_risk" -> "Riesgo por incidencia"
+        "claim_risk" -> "Riesgo por reclamo"
+        "communication_risk" -> "Riesgo de comunicación"
+        "financial_review" -> "Revisión financiera"
+        "incomplete_data" -> "Datos incompletos"
+        "incoherent_state" -> "Estado incoherente"
+        "cancellation_financial_review" -> "Cancelación con revisión financiera"
+        else -> value.adminDisplayValue("Sin clasificación")
     }
 
 private fun String?.adminMoneyLabel(): String {

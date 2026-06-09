@@ -68,7 +68,8 @@ test("order birth is transactional and writes the initial audit event once", () 
   assert.match(birth, /db\.runTransaction/);
   assert.match(birth, /const existing = await tx\.get\(orderRef\)/);
   assert.match(birth, /if \(existing\.exists\) return/);
-  assert.match(birth, /tx\.create\(orderRef, orderData\)/);
+  assert.match(birth, /tx\.create\(orderRef, \{/);
+  assert.match(birth, /assistedDecisionOrderPatch\(assistedDecision\)/);
   assert.match(birth, /orderRef\.collection\("events"\)\.doc\("initial"\)/);
   assert.match(birth, /type: "order_created"/);
   assert.match(birth, /actorRole: "public_user"/);
@@ -80,6 +81,7 @@ test("order birth is transactional and writes the initial audit event once", () 
   assert.match(birth, /idempotencyKey: orderData\.idempotencyKey/);
   assert.match(birth, /communicationRecordsForOrder/);
   assert.match(birth, /writeOrderCommunications\(tx, orderRef, communicationRecords\)/);
+  assert.match(birth, /writeAssistedDecision\(tx, orderRef, assistedDecision\)/);
 });
 
 test("admin action path carries version concurrency without opening UI operation", () => {

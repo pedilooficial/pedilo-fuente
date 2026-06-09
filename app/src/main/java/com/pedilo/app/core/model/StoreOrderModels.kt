@@ -11,6 +11,8 @@ data class StoreOrderSummary(
     val version: Int,
     val activeIncident: Boolean,
     val communicationStatus: String = "",
+    val assistanceSummary: String = "",
+    val requiresHumanReview: Boolean = false,
 )
 
 data class StoreOrderDetail(
@@ -29,4 +31,6 @@ data class StoreOrderDetail(
     val version: Int,
     val activeIncident: Boolean,
     val communicationStatus: String = "",
+    val assistanceSummary: String = "",
+    val requiresHumanReview: Boolean = false,
 )

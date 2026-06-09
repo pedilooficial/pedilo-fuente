@@ -92,6 +92,12 @@ service cloud.firestore {
           && canReadOrder(get(/databases/$(database)/documents/orders/$(orderId)).data);
         allow write: if false;
       }
+
+      match /ai_decisions/{aiDecisionId} {
+        allow read: if exists(/databases/$(database)/documents/orders/$(orderId))
+          && canReadOrder(get(/databases/$(database)/documents/orders/$(orderId)).data);
+        allow write: if false;
+      }
     }
 
     match /public_claims/{claimId} {

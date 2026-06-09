@@ -29,9 +29,11 @@ test("operateLiveOrder is the backend authority for operational actions", () => 
   assert.match(callable, /validateExpectedVersion\(clean, current\)/);
   assert.match(callable, /allowedLiveActions\(current\)/);
   assert.match(callable, /liveActionEffect\(clean, current, actor\)/);
-  assert.match(callable, /tx\.update\(orderRef, patch\)/);
+  assert.match(callable, /tx\.update\(orderRef, \{/);
+  assert.match(callable, /assistedDecisionOrderPatch\(assistedDecision\)/);
   assert.match(callable, /tx\.create\(eventRef/);
   assert.match(callable, /nextAllowedActions/);
+  assert.match(callable, /writeAssistedDecision\(tx, orderRef, assistedDecision\)/);
 });
 
 test("operational actions include local driver admin incident and cancel minimums", () => {

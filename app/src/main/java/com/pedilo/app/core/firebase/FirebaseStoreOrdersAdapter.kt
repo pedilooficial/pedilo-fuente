@@ -96,6 +96,8 @@ class FirebaseStoreOrdersAdapter(
             version = version(),
             activeIncident = getBoolean(ACTIVE_INCIDENT) ?: false,
             communicationStatus = getString(COMMUNICATION_STATUS).orEmpty(),
+            assistanceSummary = safeAssistanceSummary(),
+            requiresHumanReview = getBoolean(AI_REQUIRES_HUMAN_REVIEW) ?: false,
         )
 
     private fun com.google.firebase.firestore.DocumentSnapshot.toStoreDetail(): StoreOrderDetail =
@@ -115,6 +117,8 @@ class FirebaseStoreOrdersAdapter(
             version = version(),
             activeIncident = getBoolean(ACTIVE_INCIDENT) ?: false,
             communicationStatus = getString(COMMUNICATION_STATUS).orEmpty(),
+            assistanceSummary = safeAssistanceSummary(),
+            requiresHumanReview = getBoolean(AI_REQUIRES_HUMAN_REVIEW) ?: false,
         )
 
     private fun com.google.firebase.firestore.DocumentSnapshot.visibleNumber(): String =
@@ -154,6 +158,15 @@ class FirebaseStoreOrdersAdapter(
     private fun com.google.firebase.firestore.DocumentSnapshot.version(): Int =
         (get(VERSION) as? Number)?.toInt() ?: 0
 
+    private fun com.google.firebase.firestore.DocumentSnapshot.safeAssistanceSummary(): String =
+        when (getString(AI_SUGGESTED_ACTION).orEmpty()) {
+            "revisar incidencia" -> "Revisá la incidencia operativa del pedido."
+            "revisar comunicación" -> "Revisá la comunicación preparada del pedido."
+            "revisar datos del pedido" -> "Revisá los datos operativos propios del pedido."
+            "intervención Admin sugerida" -> "El pedido requiere revisión operativa."
+            else -> if (getBoolean(AI_REQUIRES_HUMAN_REVIEW) == true) "El pedido requiere revisión operativa." else ""
+        }
+
     private fun AdminLiveOrderActionRequest.toCallablePayload(): Map<String, Any?> =
         mapOf(
             "orderId" to orderId,
@@ -182,6 +195,8 @@ class FirebaseStoreOrdersAdapter(
         const val PAYMENT_METHOD = "paymentMethod"
         const val FINANCIAL_STATUS = "financialStatus"
         const val COMMUNICATION_STATUS = "communicationStatus"
+        const val AI_SUGGESTED_ACTION = "aiSuggestedAction"
+        const val AI_REQUIRES_HUMAN_REVIEW = "aiRequiresHumanReview"
         const val AMOUNT_TO_COLLECT = "amountToCollect"
         const val COLLECTION_REQUIRED = "collectionRequired"
         const val ITEMS = "items"

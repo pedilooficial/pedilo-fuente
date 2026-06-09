@@ -14,6 +14,8 @@ data class DriverOrderSummary(
     val activeIncident: Boolean,
     val isAssignedToCurrentDriver: Boolean,
     val communicationStatus: String = "",
+    val assistanceSummary: String = "",
+    val requiresHumanReview: Boolean = false,
 )
 
 data class DriverOrderDetail(
@@ -38,4 +40,6 @@ data class DriverOrderDetail(
     val activeIncident: Boolean,
     val isAssignedToCurrentDriver: Boolean,
     val communicationStatus: String = "",
+    val assistanceSummary: String = "",
+    val requiresHumanReview: Boolean = false,
 )

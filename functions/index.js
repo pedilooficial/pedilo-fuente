@@ -161,6 +161,22 @@ const COMMUNICATION_TEMPLATES = {
   communication_failed: "La comunicación no pudo completarse y quedó registrada.",
   phone_validation_prepared: "Teléfono recibido; validación real no ejecutada.",
 };
+const AI_PROVIDER_STATUS_DISABLED = "disabled";
+const ASSISTED_ENGINE_VERSION = "deterministic_rules_v1";
+const AI_DECISION_STATUSES = {
+  PENDING: "pending",
+  SUGGESTED: "suggested",
+  ACCEPTED: "accepted",
+  REJECTED: "rejected",
+  EXPIRED: "expired",
+  NOT_APPLICABLE: "not_applicable",
+};
+const AI_RISK_LEVELS = ["low", "medium", "high", "critical"];
+const ASSISTED_DECISION_RESOLUTION_STATUSES = [
+  AI_DECISION_STATUSES.ACCEPTED,
+  AI_DECISION_STATUSES.REJECTED,
+  AI_DECISION_STATUSES.NOT_APPLICABLE,
+];
 
 exports.createLocalOrder = onCall({region: REGION}, async (request) => {
   const payload = request.data || {};
@@ -408,6 +424,24 @@ exports.submitPublicClaim = onCall({region: REGION}, async (request) => {
     sourceEventId: eventRef.id,
     publicSafe: true,
   }];
+  let claimAssistedDecision = null;
+  if (linkedOrderId) {
+    claimAssistedDecision = assistedDecisionForOrder({
+      orderId: linkedOrderId,
+      order: {
+        status: STATUS,
+        publicStatus: "Reclamo recibido",
+        communicationStatus: COMMUNICATION_STATUS_PREPARED,
+        financialStatus: FINANCIAL_STATUS_PENDING,
+        trackingNumber: clean.trackingNumber,
+        needsAttention: true,
+      },
+      sourceEventId: eventRef.id,
+      scope: "public_claim",
+      claimId: claimRef.id,
+      now,
+    });
+  }
 
   await db.runTransaction(async (tx) => {
     tx.create(claimRef, claim);
@@ -426,6 +460,9 @@ exports.submitPublicClaim = onCall({region: REGION}, async (request) => {
         updatedAt: now,
       });
       writeOrderCommunications(tx, db.collection(ORDERS).doc(linkedOrderId), claimCommunicationRecords);
+      if (claimAssistedDecision) {
+        writeAssistedDecision(tx, db.collection(ORDERS).doc(linkedOrderId), claimAssistedDecision);
+      }
     }
   });
 
@@ -494,9 +531,18 @@ exports.adminOrderAction = onCall({region: REGION}, async (request) => {
       incidentId: clean.action === ADMIN_ACTIONS.MARK_INCIDENT ? incidentRef.id : current.activeIncidentId,
       now,
     });
+    const assistedDecision = assistedDecisionForOrder({
+      orderId: clean.orderId,
+      order: {...(orderSnap.data() || {}), ...effect.patch},
+      sourceEventId: eventRef.id,
+      scope: clean.action,
+      incidentId: clean.action === ADMIN_ACTIONS.MARK_INCIDENT ? incidentRef.id : current.activeIncidentId,
+      now,
+    });
 
     tx.update(orderRef, {
       ...effect.patch,
+      ...assistedDecisionOrderPatch(assistedDecision),
       version: current.version + 1,
       nextAllowedActions: next.nextAllowedActions,
       lastOperationEvent: {
@@ -509,6 +555,7 @@ exports.adminOrderAction = onCall({region: REGION}, async (request) => {
     });
     tx.set(eventRef, event);
     writeOrderCommunications(tx, orderRef, communicationRecords);
+    writeAssistedDecision(tx, orderRef, assistedDecision);
     if (incidentRef) {
       tx.set(incidentRef, incidentDocument({
         incidentId: incidentRef.id,
@@ -547,6 +594,70 @@ exports.adminOrderAction = onCall({region: REGION}, async (request) => {
   });
 
   return result;
+});
+
+exports.resolveAssistedDecision = onCall({region: REGION}, async (request) => {
+  const actor = await requireAdminActor(request);
+  const clean = cleanAssistedDecisionResolutionPayload(request.data || {});
+  const orderRef = db.collection(ORDERS).doc(clean.orderId);
+  const decisionRef = orderRef.collection("ai_decisions").doc(clean.aiDecisionId);
+  const eventRef = orderRef.collection("events").doc();
+
+  return db.runTransaction(async (tx) => {
+    const orderSnap = await tx.get(orderRef);
+    if (!orderSnap.exists) {
+      throw new HttpsError("not-found", "No encontramos ese pedido.");
+    }
+    const decisionSnap = await tx.get(decisionRef);
+    if (!decisionSnap.exists) {
+      throw new HttpsError("not-found", "No encontramos esa sugerencia.");
+    }
+
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    const previousStatus = cleanText(decisionSnap.get("status"));
+    const patch = {
+      status: clean.status,
+      resolvedAt: now,
+      resolvedByRole: "admin",
+      resolvedByActorId: actor.uid,
+      resolutionNote: clean.resolutionNote,
+      audit: {
+        ...(decisionSnap.get("audit") || {}),
+        resolution: {
+          previousStatus,
+          nextStatus: clean.status,
+          actorRole: "admin",
+          actorUid: actor.uid,
+          note: clean.resolutionNote,
+          createdAt: now,
+          noCriticalActionExecuted: true,
+        },
+      },
+      updatedAt: now,
+    };
+
+    tx.set(decisionRef, patch, {merge: true});
+    tx.set(eventRef, {
+      type: "assisted_decision_resolved",
+      summary: `Admin ${clean.status} sugerencia asistida.`,
+      reason: clean.resolutionNote,
+      actorUid: actor.uid,
+      actorRole: "admin",
+      previousStatus,
+      nextStatus: clean.status,
+      previousOperationalStatus: cleanText(orderSnap.get("operationalStatus")),
+      nextOperationalStatus: cleanText(orderSnap.get("operationalStatus")),
+      sourceEventId: clean.aiDecisionId,
+      createdAt: now,
+    });
+
+    return {
+      orderId: clean.orderId,
+      aiDecisionId: clean.aiDecisionId,
+      status: clean.status,
+      humanMessage: "Sugerencia asistida auditada. No se ejecutó ninguna acción crítica.",
+    };
+  });
 });
 
 exports.operateLiveOrder = onCall({region: REGION}, async (request) => {
@@ -646,10 +757,22 @@ exports.operateLiveOrder = onCall({region: REGION}, async (request) => {
       incidentId: clean.action === LIVE_ACTIONS.OPEN_INCIDENT ? clean.actionId : current.activeIncidentId,
       now,
     });
+    const assistedDecision = assistedDecisionForOrder({
+      orderId: clean.orderId,
+      order: {...(orderSnap.data() || {}), ...patch},
+      sourceEventId: clean.actionId,
+      scope: clean.action,
+      incidentId: clean.action === LIVE_ACTIONS.OPEN_INCIDENT ? clean.actionId : current.activeIncidentId,
+      now,
+    });
 
-    tx.update(orderRef, patch);
+    tx.update(orderRef, {
+      ...patch,
+      ...assistedDecisionOrderPatch(assistedDecision),
+    });
     tx.create(eventRef, event);
     writeOrderCommunications(tx, orderRef, communicationRecords);
+    writeAssistedDecision(tx, orderRef, assistedDecision);
     if (incidentRef) {
       tx.create(incidentRef, incidentDocument({
         incidentId: clean.actionId,
@@ -866,6 +989,12 @@ function liveOrderState(order) {
     amountToCollect: Number(order.amountToCollect) || 0,
     collectionRequired: order.collectionRequired === true,
     communicationStatus: cleanText(order.communicationStatus) || COMMUNICATION_STATUS_RECEIVED,
+    aiRiskLevel: cleanText(order.aiRiskLevel) || "low",
+    aiClassification: cleanText(order.aiClassification) || "normal_order",
+    aiSuggestedAction: cleanText(order.aiSuggestedAction),
+    aiSuggestedActionType: cleanText(order.aiSuggestedActionType),
+    aiRequiresHumanReview: order.aiRequiresHumanReview === true,
+    aiProviderStatus: cleanText(order.aiProviderStatus) || AI_PROVIDER_STATUS_DISABLED,
     incidentStatus: cleanText(order.incidentStatus) || INCIDENT_STATUS_NONE,
     archiveStatus: cleanText(order.archiveStatus) || ARCHIVE_STATUS_LIVE,
     responsibleRole: cleanText(order.responsibleRole),
@@ -1160,6 +1289,187 @@ function writeClaimCommunications(tx, claimRef, records) {
   }
 }
 
+function assistedDecisionForOrder({orderId, order, sourceEventId, scope, claimId = "", incidentId = "", communicationId = "", now}) {
+  const analysis = deterministicAssistedAnalysis(order, {claimId, incidentId, communicationId});
+  const aiDecisionId = safeAssistedDecisionId({orderId, sourceEventId, scope, claimId, incidentId, communicationId});
+  return {
+    aiDecisionId,
+    orderId,
+    claimId,
+    incidentId,
+    communicationId,
+    sourceEventId,
+    scope,
+    inputSummary: analysis.inputSummary,
+    classification: analysis.classification,
+    riskLevel: analysis.riskLevel,
+    suggestedAction: analysis.suggestedAction,
+    suggestedActionType: analysis.suggestedActionType,
+    confidence: analysis.confidence,
+    requiresHumanReview: analysis.requiresHumanReview,
+    status: analysis.status,
+    createdAt: now,
+    resolvedAt: null,
+    resolvedByRole: "",
+    resolvedByActorId: "",
+    resolutionNote: "",
+    ruleVersion: ASSISTED_ENGINE_VERSION,
+    engineVersion: ASSISTED_ENGINE_VERSION,
+    providerStatus: AI_PROVIDER_STATUS_DISABLED,
+    audit: {
+      engine: "deterministic_rules",
+      providerStatus: AI_PROVIDER_STATUS_DISABLED,
+      noExternalProviderUsed: true,
+      noCriticalActionExecuted: true,
+      sourceEventId,
+      scope,
+      signals: analysis.signals,
+    },
+  };
+}
+
+function deterministicAssistedAnalysis(order, links = {}) {
+  const signals = assistedDecisionSignals(order, links);
+  let classification = "normal_order";
+  let riskLevel = "low";
+  let suggestedAction = "continuar seguimiento";
+  let suggestedActionType = "review_order";
+  let confidence = 0.52;
+
+  if (signals.incoherentState) {
+    classification = "incoherent_state";
+    riskLevel = "critical";
+    suggestedAction = "revisar estado operativo";
+    suggestedActionType = "review_order";
+    confidence = 0.88;
+  } else if (signals.openIncident) {
+    classification = "incident_risk";
+    riskLevel = "high";
+    suggestedAction = "revisar incidencia";
+    suggestedActionType = "review_incident";
+    confidence = 0.84;
+  } else if (signals.linkedClaim) {
+    classification = "claim_risk";
+    riskLevel = "high";
+    suggestedAction = "revisar reclamo";
+    suggestedActionType = "review_claim";
+    confidence = 0.82;
+  } else if (signals.communicationFailed) {
+    classification = "communication_risk";
+    riskLevel = "medium";
+    suggestedAction = "revisar comunicación";
+    suggestedActionType = "review_communication";
+    confidence = 0.78;
+  } else if (signals.cancelledWithFinancialImpact) {
+    classification = "cancellation_financial_review";
+    riskLevel = "high";
+    suggestedAction = "revisar cancelación financiera";
+    suggestedActionType = "review_finance";
+    confidence = 0.8;
+  } else if (signals.financialReview) {
+    classification = "financial_review";
+    riskLevel = "medium";
+    suggestedAction = "revisar pago declarado";
+    suggestedActionType = "review_finance";
+    confidence = 0.76;
+  } else if (signals.incompleteData) {
+    classification = "incomplete_data";
+    riskLevel = "medium";
+    suggestedAction = "revisar datos del pedido";
+    suggestedActionType = "review_order";
+    confidence = 0.72;
+  } else if (signals.needsAttention) {
+    classification = "requires_review";
+    riskLevel = "medium";
+    suggestedAction = "intervención Admin sugerida";
+    suggestedActionType = "admin_intervention";
+    confidence = 0.7;
+  }
+
+  const requiresHumanReview = riskLevel !== "low" || signals.needsAttention;
+  return {
+    inputSummary: assistedInputSummary(order, signals),
+    classification,
+    riskLevel,
+    suggestedAction,
+    suggestedActionType,
+    confidence,
+    requiresHumanReview,
+    status: AI_DECISION_STATUSES.SUGGESTED,
+    signals,
+  };
+}
+
+function assistedDecisionSignals(order, links = {}) {
+  const status = cleanText(order.status).toLowerCase();
+  const operationalStatus = cleanText(order.operationalStatus).toLowerCase();
+  const financialStatus = cleanText(order.financialStatus);
+  const communicationStatus = cleanText(order.communicationStatus);
+  const openIncident = order.activeIncident === true || cleanText(order.incidentStatus) === "open" || !!links.incidentId;
+  const linkedClaim = !!links.claimId || cleanText(order.publicStatus).toLowerCase().includes("reclamo");
+  const communicationFailed = communicationStatus === "failed" || !!links.communicationId;
+  const financialReview = [
+    FINANCIAL_STATUS_PENDING,
+    FINANCIAL_STATUS_TRANSFER_DECLARED,
+    FINANCIAL_STATUS_PAID_DECLARED,
+    FINANCIAL_STATUS_DISPUTED,
+    FINANCIAL_STATUS_SETTLEMENT_PENDING,
+  ].includes(financialStatus);
+  const incompleteData = !cleanText(order.trackingNumber || order.publicOrderNumber) ||
+    (!cleanText(order.storeId) && cleanText(order.source) === LOCAL_SOURCE);
+  const remainingActions = Array.isArray(order.nextAllowedActions) ? order.nextAllowedActions.length : 0;
+  const incoherentState = status === "delivered" && cleanText(order.archiveStatus) !== "archived" ||
+    TERMINAL_STATUSES.includes(status) && remainingActions > 0;
+  const cancelledWithFinancialImpact = ["cancelled", "canceled"].includes(status) && order.financialReviewRequired === true;
+  return {
+    openIncident,
+    linkedClaim,
+    communicationFailed,
+    financialReview,
+    incompleteData,
+    incoherentState,
+    cancelledWithFinancialImpact,
+    needsAttention: order.needsAttention === true,
+    activeIncident: order.activeIncident === true,
+    status,
+    operationalStatus,
+    financialStatus,
+    communicationStatus,
+  };
+}
+
+function assistedInputSummary(order, signals) {
+  return [
+    `estado=${signals.status || cleanText(order.status) || "sin_estado"}`,
+    `operativo=${signals.operationalStatus || cleanText(order.operationalStatus) || "sin_operativo"}`,
+    `finanzas=${signals.financialStatus || "sin_finanzas"}`,
+    `comunicacion=${signals.communicationStatus || "sin_comunicacion"}`,
+    signals.openIncident ? "incidencia_abierta" : "",
+    signals.linkedClaim ? "reclamo_vinculado" : "",
+  ].filter(Boolean).join("; ");
+}
+
+function safeAssistedDecisionId(parts) {
+  return `aid_${crypto.createHash("sha256").update(stableStringify(parts)).digest("hex").slice(0, 24)}`;
+}
+
+function writeAssistedDecision(tx, orderRef, decision) {
+  tx.set(orderRef.collection("ai_decisions").doc(decision.aiDecisionId), decision, {merge: true});
+}
+
+function assistedDecisionOrderPatch(decision) {
+  return {
+    aiDecisionStatus: decision.status,
+    aiRiskLevel: decision.riskLevel,
+    aiClassification: decision.classification,
+    aiSuggestedAction: decision.suggestedAction,
+    aiSuggestedActionType: decision.suggestedActionType,
+    aiRequiresHumanReview: decision.requiresHumanReview,
+    aiProviderStatus: decision.providerStatus,
+    aiEngineVersion: decision.engineVersion,
+  };
+}
+
 function cancellationAuditPatch({clean, current, actor}) {
   const financialReviewRequired = cancellationNeedsFinancialReview(current);
   return {
@@ -1315,6 +1625,22 @@ function cleanPublicClaimPayload(payload) {
   };
 }
 
+function cleanAssistedDecisionResolutionPayload(payload) {
+  const orderId = cleanText(payload.orderId);
+  const aiDecisionId = cleanText(payload.aiDecisionId);
+  const status = cleanText(payload.status);
+  const resolutionNote = cleanText(payload.resolutionNote);
+
+  if (!isSafeDocumentId(orderId) || !isSafeDocumentId(aiDecisionId) || !ASSISTED_DECISION_RESOLUTION_STATUSES.includes(status)) {
+    throw new HttpsError("invalid-argument", "Elegí una sugerencia y resolución válidas.");
+  }
+  if (resolutionNote.length < 4) {
+    throw new HttpsError("invalid-argument", "Ingresá una nota de resolución.");
+  }
+
+  return {orderId, aiDecisionId, status, resolutionNote};
+}
+
 function operationalOrderState(order) {
   const status = cleanText(order.status) || STATUS;
   return {
@@ -1326,6 +1652,12 @@ function operationalOrderState(order) {
     collectionRequired: order.collectionRequired === true,
     incidentStatus: cleanText(order.incidentStatus) || INCIDENT_STATUS_NONE,
     communicationStatus: cleanText(order.communicationStatus) || COMMUNICATION_STATUS_RECEIVED,
+    aiRiskLevel: cleanText(order.aiRiskLevel) || "low",
+    aiClassification: cleanText(order.aiClassification) || "normal_order",
+    aiSuggestedAction: cleanText(order.aiSuggestedAction),
+    aiSuggestedActionType: cleanText(order.aiSuggestedActionType),
+    aiRequiresHumanReview: order.aiRequiresHumanReview === true,
+    aiProviderStatus: cleanText(order.aiProviderStatus) || AI_PROVIDER_STATUS_DISABLED,
     archiveStatus: cleanText(order.archiveStatus) || ARCHIVE_STATUS_LIVE,
     responsibleRole: cleanText(order.responsibleRole),
     priority: cleanText(order.priority) || (order.activeIncident || order.needsAttention ? "high" : "normal"),
@@ -1809,8 +2141,18 @@ async function createOrderWithInitialEvent(orderRef, orderData, now) {
       sourceEventId: "initial",
       now,
     });
+    const assistedDecision = assistedDecisionForOrder({
+      orderId: orderRef.id,
+      order: orderData,
+      sourceEventId: "initial",
+      scope: "order_created",
+      now,
+    });
 
-    tx.create(orderRef, orderData);
+    tx.create(orderRef, {
+      ...orderData,
+      ...assistedDecisionOrderPatch(assistedDecision),
+    });
     tx.create(eventRef, {
       type: "order_created",
       summary: "Pedido Vivo Universal creado desde canal público.",
@@ -1848,6 +2190,7 @@ async function createOrderWithInitialEvent(orderRef, orderData, now) {
       createdAt: now,
     });
     writeOrderCommunications(tx, orderRef, communicationRecords);
+    writeAssistedDecision(tx, orderRef, assistedDecision);
   });
 }
 
@@ -1901,10 +2244,11 @@ function isValidTrackingNumber(value) {
 function publicTrackingResponse(order, requestedTrackingNumber) {
   const hasOperationalProblem = order.activeIncident === true || cleanText(order.incidentStatus) === "open" || order.needsAttention === true;
   const hasCommunicationIssue = cleanText(order.communicationStatus) === "failed";
-  const status = (hasOperationalProblem || hasCommunicationIssue) && !isTerminalStatus(order.status) ? "UNDER_REVIEW" : publicStatusCode(order.status);
+  const hasAssistedReview = order.aiRequiresHumanReview === true;
+  const status = (hasOperationalProblem || hasCommunicationIssue || hasAssistedReview) && !isTerminalStatus(order.status) ? "UNDER_REVIEW" : publicStatusCode(order.status);
   const terminal = isTerminalStatus(order.status);
   const trackingNumber = cleanText(order.trackingNumber || order.publicOrderNumber || requestedTrackingNumber);
-  const publicStatus = terminal ? "Pedido cerrado" : (hasOperationalProblem || hasCommunicationIssue) ? "Pedido en revisión operativa" : cleanText(order.publicStatus) || PUBLIC_STATUS;
+  const publicStatus = terminal ? "Pedido cerrado" : (hasOperationalProblem || hasCommunicationIssue || hasAssistedReview) ? "Pedido en revisión operativa" : cleanText(order.publicStatus) || PUBLIC_STATUS;
 
   if (terminal) {
     return {
@@ -1928,7 +2272,7 @@ function publicTrackingResponse(order, requestedTrackingNumber) {
     trackingNumber,
     publicStatus,
     status,
-    humanMessage: hasOperationalProblem || hasCommunicationIssue
+    humanMessage: hasOperationalProblem || hasCommunicationIssue || hasAssistedReview
       ? "Estamos revisando el pedido. Te mostramos solo información segura del seguimiento."
       : "Estamos siguiendo tu pedido con el estado actual disponible.",
     orderType: publicOrderType(order),
