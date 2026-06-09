@@ -184,8 +184,8 @@ fun PublicPlusBuyScreen(
     var contactName by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
-    val canAddProduct = productName.isNotBlank() && productDetail.isNotBlank()
-    val canContinue = products.isNotEmpty() && source.isNotBlank() && contactName.isNotBlank() && isValidPublicPhone(phone) && address.isNotBlank()
+    val canAddProduct = hasPublicValue(productName) && hasPublicValue(productDetail)
+    val canContinue = products.isNotEmpty() && hasPublicValue(source) && hasPublicValue(contactName) && isValidPublicPhone(phone) && hasPublicValue(address)
 
     PublicShell(current = PublicBottomDestination.Plus, onHome = onHome, onPlus = onPlus, onShop = onShop) {
         LazyColumn(
@@ -266,12 +266,12 @@ fun PublicPlusPickupShippingScreen(
     var alreadyPaid by remember { mutableStateOf(false) }
     var amount by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    val canContinue = pickupAddress.isNotBlank() &&
-        destination.isNotBlank() &&
-        contactName.isNotBlank() &&
+    val canContinue = hasPublicValue(pickupAddress) &&
+        hasPublicValue(destination) &&
+        hasPublicValue(contactName) &&
         isValidPublicPhone(phone) &&
-        description.isNotBlank() &&
-        (alreadyPaid || amount.isNotBlank())
+        hasPublicValue(description) &&
+        (alreadyPaid || hasPublicValue(amount))
 
     PublicShell(current = PublicBottomDestination.Plus, onHome = onHome, onPlus = onPlus, onShop = onShop) {
         LazyColumn(

@@ -296,7 +296,7 @@ fun PublicLocalCartScreen(
             items(cartItems) { item -> CartItemCard(item) }
             item { TotalsCard(cartItems) }
             item { LocalSecondaryButton("Agregar más productos", LocalIconKind.Plus, onMoreProducts) }
-            item { LocalPrimaryButton("Continuar", LocalIconKind.Check, onClick = onContinue) }
+            item { LocalPrimaryButton("Continuar", LocalIconKind.Check, enabled = cartItems.isNotEmpty(), onClick = onContinue) }
         }
     }
 }
@@ -314,7 +314,7 @@ fun PublicLocalDataScreen(
     var address by remember { mutableStateOf("") }
     var payment by remember { mutableStateOf("Efectivo al recibir") }
     var notes by remember { mutableStateOf("") }
-    val canContinue = cartItems.isNotEmpty() && name.isNotBlank() && isValidPublicPhone(phone) && address.isNotBlank() && payment.isNotBlank()
+    val canContinue = cartItems.isNotEmpty() && hasPublicValue(name) && isValidPublicPhone(phone) && hasPublicValue(address) && payment.isNotBlank()
 
     PublicShell(current = PublicBottomDestination.Shop, onHome = onHome, onPlus = onPlus, onShop = onShop) {
         LazyColumn(

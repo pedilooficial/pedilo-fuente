@@ -161,7 +161,7 @@ fun PublicConventionsClaimScreen(
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var sent by remember { mutableStateOf(false) }
+    var prepared by remember { mutableStateOf(false) }
 
     PublicShell(
         current = PublicBottomDestination.Home,
@@ -178,7 +178,7 @@ fun PublicConventionsClaimScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                ClaimIntroCard(sent = sent)
+                ClaimIntroCard(prepared = prepared)
             }
             item {
                 ConventionInput(
@@ -187,7 +187,7 @@ fun PublicConventionsClaimScreen(
                     placeholder = "PDL-XXXXXX",
                     onValueChange = {
                         orderNumber = normalizePublicTrackingInput(it)
-                        sent = false
+                        prepared = false
                     },
                 )
             }
@@ -198,7 +198,7 @@ fun PublicConventionsClaimScreen(
                     placeholder = "Tu nombre",
                     onValueChange = {
                         name = it
-                        sent = false
+                        prepared = false
                     },
                 )
             }
@@ -209,7 +209,7 @@ fun PublicConventionsClaimScreen(
                     placeholder = "11 5555 5555",
                     onValueChange = {
                         phone = it
-                        sent = false
+                        prepared = false
                     },
                 )
             }
@@ -222,21 +222,21 @@ fun PublicConventionsClaimScreen(
                     singleLine = false,
                     onValueChange = {
                         description = it
-                        sent = false
+                        prepared = false
                     },
                 )
             }
             item {
                 ConventionPrimaryAction(
-                    label = if (sent) "Reclamo registrado" else "Enviar reclamo",
-                    icon = if (sent) ConventionIconKind.Check else ConventionIconKind.Claim,
-                    enabled = !sent && description.isNotBlank() && isValidPublicPhone(phone),
-                    onClick = { sent = true },
+                    label = if (prepared) "Aviso preparado" else "Preparar aviso",
+                    icon = if (prepared) ConventionIconKind.Check else ConventionIconKind.Claim,
+                    enabled = !prepared && hasPublicValue(description) && isValidPublicPhone(phone),
+                    onClick = { prepared = true },
                 )
             }
-            if (sent) {
+            if (prepared) {
                 item {
-                    ConventionNotice(text = "Tu reclamo quedó registrado.")
+                    ConventionNotice(text = "El aviso quedó listo para que lo tengas a mano. La app todavía no envía reclamos al sistema.")
                 }
             }
         }
@@ -419,20 +419,20 @@ private fun InformationCard(
 }
 
 @Composable
-private fun ClaimIntroCard(sent: Boolean) {
+private fun ClaimIntroCard(prepared: Boolean) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .pediloCardDepth(RoundedCornerShape(15.dp))
-            .background(if (sent) Brush.verticalGradient(listOf(PediloGreen.copy(alpha = 0.18f), PediloPanel)) else PediloCardBrush, RoundedCornerShape(15.dp))
-            .border(1.dp, if (sent) PediloGreen else PediloLine, RoundedCornerShape(15.dp))
+            .background(if (prepared) Brush.verticalGradient(listOf(PediloGreen.copy(alpha = 0.18f), PediloPanel)) else PediloCardBrush, RoundedCornerShape(15.dp))
+            .border(1.dp, if (prepared) PediloGreen else PediloLine, RoundedCornerShape(15.dp))
             .padding(15.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            ConventionIcon(if (sent) ConventionIconKind.Check else ConventionIconKind.Note, tint = if (sent) PediloGreen else PediloOrange, modifier = Modifier.size(28.dp))
+            ConventionIcon(if (prepared) ConventionIconKind.Check else ConventionIconKind.Note, tint = if (prepared) PediloGreen else PediloOrange, modifier = Modifier.size(28.dp))
             Spacer(Modifier.width(10.dp))
             Text(
-                text = if (sent) "Tu reclamo quedó registrado." else "Registro de aviso",
+                text = if (prepared) "Aviso preparado" else "Registro de aviso",
                 color = PediloText,
                 fontSize = 19.sp,
                 fontWeight = FontWeight.Bold,

@@ -28,6 +28,18 @@ import androidx.compose.ui.unit.sp
 
 private const val MaxPhoneChars = 16
 private const val MaxTrackingChars = 14
+private val PublicTrackingPattern = Regex("^PDL-[A-Z0-9]{4,10}$")
+private val publicPlaceholderValues = setOf(
+    "nombre",
+    "tu nombre",
+    "telefono",
+    "teléfono",
+    "direccion",
+    "dirección",
+    "pedido",
+    "producto",
+    "paquete",
+)
 
 fun normalizePublicPhoneInput(raw: String): String {
     val trimmed = raw.take(MaxPhoneChars * 2)
@@ -56,8 +68,14 @@ fun normalizePublicTrackingInput(raw: String): String =
 
 fun isValidPublicTrackingNumber(value: String): Boolean {
     val normalized = normalizePublicTrackingInput(value)
-    return normalized.length in 7..14 && normalized.startsWith("PDL-")
+    return normalized.startsWith("PDL-") && PublicTrackingPattern.matches(normalized)
 }
+
+fun isPublicPlaceholder(value: String): Boolean =
+    value.trim().lowercase() in publicPlaceholderValues
+
+fun hasPublicValue(value: String): Boolean =
+    value.isNotBlank() && !isPublicPlaceholder(value)
 
 @Composable
 fun PublicTextInput(
