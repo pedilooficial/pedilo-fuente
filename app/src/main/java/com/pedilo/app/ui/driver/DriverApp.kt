@@ -140,7 +140,7 @@ fun DriverApp(onSignOutConfirmed: () -> Unit) {
         item {
             DriverHeader(
                 title = "Repartidor",
-                subtitle = "Pedidos disponibles y asignados a tu cuenta",
+                subtitle = "Pedidos disponibles para tomar y pedidos asignados a tu cuenta",
                 action = "Cerrar sesión",
                 onAction = onSignOutConfirmed,
             )
@@ -191,12 +191,39 @@ fun DriverApp(onSignOutConfirmed: () -> Unit) {
                 item {
                     DriverInfoCard(
                         "Estado operativo",
-                        "Real: ${current.operationalStatus.ifBlank { "No informado" }}\nVersión: ${current.version}\nAcciones permitidas: ${current.nextAllowedActions.joinToString { it.driverLabel() }.ifBlank { "Ninguna" }}",
+                        "Tipo: ${current.orderType.driverOrderTypeLabel()}\nReal: ${current.operationalStatus.ifBlank { "No informado" }}\nVersión: ${current.version}\nAcción necesaria: ${current.driverActionNeeded()}\nAcciones permitidas por backend: ${current.nextAllowedActions.joinToString { it.driverLabel() }.ifBlank { "Ninguna" }}",
                         PediloOrange,
                     )
                 }
+                item {
+                    DriverInfoCard(
+                        "Incidencia",
+                        if (current.activeIncident) "Hay una incidencia activa. Operá solo las acciones que siga habilitando el backend." else "Sin incidencia activa visible para este pedido.",
+                        if (current.activeIncident) PediloWarning else PediloMuted,
+                    )
+                }
+                item {
+                    DriverInfoCard(
+                        "Capacidad",
+                        "Preparación: no hay motor seguro de cupos o disponibilidad avanzada. Esta pantalla no bloquea ni asigna por capacidad.",
+                        PediloMuted,
+                    )
+                }
+                item {
+                    DriverInfoCard(
+                        "Cobro y caja",
+                        "Visual no persistente: no registra cobros, cierre de caja, deuda, liquidaciones ni comprobantes.",
+                        PediloMuted,
+                    )
+                }
                 if (current.nextAllowedActions.isEmpty()) {
-                    item { DriverInfoCard("Acciones", "No hay acciones disponibles para este estado.", PediloMuted) }
+                    item {
+                        DriverInfoCard(
+                            "Acciones",
+                            "El backend no habilita acciones para este pedido, versión o estado cerrado.",
+                            PediloMuted,
+                        )
+                    }
                 } else {
                     items(current.nextAllowedActions) { action ->
                         DriverActionCard(action = action, onClick = {
@@ -283,6 +310,7 @@ private fun DriverOrderCard(order: DriverOrderSummary, onClick: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text("Pedido #${order.visibleNumber}", color = PediloText, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+        Text(order.orderType.driverOrderTypeLabel(), color = PediloMuted, fontSize = 12.sp)
         Text(order.publicStatus.ifBlank { order.operationalStatus }, color = PediloOrange, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         Text(order.storeLabel.ifBlank { "Local no informado" }, color = PediloMuted, fontSize = 13.sp)
         Text(order.itemsSummary.joinToString(" · ").ifBlank { "Productos no informados" }, color = PediloMuted, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -302,6 +330,7 @@ private fun DriverOrderDetailCard(order: DriverOrderDetail) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text("Pedido #${order.visibleNumber}", color = PediloText, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+        Text("Tipo: ${order.orderType.driverOrderTypeLabel()}", color = PediloMuted, fontSize = 13.sp)
         Text(order.publicStatus.ifBlank { order.operationalStatus }, color = PediloOrange, fontSize = 14.sp, fontWeight = FontWeight.Bold)
         Text("Local: ${order.storeLabel.ifBlank { "No informado" }}", color = PediloMuted, fontSize = 13.sp)
         Text("Persona: ${order.contactName.ifBlank { "No informado" }}", color = PediloMuted, fontSize = 13.sp)
@@ -310,7 +339,7 @@ private fun DriverOrderDetailCard(order: DriverOrderDetail) {
         order.itemsSummary.forEach {
             Text(it, color = PediloText, fontSize = 14.sp, lineHeight = 18.sp)
         }
-        Text("Total: ${order.total.ifBlank { "No informado" }}", color = PediloMuted, fontSize = 13.sp)
+        Text("Total referencial: ${order.total.ifBlank { "No informado" }}. No registra cobro.", color = PediloMuted, fontSize = 13.sp)
     }
 }
 
@@ -369,10 +398,29 @@ private fun LiveOrderAction.driverImpact(): String =
 private fun LiveOrderAction.requiresDriverReason(): Boolean =
     this in setOf(LiveOrderAction.OpenIncident, LiveOrderAction.CancelOrder)
 
+private fun String.driverOrderTypeLabel(): String =
+    when (trim()) {
+        "local_order" -> "Pedido local"
+        "direct_purchase" -> "Compra directa"
+        "pickup_shipping" -> "Retiro y envío"
+        else -> "Tipo no informado"
+    }
+
+private fun DriverOrderDetail.driverActionNeeded(): String =
+    when {
+        activeIncident -> "Revisión por incidencia activa"
+        nextAllowedActions.contains(LiveOrderAction.DriverTake) -> "Tomar pedido"
+        nextAllowedActions.contains(LiveOrderAction.DriverMarkPickedUp) -> "Marcar retirado"
+        nextAllowedActions.contains(LiveOrderAction.DriverMarkDelivered) -> "Marcar entregado"
+        nextAllowedActions.contains(LiveOrderAction.OpenIncident) -> "Operar o reportar incidencia si corresponde"
+        nextAllowedActions.contains(LiveOrderAction.CancelOrder) -> "Operar o cancelar con motivo si corresponde"
+        else -> "Sin acción disponible para repartidor"
+    }
+
 private fun CoreError.driverErrorMessage(): String =
     when (this) {
         is CoreError.Operational -> humanMessage
-        CoreError.NotAvailable -> "No pudimos cargar tus pedidos."
+        CoreError.NotAvailable -> "No pudimos cargar pedidos visibles para este repartidor activo."
         CoreError.IncompleteData -> "Faltan datos para operar el pedido."
         is CoreError.Validation -> "Revisá los datos antes de confirmar."
         CoreError.Unknown -> "No pudimos completar la operación."

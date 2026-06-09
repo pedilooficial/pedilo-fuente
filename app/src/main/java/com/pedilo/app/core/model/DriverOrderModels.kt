@@ -3,6 +3,7 @@ package com.pedilo.app.core.model
 data class DriverOrderSummary(
     val id: String,
     val visibleNumber: String,
+    val orderType: String,
     val publicStatus: String,
     val operationalStatus: String,
     val contactName: String,
@@ -17,6 +18,7 @@ data class DriverOrderSummary(
 data class DriverOrderDetail(
     val id: String,
     val visibleNumber: String,
+    val orderType: String,
     val publicStatus: String,
     val operationalStatus: String,
     val contactName: String,

@@ -65,7 +65,7 @@ class FirebaseDriverOrdersAdapter(
                     }
                     availableOrders = snapshot.documents
                         .map { it.toDriverSummary(uid) }
-                        .filter { !it.isAssignedToCurrentDriver }
+                        .filter { it.isAvailableToCurrentDriver }
                     pushMerged()
                 }
             registrations += db.collection(ORDERS)
@@ -126,12 +126,13 @@ class FirebaseDriverOrdersAdapter(
         DriverOrderSummary(
             id = id,
             visibleNumber = visibleNumber(),
+            orderType = getString(ORDER_TYPE).orEmpty(),
             publicStatus = getString(PUBLIC_STATUS).orEmpty(),
             operationalStatus = operationalStatus(),
             contactName = customerName(),
             storeLabel = storeLabel(),
             itemsSummary = itemsSummary(),
-            nextAllowedActions = nextAllowedActions().driverAllowedOnly(),
+            nextAllowedActions = driverAllowedActions(uid),
             version = version(),
             activeIncident = getBoolean(ACTIVE_INCIDENT) ?: false,
             isAssignedToCurrentDriver = isAssignedToDriver(uid),
@@ -141,6 +142,7 @@ class FirebaseDriverOrdersAdapter(
         DriverOrderDetail(
             id = id,
             visibleNumber = visibleNumber(),
+            orderType = getString(ORDER_TYPE).orEmpty(),
             publicStatus = getString(PUBLIC_STATUS).orEmpty(),
             operationalStatus = operationalStatus(),
             contactName = customerName(),
@@ -149,17 +151,24 @@ class FirebaseDriverOrdersAdapter(
             storeLabel = storeLabel(),
             itemsSummary = itemsSummary(),
             total = get(TOTAL)?.toString().orEmpty(),
-            nextAllowedActions = nextAllowedActions().driverAllowedOnly(),
+            nextAllowedActions = driverAllowedActions(uid),
             version = version(),
             activeIncident = getBoolean(ACTIVE_INCIDENT) ?: false,
             isAssignedToCurrentDriver = isAssignedToDriver(uid),
         )
 
     private fun com.google.firebase.firestore.DocumentSnapshot.isVisibleToDriver(uid: String): Boolean =
-        isAssignedToDriver(uid) || (
+        isAssignedToDriver(uid) || isAvailableToDriver()
+
+    private val DriverOrderSummary.isAvailableToCurrentDriver: Boolean
+        get() = !isAssignedToCurrentDriver && nextAllowedActions.contains(LiveOrderAction.DriverTake)
+
+    private fun com.google.firebase.firestore.DocumentSnapshot.isAvailableToDriver(): Boolean =
             getString(RESPONSIBLE_ROLE).orEmpty() == DRIVER_ROLE &&
-                getString(ASSIGNED_ACTOR_ID).orEmpty().isBlank()
-        )
+                getString(CURRENT_RESPONSIBLE_ROLE).orEmpty().ifBlank { getString(RESPONSIBLE_ROLE).orEmpty() } == DRIVER_ROLE &&
+                getString(ASSIGNED_ACTOR_ID).orEmpty().isBlank() &&
+                getString(DRIVER_ID).orEmpty().isBlank() &&
+                nextAllowedActions().contains(LiveOrderAction.DriverTake)
 
     private fun com.google.firebase.firestore.DocumentSnapshot.isAssignedToDriver(uid: String): Boolean =
         getString(DRIVER_ID).orEmpty() == uid || getString(ASSIGNED_ACTOR_ID).orEmpty() == uid
@@ -205,6 +214,15 @@ class FirebaseDriverOrdersAdapter(
             .orEmpty()
             .mapNotNull { LiveOrderAction.fromWire(it.orEmptyText()) }
 
+    private fun com.google.firebase.firestore.DocumentSnapshot.driverAllowedActions(uid: String): List<LiveOrderAction> {
+        val actions = nextAllowedActions().driverAllowedOnly()
+        return if (isAssignedToDriver(uid)) {
+            actions
+        } else {
+            actions.filter { it == LiveOrderAction.DriverTake }
+        }
+    }
+
     private fun List<LiveOrderAction>.driverAllowedOnly(): List<LiveOrderAction> =
         filter {
             it in setOf(
@@ -241,9 +259,11 @@ class FirebaseDriverOrdersAdapter(
         const val TRACKING = "trackingNumber"
         const val PUBLIC_NUMBER = "publicOrderNumber"
         const val STATUS = "status"
+        const val ORDER_TYPE = "orderType"
         const val PUBLIC_STATUS = "publicStatus"
         const val OPERATIONAL_STATUS = "operationalStatus"
         const val NEXT_ALLOWED_ACTIONS = "nextAllowedActions"
+        const val CURRENT_RESPONSIBLE_ROLE = "currentResponsibleRole"
         const val ACTIVE_INCIDENT = "activeIncident"
         const val VERSION = "version"
         const val TOTAL = "total"
