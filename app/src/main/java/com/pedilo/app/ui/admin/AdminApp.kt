@@ -669,7 +669,7 @@ private val roleAccessSections = listOf(
         contextText = "Revisión de cuentas Admin sin modificar permisos reales.",
         entries = listOf(
             AdminEntry("Cuentas Admin", "Listado conceptual de acceso"),
-            AdminEntry("Crear Admin", "Alta visual sensible"),
+            AdminEntry("Preparar alta Admin", "Alta visual sensible sin crear usuario real"),
             AdminEntry("Estado de acceso", "Control de vigencia administrativa"),
             AdminEntry("Nivel de sensibilidad", "Impacto del acceso"),
             AdminEntry("Permisos visibles", "Alcance de acciones permitido"),
@@ -683,7 +683,7 @@ private val roleAccessSections = listOf(
         contextText = "Organiza relación de cuenta y local sin editar la entidad comercial.",
         entries = listOf(
             AdminEntry("Cuentas Local", "Estado de cuentas store"),
-            AdminEntry("Crear cuenta Local", "Alta visual de acceso"),
+            AdminEntry("Preparar alta Local", "Alta visual de acceso sin crear usuario real"),
             AdminEntry("Local vinculado", "Relación con local asignado"),
             AdminEntry("Vinculación pendiente", "Cuenta sin relación completa"),
             AdminEntry("Estado de acceso", "Lectura de habilitación de ingreso"),
@@ -697,7 +697,7 @@ private val roleAccessSections = listOf(
         contextText = "Organiza relación de cuenta y repartidor sin operar entregas.",
         entries = listOf(
             AdminEntry("Cuentas Repartidor", "Estado de cuentas driver"),
-            AdminEntry("Crear cuenta Repartidor", "Alta visual de acceso"),
+            AdminEntry("Preparar alta Repartidor", "Alta visual de acceso sin crear usuario real"),
             AdminEntry("Repartidor vinculado", "Relación con entidad de reparto"),
             AdminEntry("Vinculación pendiente", "Cuenta con vínculo incompleto"),
             AdminEntry("Estado de acceso", "Lectura de habilitación de ingreso"),
@@ -926,7 +926,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             AdminRoute.RoleAccess -> AdminRootScreen(
                 title = "Alta de roles",
                 eyebrow = "Usuarios y accesos",
-                summary = "Cuentas, roles y vinculaciones.",
+                summary = "Preparación visual sin crear usuarios reales.",
                 entries = roleAccessRootEntries,
                 onEntry = { entry ->
                     roleAccessSections.firstOrNull { it.title == entry.title }?.let {
@@ -1208,7 +1208,7 @@ private fun AdminConfigurationHomeScreen(
             AdminHeader(
                 title = "Configuración",
                 eyebrow = "Datos y reglas",
-                summary = "Prepará cómo funciona Pédilo.",
+                summary = "Preparación visual sin guardar cambios reales.",
                 onSignOut = {},
                 showSignOut = false,
             )
@@ -1403,7 +1403,7 @@ private fun AdminPublicHomeEditorScreen(
             item {
                 AdminActionCard(
                     title = "Guardar borrador visual",
-                    note = "Conserva la revisión dentro de esta pantalla, sin guardar datos reales.",
+                    note = "Prepara la revisión dentro de esta pantalla, sin guardar datos reales.",
                     onClick = {},
                 )
             }
@@ -2477,7 +2477,7 @@ private fun AdminConfigurationConvergenceScreen(
             item {
                 AdminInfoPanel(
                     title = "Campos del editor",
-                    text = "Valor actual · Nuevo valor · Campo requerido · Campo bloqueado · Guardado como borrador (solo visual).",
+                    text = "Valor actual · Nuevo valor · Campo requerido · Campo bloqueado · Borrador visual preparado, sin guardar datos reales.",
                 )
             }
         }
@@ -2612,6 +2612,13 @@ private fun AdminOrderDetailScreen(
                     title = action.adminActionLabel(),
                     note = action.adminActionImpact(),
                     onClick = { onLiveAction(action, expectedVersion) },
+                )
+            }
+        } else if (orderId != null) {
+            item {
+                AdminInfoPanel(
+                    title = "Sin acciones disponibles",
+                    text = "El backend no habilita acciones para este pedido o versión. Si el pedido está cerrado, no hay acciones normales.",
                 )
             }
         }
