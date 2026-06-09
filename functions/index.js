@@ -26,11 +26,15 @@ const ASSIGNED_ACTOR_UNASSIGNED = "";
 const INITIAL_TIMEOUT_POLICY = {
   code: "initial_admin_review",
   mode: "declarative",
+  executable: false,
   duration: "",
   nextFallback: "admin_review_required",
+  note: "Declarative only: no scheduler is attached in Bloque B.",
 };
 const INITIAL_FALLBACK_POLICY = {
   code: "admin_review_required",
+  mode: "declarative",
+  executable: false,
   responsibleRole: RESPONSIBLE_ADMIN,
   publicStatus: PUBLIC_STATUS,
 };
@@ -58,6 +62,15 @@ const LIVE_ACTIONS = {
   ADMIN_INTERVENE: "admin_intervene",
 };
 const TERMINAL_STATUSES = ["cancelled", "canceled", "delivered", "closed", "archived"];
+const LIVE_ORDER_STATES = {
+  initial: [STATUS],
+  operational: ["accepted", "preparing", "ready_for_pickup", "assigned_to_driver", "picked_up", "under_review"],
+  terminal: TERMINAL_STATUSES,
+  financial: [FINANCIAL_STATUS_PENDING],
+  communication: [COMMUNICATION_STATUS_RECEIVED, "closed"],
+  incident: [INCIDENT_STATUS_NONE, "open", "resolved"],
+  archive: [ARCHIVE_STATUS_LIVE, "archived"],
+};
 const FORCEABLE_STATUSES = {
   created: "Pedido recibido",
   preparing: "Pedido en preparación",
@@ -332,6 +345,7 @@ exports.operateLiveOrder = onCall({region: REGION}, async (request) => {
     const current = liveOrderState(orderSnap.data() || {});
     validateLiveActor(actor, current, clean.action);
     validateExpectedVersion(clean, current);
+    validateLiveTransition(current, clean.action);
 
     const allowed = allowedLiveActions(current);
     if (!allowed.includes(clean.action)) {
@@ -380,24 +394,17 @@ exports.operateLiveOrder = onCall({region: REGION}, async (request) => {
       humanMessage: effect.humanMessage,
       idempotent: false,
     };
+    const event = liveOrderEvent({
+      clean,
+      actor,
+      current,
+      result,
+      summary: effect.eventSummary,
+      now,
+    });
 
     tx.update(orderRef, patch);
-    tx.create(eventRef, {
-      type: clean.action,
-      summary: effect.eventSummary,
-      reason: clean.reason,
-      actorUid: actor.uid,
-      actorRole: actor.role,
-      previousStatus: current.status,
-      nextStatus: result.status,
-      previousOperationalStatus: current.operationalStatus,
-      nextOperationalStatus: result.operationalStatus,
-      previousVersion: current.version,
-      nextVersion: result.version,
-      actionId: clean.actionId,
-      result,
-      createdAt: now,
-    });
+    tx.create(eventRef, event);
     if (incidentRef) {
       tx.create(incidentRef, {
         status: "open",
@@ -462,6 +469,34 @@ function liveActionId(payload) {
   return `act_${crypto.createHash("sha256").update(stableStringify(payload)).digest("hex").slice(0, 24)}`;
 }
 
+function liveOrderEvent({clean, actor, current, result, summary, now}) {
+  return {
+    type: clean.action,
+    summary,
+    reason: clean.reason,
+    actorUid: actor.uid,
+    actorRole: actor.role,
+    previousStatus: current.status,
+    nextStatus: result.status,
+    previousOperationalStatus: current.operationalStatus,
+    nextOperationalStatus: result.operationalStatus,
+    previousVersion: current.version,
+    nextVersion: result.version,
+    actionId: clean.actionId,
+    result,
+    audit: {
+      orderId: clean.orderId,
+      action: clean.action,
+      actorRole: actor.role,
+      previousResponsibleRole: current.currentResponsibleRole,
+      nextResponsibleRole: result.currentResponsibleRole,
+      previousArchiveStatus: current.archiveStatus,
+      nextArchiveStatus: result.archiveStatus,
+    },
+    createdAt: now,
+  };
+}
+
 function patchValue(patch, field, fallback) {
   return Object.hasOwn(patch, field) ? patch[field] : fallback;
 }
@@ -473,6 +508,27 @@ function isSafeDocumentId(value) {
 function validateExpectedVersion(clean, current) {
   if (current.version !== clean.expectedVersion) {
     throw new HttpsError("failed-precondition", "El pedido cambió. Actualizá la vista antes de operar.");
+  }
+}
+
+function validateLiveTransition(current, action) {
+  if (isTerminalStatus(current.status)) {
+    throw new HttpsError("failed-precondition", "El pedido ya está cerrado.");
+  }
+  if (action === LIVE_ACTIONS.LOCAL_MARK_PREPARING && current.status !== "accepted") {
+    throw new HttpsError("failed-precondition", "El pedido debe estar aceptado antes de prepararse.");
+  }
+  if (action === LIVE_ACTIONS.LOCAL_MARK_READY && current.status !== "preparing") {
+    throw new HttpsError("failed-precondition", "El pedido debe estar en preparación antes de quedar listo.");
+  }
+  if (action === LIVE_ACTIONS.DRIVER_TAKE && current.status !== "ready_for_pickup") {
+    throw new HttpsError("failed-precondition", "El pedido debe estar listo para retiro antes de ser tomado.");
+  }
+  if (action === LIVE_ACTIONS.DRIVER_MARK_PICKED_UP && current.status !== "assigned_to_driver") {
+    throw new HttpsError("failed-precondition", "El pedido debe estar asignado antes de retirarse.");
+  }
+  if (action === LIVE_ACTIONS.DRIVER_MARK_DELIVERED && current.status !== "picked_up") {
+    throw new HttpsError("failed-precondition", "El pedido debe estar retirado antes de entregarse.");
   }
 }
 
@@ -492,6 +548,14 @@ function validateLiveActor(actor, current, action) {
     if (current.storeId !== actor.uid) {
       throw new HttpsError("permission-denied", "El local no corresponde a este pedido.");
     }
+    if (["driver", "admin"].includes(current.currentResponsibleRole) && ![
+      LIVE_ACTIONS.LOCAL_ACCEPT,
+      LIVE_ACTIONS.LOCAL_REJECT,
+      LIVE_ACTIONS.CANCEL_ORDER,
+      LIVE_ACTIONS.OPEN_INCIDENT,
+    ].includes(action)) {
+      throw new HttpsError("permission-denied", "El local no es responsable de esta acción.");
+    }
     return;
   }
   if (actor.role === "driver") {
@@ -510,12 +574,17 @@ function validateLiveActor(actor, current, action) {
     if (action === LIVE_ACTIONS.DRIVER_TAKE && current.assignedActorId && current.assignedActorId !== actor.uid) {
       throw new HttpsError("failed-precondition", "El pedido ya fue tomado por otro repartidor.");
     }
+    if (current.currentResponsibleRole !== "driver") {
+      throw new HttpsError("permission-denied", "El repartidor no es responsable de esta acción.");
+    }
   }
 }
 
 function liveOrderState(order) {
   const status = cleanText(order.status) || STATUS;
   return {
+    id: cleanText(order.id),
+    orderType: cleanText(order.orderType),
     status,
     publicStatus: cleanText(order.publicStatus) || PUBLIC_STATUS,
     operationalStatus: cleanText(order.operationalStatus) || status,
@@ -529,11 +598,21 @@ function liveOrderState(order) {
     assignedActorRole: cleanText(order.assignedActorRole),
     driverId: cleanText(order.driverId),
     storeId: cleanText(order.storeId),
+    trackingNumber: cleanText(order.trackingNumber),
+    publicOrderNumber: cleanText(order.publicOrderNumber || order.trackingNumber),
     source: cleanText(order.source),
     priority: cleanText(order.priority) || (order.activeIncident || order.needsAttention ? "high" : "normal"),
     needsAttention: order.needsAttention === true,
     activeIncident: order.activeIncident === true,
     adminReviewed: order.adminReviewed === true,
+    nextAllowedActions: Array.isArray(order.nextAllowedActions) ? order.nextAllowedActions.map(cleanText).filter(Boolean) : [],
+    createdAt: order.createdAt || null,
+    updatedAt: order.updatedAt || null,
+    lastOperationEvent: order.lastOperationEvent || null,
+    initialSnapshot: order.initialSnapshot || null,
+    liveSnapshot: order.liveSnapshot || null,
+    timeoutPolicy: order.timeoutPolicy || INITIAL_TIMEOUT_POLICY,
+    fallbackPolicy: order.fallbackPolicy || INITIAL_FALLBACK_POLICY,
     version: Number.isInteger(order.version) ? order.version : LIVE_ORDER_VERSION,
   };
 }
@@ -1033,6 +1112,7 @@ function plusOrderData(clean, trackingNumber, now, idempotencyKey) {
 
 function liveBirthContract({orderType, source, idempotencyKey, trackingNumber, snapshot}) {
   const responsibleRole = RESPONSIBLE_ADMIN;
+  const normalizedSnapshot = liveOrderSnapshot({orderType, source, trackingNumber, snapshot});
   const nextAllowedActions = allowedLiveActions({
     source,
     status: STATUS,
@@ -1060,8 +1140,8 @@ function liveBirthContract({orderType, source, idempotencyKey, trackingNumber, s
     activeIncident: false,
     adminReviewed: false,
     nextAllowedActions,
-    liveSnapshot: snapshot,
-    initialSnapshot: snapshot,
+    liveSnapshot: normalizedSnapshot,
+    initialSnapshot: normalizedSnapshot,
     timeoutPolicy: INITIAL_TIMEOUT_POLICY,
     fallbackPolicy: INITIAL_FALLBACK_POLICY,
     version: LIVE_ORDER_VERSION,
@@ -1070,6 +1150,31 @@ function liveBirthContract({orderType, source, idempotencyKey, trackingNumber, s
     publicOrderNumber: trackingNumber,
     isPublicCreated: true,
   };
+}
+
+function liveOrderSnapshot({orderType, source, trackingNumber, snapshot}) {
+  return {
+    schemaVersion: 1,
+    orderType,
+    source,
+    trackingNumber,
+    publicSummary: publicSnapshotSummary(source, snapshot),
+    payload: snapshot,
+  };
+}
+
+function publicSnapshotSummary(source, snapshot) {
+  if (!snapshot || typeof snapshot !== "object") return "";
+  if (source === LOCAL_SOURCE && Array.isArray(snapshot.items)) {
+    return snapshot.items.map((item) => cleanText(item.name)).filter(Boolean).slice(0, 3).join(", ");
+  }
+  if (source === PLUS_BUY_SOURCE && Array.isArray(snapshot.items)) {
+    return snapshot.items.map((item) => cleanText(item.name)).filter(Boolean).slice(0, 3).join(", ");
+  }
+  if (source === PLUS_PICKUP_SHIPPING_SOURCE && Array.isArray(snapshot.items)) {
+    return cleanText(snapshot.items[0] && snapshot.items[0].name);
+  }
+  return "";
 }
 
 async function createOrderWithInitialEvent(orderRef, orderData, now) {
@@ -1091,7 +1196,28 @@ async function createOrderWithInitialEvent(orderRef, orderData, now) {
       previousOperationalStatus: "",
       nextOperationalStatus: orderData.operationalStatus,
       version: orderData.version,
+      previousVersion: 0,
+      nextVersion: orderData.version,
       idempotencyKey: orderData.idempotencyKey,
+      result: {
+        status: orderData.status,
+        publicStatus: orderData.publicStatus,
+        operationalStatus: orderData.operationalStatus,
+        responsibleRole: orderData.responsibleRole,
+        currentResponsibleRole: orderData.currentResponsibleRole,
+        archiveStatus: orderData.archiveStatus,
+        version: orderData.version,
+        nextAllowedActions: orderData.nextAllowedActions,
+        idempotent: false,
+      },
+      audit: {
+        orderType: orderData.orderType,
+        source: orderData.source,
+        previousResponsibleRole: "",
+        nextResponsibleRole: orderData.currentResponsibleRole,
+        previousArchiveStatus: "",
+        nextArchiveStatus: orderData.archiveStatus,
+      },
       createdAt: now,
     });
   });

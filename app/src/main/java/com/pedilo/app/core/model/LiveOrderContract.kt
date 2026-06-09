@@ -26,10 +26,13 @@ enum class LiveOrderFinancialStatus(val wireName: String) {
 
 enum class LiveOrderCommunicationStatus(val wireName: String) {
     Received("received"),
+    Closed("closed"),
 }
 
 enum class LiveOrderIncidentStatus(val wireName: String) {
     None("none"),
+    Open("open"),
+    Resolved("resolved"),
 }
 
 enum class LiveOrderArchiveStatus(val wireName: String) {

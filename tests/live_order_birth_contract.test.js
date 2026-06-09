@@ -31,8 +31,9 @@ test("new public orders are born as non-floating Pedido Vivo Universal records",
     "currentResponsibleRole: responsibleRole",
     "assignedActorId: ASSIGNED_ACTOR_UNASSIGNED",
     "nextAllowedActions",
-    "liveSnapshot: snapshot",
-    "initialSnapshot: snapshot",
+    "const normalizedSnapshot = liveOrderSnapshot",
+    "liveSnapshot: normalizedSnapshot",
+    "initialSnapshot: normalizedSnapshot",
     "timeoutPolicy: INITIAL_TIMEOUT_POLICY",
     "fallbackPolicy: INITIAL_FALLBACK_POLICY",
     "version: LIVE_ORDER_VERSION",
@@ -72,6 +73,10 @@ test("order birth is transactional and writes the initial audit event once", () 
   assert.match(birth, /type: "order_created"/);
   assert.match(birth, /actorRole: "public_user"/);
   assert.match(birth, /version: orderData\.version/);
+  assert.match(birth, /previousVersion: 0/);
+  assert.match(birth, /nextVersion: orderData\.version/);
+  assert.match(birth, /result: \{/);
+  assert.match(birth, /audit: \{/);
   assert.match(birth, /idempotencyKey: orderData\.idempotencyKey/);
 });
 
