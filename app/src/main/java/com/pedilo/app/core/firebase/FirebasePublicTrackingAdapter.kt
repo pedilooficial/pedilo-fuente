@@ -33,6 +33,9 @@ class FirebasePublicTrackingAdapter(
                 orderType = data["orderType"].asText(),
                 storeName = data["storeName"].asText(),
                 summary = data["summary"].asText(),
+                paymentLabel = data["paymentLabel"].asText(),
+                publicTotal = data["publicTotal"].asText(),
+                collectionMessage = data["collectionMessage"].asText(),
                 isClosed = data["isClosed"] as? Boolean ?: false,
             )
         }.fold(

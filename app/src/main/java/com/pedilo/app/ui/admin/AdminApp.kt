@@ -2564,7 +2564,7 @@ private fun AdminOrderDetailScreen(
         AdminOrderNavigationEntry(AdminOrderSection.Summary, Icons.Outlined.Dashboard, "Resumen", statusText),
         AdminOrderNavigationEntry(AdminOrderSection.Operation, operationIconFor(operationTitle), operationTitle, operationNote),
         AdminOrderNavigationEntry(AdminOrderSection.Delivery, Icons.Outlined.LocalShipping, "Entrega", detail.adminPersonName("Sin datos")),
-        AdminOrderNavigationEntry(AdminOrderSection.Payment, Icons.Outlined.Payments, "Pago", (detail?.total ?: summary?.total).adminDisplayValue("Sin datos")),
+        AdminOrderNavigationEntry(AdminOrderSection.Payment, Icons.Outlined.Payments, "Pago", adminFinancialStatusLabel(detail?.financialStatus ?: summary?.financialStatus.orEmpty())),
         AdminOrderNavigationEntry(AdminOrderSection.Problems, Icons.Outlined.ReportProblem, "Problemas", problemFocus?.first ?: "Sin problemas"),
         AdminOrderNavigationEntry(AdminOrderSection.History, Icons.Outlined.History, "Historial", detail?.lastEventSummary.adminDisplayValue("Sin datos")),
         AdminOrderNavigationEntry(AdminOrderSection.Options, Icons.Outlined.Tune, "Opciones", adminActionsSummary(allowedActions)),
@@ -2690,7 +2690,7 @@ private fun AdminOrderSectionScreen(
         )
         AdminOrderSection.Operation -> adminOrderOperationFacts(identity, storeName, detail)
         AdminOrderSection.Delivery -> listOf("Persona" to detail.adminPersonName("Sin datos"))
-        AdminOrderSection.Payment -> listOf("Total" to (detail?.total ?: summary?.total).adminDisplayValue("Sin datos"))
+        AdminOrderSection.Payment -> adminFinancialFacts(summary, detail)
         AdminOrderSection.Problems -> listOf(
             "Estado" to (problem?.first ?: "Sin problemas"),
             "Seguimiento" to (problem?.second ?: "Sin problemas"),
@@ -2756,6 +2756,43 @@ private fun adminOrderOperationFacts(
 
 private fun adminActionsSummary(actions: List<LiveOrderAction>): String =
     if (actions.isEmpty()) "Sin acciones" else "${actions.size} permitidas"
+
+private fun adminFinancialFacts(summary: AdminOrderSummary?, detail: AdminOrderDetail?): List<Pair<String, String>> =
+    listOf(
+        "Estado financiero" to adminFinancialStatusLabel(detail?.financialStatus ?: summary?.financialStatus.orEmpty()),
+        "Método" to adminPaymentMethodLabel(detail?.paymentMethod ?: summary?.paymentMethod.orEmpty()),
+        "Total" to (detail?.total ?: summary?.total).adminMoneyLabel(),
+        "Monto a cobrar" to (detail?.amountToCollect ?: summary?.amountToCollect).adminMoneyLabel(),
+        "Cobro requerido" to if (detail?.collectionRequired ?: summary?.collectionRequired ?: false) "Sí" else "No",
+        "Responsable de cobro" to (detail?.cashResponsibleRole ?: summary?.cashResponsibleRole.orEmpty()).adminDisplayValue("No aplica"),
+        "Nota financiera" to detail?.financialNotes.adminDisplayValue("Sin nota financiera"),
+    )
+
+private fun adminPaymentMethodLabel(value: String): String =
+    when (value.trim()) {
+        "cash" -> "Efectivo"
+        "transfer" -> "Transferencia declarada"
+        "already_paid" -> "Pago declarado"
+        else -> "Pago en revisión"
+    }
+
+private fun adminFinancialStatusLabel(value: String): String =
+    when (value.trim()) {
+        "collect_on_delivery" -> "Cobro en entrega"
+        "transfer_declared_pending" -> "Transferencia pendiente"
+        "paid_declared" -> "Pago declarado"
+        "pending_review" -> "Revisión financiera"
+        "settlement_pending" -> "Rendición pendiente"
+        "settled" -> "Cerrado"
+        "disputed" -> "Disputa"
+        "rejected" -> "Rechazado"
+        else -> value.adminDisplayValue("Estado financiero no informado")
+    }
+
+private fun String?.adminMoneyLabel(): String {
+    val cents = this?.toLongOrNull() ?: return this.adminDisplayValue("Sin datos")
+    return "\$${cents / 100}"
+}
 
 private fun LiveOrderAction.adminActionLabel(): String =
     when (this) {

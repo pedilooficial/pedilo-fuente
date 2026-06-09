@@ -22,6 +22,15 @@ enum class LiveOrderOperationalStatus(val wireName: String) {
 
 enum class LiveOrderFinancialStatus(val wireName: String) {
     PendingReview("pending_review"),
+    PendingPayment("pending_payment"),
+    CollectOnDelivery("collect_on_delivery"),
+    TransferDeclaredPending("transfer_declared_pending"),
+    PaidDeclared("paid_declared"),
+    ConfirmedInternal("confirmed_internal"),
+    Rejected("rejected"),
+    Disputed("disputed"),
+    SettlementPending("settlement_pending"),
+    Settled("settled"),
 }
 
 enum class LiveOrderCommunicationStatus(val wireName: String) {

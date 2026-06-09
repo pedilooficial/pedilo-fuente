@@ -151,6 +151,11 @@ class FirebaseDriverOrdersAdapter(
             storeLabel = storeLabel(),
             itemsSummary = itemsSummary(),
             total = get(TOTAL)?.toString().orEmpty(),
+            paymentMethod = getString(PAYMENT_METHOD).orEmpty(),
+            financialStatus = getString(FINANCIAL_STATUS).orEmpty(),
+            amountToCollect = get(AMOUNT_TO_COLLECT)?.toString().orEmpty(),
+            collectionRequired = getBoolean(COLLECTION_REQUIRED) ?: false,
+            cashResponsibleRole = getString(CASH_RESPONSIBLE_ROLE).orEmpty(),
             nextAllowedActions = driverAllowedActions(uid),
             version = version(),
             activeIncident = getBoolean(ACTIVE_INCIDENT) ?: false,
@@ -267,6 +272,11 @@ class FirebaseDriverOrdersAdapter(
         const val ACTIVE_INCIDENT = "activeIncident"
         const val VERSION = "version"
         const val TOTAL = "total"
+        const val PAYMENT_METHOD = "paymentMethod"
+        const val FINANCIAL_STATUS = "financialStatus"
+        const val AMOUNT_TO_COLLECT = "amountToCollect"
+        const val COLLECTION_REQUIRED = "collectionRequired"
+        const val CASH_RESPONSIBLE_ROLE = "cashResponsibleRole"
         const val ITEMS = "items"
         const val ITEM_NAME = "name"
         const val ITEM_QTY = "quantity"

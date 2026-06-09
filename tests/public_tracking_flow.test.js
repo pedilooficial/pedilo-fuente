@@ -24,13 +24,13 @@ test("tracking use case rejects empty input and normalizes the number", () => {
   assert.match(source, /trackingPort\.getPublicTracking\(cleanTrackingNumber\)/);
 });
 
-test("public tracking model exposes only public fields", () => {
+test("public tracking model exposes only public fields including safe finance labels", () => {
   const source = read(model);
 
-  for (const field of ["found", "trackingNumber", "publicStatus", "humanMessage", "orderType", "storeName", "summary", "isClosed"]) {
+  for (const field of ["found", "trackingNumber", "publicStatus", "humanMessage", "orderType", "storeName", "summary", "paymentLabel", "publicTotal", "collectionMessage", "isClosed"]) {
     assert.match(source, new RegExp(`val ${field}`));
   }
-  assert.doesNotMatch(source, /phone|address|driverId|role|payment/i);
+  assert.doesNotMatch(source, /phone|address|driverId|debt|cashbox|settlement|audit|rendicion|rendición/i);
 });
 
 test("tracking adapter uses callable and never reads orders directly", () => {

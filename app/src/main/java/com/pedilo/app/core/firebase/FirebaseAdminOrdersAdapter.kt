@@ -82,6 +82,12 @@ class FirebaseAdminOrdersAdapter(
                 createdAtMillis = (doc.get(CREATED_AT) as? Timestamp)?.toDate()?.time,
                 updatedAtMillis = (doc.get(UPDATED_AT) as? Timestamp)?.toDate()?.time,
                 total = doc.get(TOTAL)?.toString().orEmpty(),
+                paymentMethod = doc.getString(PAYMENT_METHOD).orEmpty(),
+                amountToCollect = doc.get(AMOUNT_TO_COLLECT)?.toString().orEmpty(),
+                collectedAmount = doc.get(COLLECTED_AMOUNT)?.toString().orEmpty(),
+                collectionRequired = doc.getBoolean(COLLECTION_REQUIRED) ?: false,
+                cashResponsibleRole = doc.getString(CASH_RESPONSIBLE_ROLE).orEmpty(),
+                financialNotes = doc.getString(FINANCIAL_NOTES).orEmpty(),
                 itemsSummary = itemsSummary,
                 lastEventSummary = lastEvent[EVENT_SUMMARY].orEmptyText(),
                 orderType = doc.getString(ORDER_TYPE).orEmpty(),
@@ -198,6 +204,11 @@ class FirebaseAdminOrdersAdapter(
             storeName = getString(STORE_NAME).orEmpty(),
             createdAtMillis = (get(CREATED_AT) as? Timestamp)?.toDate()?.time,
             total = get(TOTAL)?.toString().orEmpty(),
+            paymentMethod = getString(PAYMENT_METHOD).orEmpty(),
+            amountToCollect = get(AMOUNT_TO_COLLECT)?.toString().orEmpty(),
+            collectedAmount = get(COLLECTED_AMOUNT)?.toString().orEmpty(),
+            collectionRequired = getBoolean(COLLECTION_REQUIRED) ?: false,
+            cashResponsibleRole = getString(CASH_RESPONSIBLE_ROLE).orEmpty(),
             orderType = getString(ORDER_TYPE).orEmpty(),
             financialStatus = getString(FINANCIAL_STATUS).orEmpty(),
             communicationStatus = getString(COMMUNICATION_STATUS).orEmpty(),
@@ -281,6 +292,12 @@ class FirebaseAdminOrdersAdapter(
         const val CREATED_AT = "createdAt"
         const val UPDATED_AT = "updatedAt"
         const val TOTAL = "total"
+        const val PAYMENT_METHOD = "paymentMethod"
+        const val AMOUNT_TO_COLLECT = "amountToCollect"
+        const val COLLECTED_AMOUNT = "collectedAmount"
+        const val COLLECTION_REQUIRED = "collectionRequired"
+        const val CASH_RESPONSIBLE_ROLE = "cashResponsibleRole"
+        const val FINANCIAL_NOTES = "financialNotes"
         const val ITEMS = "items"
         const val ITEM_NAME = "name"
         const val ITEM_QTY = "quantity"

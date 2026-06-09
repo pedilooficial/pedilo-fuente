@@ -212,8 +212,8 @@ fun DriverApp(onSignOutConfirmed: () -> Unit) {
                 item {
                     DriverInfoCard(
                         "Cobro y caja",
-                        "Visual no persistente: no registra cobros, cierre de caja, deuda, liquidaciones ni comprobantes.",
-                        PediloMuted,
+                        current.driverFinancialSummary(),
+                        if (current.collectionRequired) PediloOrange else PediloMuted,
                     )
                 }
                 if (current.nextAllowedActions.isEmpty()) {
@@ -339,7 +339,11 @@ private fun DriverOrderDetailCard(order: DriverOrderDetail) {
         order.itemsSummary.forEach {
             Text(it, color = PediloText, fontSize = 14.sp, lineHeight = 18.sp)
         }
-        Text("Total referencial: ${order.total.ifBlank { "No informado" }}. No registra cobro.", color = PediloMuted, fontSize = 13.sp)
+        Text("Total: ${order.total.asMoneyLabel()}", color = PediloMuted, fontSize = 13.sp)
+        Text("Pago: ${order.paymentMethod.paymentMethodLabel()} · ${order.financialStatus.financialStatusLabel()}", color = PediloMuted, fontSize = 13.sp)
+        if (order.collectionRequired) {
+            Text("A cobrar: ${order.amountToCollect.asMoneyLabel()} · responsable ${order.cashResponsibleRole.ifBlank { "no asignado" }}", color = PediloOrange, fontSize = 13.sp)
+        }
     }
 }
 
@@ -416,6 +420,35 @@ private fun DriverOrderDetail.driverActionNeeded(): String =
         nextAllowedActions.contains(LiveOrderAction.CancelOrder) -> "Operar o cancelar con motivo si corresponde"
         else -> "Sin acción disponible para repartidor"
     }
+
+private fun DriverOrderDetail.driverFinancialSummary(): String =
+    if (collectionRequired) {
+        "Cobro operativo requerido: ${amountToCollect.asMoneyLabel()} al recibir. Caja, deuda, cierre y bloqueo financiero no persisten en este bloque."
+    } else {
+        "${paymentMethod.paymentMethodLabel()} · ${financialStatus.financialStatusLabel()}. Sin caja, deuda, cierre ni bloqueo financiero persistente."
+    }
+
+private fun String.paymentMethodLabel(): String =
+    when (trim()) {
+        "cash" -> "Efectivo"
+        "transfer" -> "Transferencia declarada"
+        "already_paid" -> "Pago declarado"
+        else -> "Pago en revisión"
+    }
+
+private fun String.financialStatusLabel(): String =
+    when (trim()) {
+        "collect_on_delivery" -> "Cobro en entrega"
+        "transfer_declared_pending" -> "Transferencia pendiente"
+        "paid_declared" -> "Pago declarado"
+        "pending_review" -> "Revisión financiera"
+        else -> ifBlank { "Estado financiero no informado" }
+    }
+
+private fun String.asMoneyLabel(): String {
+    val cents = toLongOrNull() ?: return ifBlank { "No informado" }
+    return "\$${cents / 100}"
+}
 
 private fun CoreError.driverErrorMessage(): String =
     when (this) {

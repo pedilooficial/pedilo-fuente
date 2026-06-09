@@ -18,6 +18,18 @@ const STATUS = "created";
 const PUBLIC_STATUS = "Pedido recibido";
 const LIVE_ORDER_VERSION = 1;
 const FINANCIAL_STATUS_PENDING = "pending_review";
+const FINANCIAL_STATUS_COLLECT_ON_DELIVERY = "collect_on_delivery";
+const FINANCIAL_STATUS_TRANSFER_DECLARED = "transfer_declared_pending";
+const FINANCIAL_STATUS_PAID_DECLARED = "paid_declared";
+const FINANCIAL_STATUS_CONFIRMED_INTERNAL = "confirmed_internal";
+const FINANCIAL_STATUS_REJECTED = "rejected";
+const FINANCIAL_STATUS_DISPUTED = "disputed";
+const FINANCIAL_STATUS_SETTLEMENT_PENDING = "settlement_pending";
+const FINANCIAL_STATUS_SETTLED = "settled";
+const PAYMENT_METHOD_CASH = "cash";
+const PAYMENT_METHOD_TRANSFER = "transfer";
+const PAYMENT_METHOD_CARD = "card";
+const PAYMENT_METHOD_ALREADY_PAID = "already_paid";
 const COMMUNICATION_STATUS_RECEIVED = "received";
 const INCIDENT_STATUS_NONE = "none";
 const ARCHIVE_STATUS_LIVE = "live";
@@ -66,7 +78,18 @@ const LIVE_ORDER_STATES = {
   initial: [STATUS],
   operational: ["accepted", "preparing", "ready_for_pickup", "assigned_to_driver", "picked_up", "under_review"],
   terminal: TERMINAL_STATUSES,
-  financial: [FINANCIAL_STATUS_PENDING],
+  financial: [
+    FINANCIAL_STATUS_PENDING,
+    "pending_payment",
+    FINANCIAL_STATUS_COLLECT_ON_DELIVERY,
+    FINANCIAL_STATUS_TRANSFER_DECLARED,
+    FINANCIAL_STATUS_PAID_DECLARED,
+    FINANCIAL_STATUS_CONFIRMED_INTERNAL,
+    FINANCIAL_STATUS_REJECTED,
+    FINANCIAL_STATUS_DISPUTED,
+    FINANCIAL_STATUS_SETTLEMENT_PENDING,
+    FINANCIAL_STATUS_SETTLED,
+  ],
   communication: [COMMUNICATION_STATUS_RECEIVED, "closed"],
   incident: [INCIDENT_STATUS_NONE, "open", "resolved"],
   archive: [ARCHIVE_STATUS_LIVE, "archived"],
@@ -123,6 +146,12 @@ exports.createLocalOrder = onCall({region: REGION}, async (request) => {
   }
 
   const subtotal = items.reduce((sum, item) => sum + (item.total || 0), 0);
+  const finance = buildFinancialContract({
+    paymentMethod: clean.paymentMethod,
+    subtotal,
+    source: LOCAL_SOURCE,
+    orderType: "local_order",
+  });
   const idempotencyKey = publicIdempotencyKey(LOCAL_SOURCE, clean);
   const orderRef = db.collection(ORDERS).doc(idempotencyKey);
   const trackingNumber = publicNumberFor(orderRef.id);
@@ -146,9 +175,7 @@ exports.createLocalOrder = onCall({region: REGION}, async (request) => {
       items,
       delivery,
       pricing: {
-        subtotal,
-        total: subtotal,
-        paymentMethod: clean.paymentMethod,
+        ...finance.financialSnapshot,
       },
       note: clean.note,
     },
@@ -162,9 +189,7 @@ exports.createLocalOrder = onCall({region: REGION}, async (request) => {
     delivery,
     items,
     note: clean.note,
-    paymentMethod: clean.paymentMethod,
-    subtotal,
-    total: subtotal,
+    ...finance,
     createdAt: now,
     updatedAt: now,
   }, now);
@@ -1050,6 +1075,114 @@ function cleanPlusOrderPayload(payload) {
   };
 }
 
+function buildFinancialContract({paymentMethod, subtotal, source, orderType}) {
+  const normalizedMethod = normalizePaymentMethod(paymentMethod);
+  const cleanSubtotal = assertValidMoneyAmount(subtotal, "subtotal");
+  const deliveryFee = 0;
+  const extraFees = [];
+  const discounts = [];
+  const total = cleanSubtotal + deliveryFee + extraFees.reduce((sum, fee) => sum + assertValidMoneyAmount(fee.amount || 0, "extraFee"), 0) -
+    discounts.reduce((sum, discount) => sum + assertValidMoneyAmount(discount.amount || 0, "discount"), 0);
+
+  if (total < 0) {
+    throw new HttpsError("invalid-argument", "El total financiero no puede ser negativo.");
+  }
+
+  const collectionRequired = normalizedMethod === PAYMENT_METHOD_CASH;
+  const amountToCollect = collectionRequired ? total : 0;
+  const collectedAmount = 0;
+  const financialStatus = financialStatusForPaymentMethod(normalizedMethod);
+  const cashResponsibleRole = collectionRequired ? "driver" : "";
+  const cashResponsibleActorId = "";
+  const financialNotes = financialNotesForPaymentMethod(normalizedMethod);
+  const financialSnapshot = {
+    schemaVersion: 1,
+    source,
+    orderType,
+    financialStatus,
+    paymentMethod: normalizedMethod,
+    subtotal: cleanSubtotal,
+    deliveryFee,
+    extraFees,
+    discounts,
+    total,
+    amountToCollect,
+    collectedAmount,
+    collectionRequired,
+    cashResponsibleRole,
+    cashResponsibleActorId,
+    financialNotes,
+  };
+
+  return {
+    financialStatus,
+    paymentMethod: normalizedMethod,
+    subtotal: cleanSubtotal,
+    deliveryFee,
+    extraFees,
+    discounts,
+    total,
+    amountToCollect,
+    collectedAmount,
+    collectionRequired,
+    cashResponsibleRole,
+    cashResponsibleActorId,
+    financialSnapshot,
+    financialUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    financialNotes,
+  };
+}
+
+function normalizePaymentMethod(value) {
+  const clean = cleanText(value).toLowerCase();
+  if (["cash", "efectivo", "efectivo al recibir", "pagar al retirar", "pago al retirar"].includes(clean)) {
+    return PAYMENT_METHOD_CASH;
+  }
+  if (["transfer", "transferencia", "transferencia bancaria"].includes(clean)) {
+    return PAYMENT_METHOD_TRANSFER;
+  }
+  if (["already_paid", "paid", "ya esta pago", "ya está pago", "pagado"].includes(clean)) {
+    return PAYMENT_METHOD_ALREADY_PAID;
+  }
+  if (["card", "tarjeta", "credit_card", "debit_card"].includes(clean)) {
+    throw new HttpsError("failed-precondition", "Tarjeta no está disponible: no hay pasarela de pago activa.");
+  }
+  throw new HttpsError("invalid-argument", "Elegí una forma de pago válida.");
+}
+
+function financialStatusForPaymentMethod(paymentMethod) {
+  if (paymentMethod === PAYMENT_METHOD_CASH) return FINANCIAL_STATUS_COLLECT_ON_DELIVERY;
+  if (paymentMethod === PAYMENT_METHOD_TRANSFER) return FINANCIAL_STATUS_TRANSFER_DECLARED;
+  if (paymentMethod === PAYMENT_METHOD_ALREADY_PAID) return FINANCIAL_STATUS_PAID_DECLARED;
+  return FINANCIAL_STATUS_PENDING;
+}
+
+function financialNotesForPaymentMethod(paymentMethod) {
+  if (paymentMethod === PAYMENT_METHOD_CASH) return "Cobro en entrega pendiente de rendición operativa.";
+  if (paymentMethod === PAYMENT_METHOD_TRANSFER) return "Transferencia declarada por el usuario; no validada bancariamente.";
+  if (paymentMethod === PAYMENT_METHOD_ALREADY_PAID) return "Pago declarado por el usuario; no confirmado por pasarela externa.";
+  return "Revisión financiera pendiente.";
+}
+
+function assertValidMoneyAmount(value, label) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || !Number.isInteger(number) || number < 0) {
+    throw new HttpsError("invalid-argument", `El monto ${label} no es válido.`);
+  }
+  return number;
+}
+
+function parsePublicAmountToCents(value) {
+  const clean = cleanText(value);
+  if (!clean) return 0;
+  const normalized = clean.replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".");
+  const amount = Number(normalized);
+  if (!Number.isFinite(amount) || amount < 0) {
+    throw new HttpsError("invalid-argument", "El monto informado no es válido.");
+  }
+  return Math.round(amount * 100);
+}
+
 function cleanPlusItem(item) {
   return {
     name: cleanText(item.name),
@@ -1059,6 +1192,13 @@ function cleanPlusItem(item) {
 
 function plusOrderData(clean, trackingNumber, now, idempotencyKey) {
   const orderType = clean.requestType === "buy" ? "direct_purchase" : "pickup_shipping";
+  const subtotal = parsePublicAmountToCents(clean.amount);
+  const finance = buildFinancialContract({
+    paymentMethod: clean.paymentMethod,
+    subtotal,
+    source: clean.source,
+    orderType,
+  });
   const base = liveBirthContract({
     orderType,
     source: clean.source,
@@ -1071,7 +1211,7 @@ function plusOrderData(clean, trackingNumber, now, idempotencyKey) {
       items: clean.items,
       sourceReference: clean.sourceReference,
       destination: clean.destination,
-      paymentMethod: clean.paymentMethod,
+      financialSnapshot: finance.financialSnapshot,
       amount: clean.amount,
       schedule: clean.schedule,
       note: clean.note,
@@ -1084,8 +1224,8 @@ function plusOrderData(clean, trackingNumber, now, idempotencyKey) {
     requestType: clean.requestType,
     customer: clean.customer,
     note: clean.note,
-    paymentMethod: clean.paymentMethod,
     amount: clean.amount,
+    ...finance,
     schedule: clean.schedule,
     createdAt: now,
     updatedAt: now,
@@ -1295,6 +1435,9 @@ function publicTrackingResponse(order, requestedTrackingNumber) {
       orderType: publicOrderType(order),
       storeName: "",
       summary: "",
+      paymentLabel: publicPaymentLabel(order),
+      publicTotal: publicMoneyLabel(order.total),
+      collectionMessage: publicCollectionMessage(order),
       isClosed: true,
     };
   }
@@ -1308,8 +1451,38 @@ function publicTrackingResponse(order, requestedTrackingNumber) {
     orderType: publicOrderType(order),
     storeName: cleanText(order.storeName),
     summary: publicOrderSummary(order),
+    paymentLabel: publicPaymentLabel(order),
+    publicTotal: publicMoneyLabel(order.total),
+    collectionMessage: publicCollectionMessage(order),
     isClosed: false,
   };
+}
+
+function publicPaymentLabel(order) {
+  const method = cleanText(order.paymentMethod).toLowerCase();
+  if (method === PAYMENT_METHOD_CASH) return "Efectivo al recibir";
+  if (method === PAYMENT_METHOD_TRANSFER) return "Transferencia declarada";
+  if (method === PAYMENT_METHOD_ALREADY_PAID) return "Pago declarado";
+  return "Forma de pago en revisión";
+}
+
+function publicCollectionMessage(order) {
+  if (order.collectionRequired === true && Number(order.amountToCollect) > 0) {
+    return `Monto a pagar al recibir: ${publicMoneyLabel(order.amountToCollect)}`;
+  }
+  if (cleanText(order.paymentMethod) === PAYMENT_METHOD_TRANSFER) {
+    return "Transferencia pendiente de revisión; no se valida automáticamente.";
+  }
+  if (cleanText(order.paymentMethod) === PAYMENT_METHOD_ALREADY_PAID) {
+    return "Pago declarado; no confirmado por pasarela externa.";
+  }
+  return "Sin cobro al recibir informado.";
+}
+
+function publicMoneyLabel(value) {
+  const cents = Number(value);
+  if (!Number.isFinite(cents) || cents < 0) return "Sin total informado";
+  return `$${Math.round(cents / 100).toLocaleString("es-AR")}`;
 }
 
 function publicStatusCode(status) {

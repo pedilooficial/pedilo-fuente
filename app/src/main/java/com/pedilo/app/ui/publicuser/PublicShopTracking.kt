@@ -160,6 +160,16 @@ fun PublicShopTrackingScreen(
                             )
                         }
                     }
+                    if (state.paymentLabel.isNotBlank() || state.publicTotal.isNotBlank()) {
+                        item {
+                            TrackingInfoCard(
+                                icon = TrackingIconKind.Clock,
+                                label = "Pago",
+                                value = listOf(state.paymentLabel, state.publicTotal).filter { it.isNotBlank() }.joinToString(" · "),
+                                detail = state.collectionMessage.takeIf { it.isNotBlank() },
+                            )
+                        }
+                    }
                 } else {
                     item { TrackingMessageCard(state.publicStatus, state.humanMessage, TrackingIconKind.Warning) }
                 }

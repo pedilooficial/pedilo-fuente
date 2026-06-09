@@ -77,7 +77,8 @@ test("store non persistent areas are explicit for stock delivery request and fin
   assert.match(ui, /Solicitud de repartidor/);
   assert.match(ui, /El local no solicita repartidor desde esta pantalla/);
   assert.match(ui, /Finanzas/);
-  assert.match(ui, /Sin caja, deuda, liquidaciones ni pagos reales/);
+  assert.match(ui, /estado financiero mínimo/);
+  assert.match(ui, /Caja, deuda y liquidaciones siguen fuera/);
   assert.match(ui, /producto no disponible, demora o problema operativo/);
 });
 

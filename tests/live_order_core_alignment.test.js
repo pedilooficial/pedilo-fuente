@@ -100,7 +100,10 @@ test("live order state contract lists current B states and declarative timeout f
   assert.deepEqual(Array.from(api.LIVE_ORDER_STATES.initial), ["created"]);
   assert.ok(api.LIVE_ORDER_STATES.operational.includes("ready_for_pickup"));
   assert.ok(api.LIVE_ORDER_STATES.terminal.includes("delivered"));
-  assert.deepEqual(Array.from(api.LIVE_ORDER_STATES.financial), ["pending_review"]);
+  assert.ok(api.LIVE_ORDER_STATES.financial.includes("pending_review"));
+  assert.ok(api.LIVE_ORDER_STATES.financial.includes("collect_on_delivery"));
+  assert.ok(api.LIVE_ORDER_STATES.financial.includes("transfer_declared_pending"));
+  assert.ok(api.LIVE_ORDER_STATES.financial.includes("paid_declared"));
   assert.ok(api.LIVE_ORDER_STATES.communication.includes("closed"));
   assert.ok(api.LIVE_ORDER_STATES.incident.includes("open"));
   assert.ok(api.LIVE_ORDER_STATES.archive.includes("archived"));

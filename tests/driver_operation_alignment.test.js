@@ -126,8 +126,8 @@ test("driver detail exposes operational essentials and no raw payload or real fi
     "Capacidad",
     "Preparación: no hay motor seguro",
     "Cobro y caja",
-    "Visual no persistente",
-    "No registra cobro",
+    "Cobro operativo requerido",
+    "Caja, deuda, cierre y bloqueo financiero no persisten",
   ]) {
     assert.match(source, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }

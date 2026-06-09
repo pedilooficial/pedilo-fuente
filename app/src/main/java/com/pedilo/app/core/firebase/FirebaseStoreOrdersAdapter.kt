@@ -106,6 +106,10 @@ class FirebaseStoreOrdersAdapter(
             contactName = customerName(),
             itemsSummary = itemsSummary(),
             total = get(TOTAL)?.toString().orEmpty(),
+            paymentMethod = getString(PAYMENT_METHOD).orEmpty(),
+            financialStatus = getString(FINANCIAL_STATUS).orEmpty(),
+            amountToCollect = get(AMOUNT_TO_COLLECT)?.toString().orEmpty(),
+            collectionRequired = getBoolean(COLLECTION_REQUIRED) ?: false,
             nextAllowedActions = nextAllowedActions().storeAllowedOnly(),
             version = version(),
             activeIncident = getBoolean(ACTIVE_INCIDENT) ?: false,
@@ -173,6 +177,10 @@ class FirebaseStoreOrdersAdapter(
         const val ACTIVE_INCIDENT = "activeIncident"
         const val VERSION = "version"
         const val TOTAL = "total"
+        const val PAYMENT_METHOD = "paymentMethod"
+        const val FINANCIAL_STATUS = "financialStatus"
+        const val AMOUNT_TO_COLLECT = "amountToCollect"
+        const val COLLECTION_REQUIRED = "collectionRequired"
         const val ITEMS = "items"
         const val ITEM_NAME = "name"
         const val ITEM_QTY = "quantity"

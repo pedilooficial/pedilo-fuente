@@ -9,5 +9,8 @@ data class PublicTrackingState(
     val orderType: String = "",
     val storeName: String = "",
     val summary: String = "",
+    val paymentLabel: String = "",
+    val publicTotal: String = "",
+    val collectionMessage: String = "",
     val isClosed: Boolean = false,
 )

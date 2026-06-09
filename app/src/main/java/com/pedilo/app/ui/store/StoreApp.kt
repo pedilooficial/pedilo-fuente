@@ -155,7 +155,7 @@ fun StoreApp(onSignOutConfirmed: () -> Unit) {
                 }
                 item { StoreInfoCard("Productos y stock", "Gestión visual no disponible en este bloque. No se guardan cambios de catálogo ni disponibilidad.", PediloMuted) }
                 item { StoreInfoCard("Solicitud de repartidor", "La asignación real queda a cargo del flujo operativo seguro. El local no solicita repartidor desde esta pantalla.", PediloMuted) }
-                item { StoreInfoCard("Finanzas", "Sin caja, deuda, liquidaciones ni pagos reales en este bloque.", PediloMuted) }
+                item { StoreInfoCard("Finanzas", "El pedido trae estado financiero mínimo. Caja, deuda y liquidaciones siguen fuera de esta pantalla.", PediloMuted) }
             }
         } else {
             item {
@@ -289,6 +289,10 @@ private fun StoreOrderDetailCard(order: StoreOrderDetail) {
             Text(it, color = PediloText, fontSize = 14.sp, lineHeight = 18.sp)
         }
         Text("Total: ${order.total.ifBlank { "No informado" }}", color = PediloMuted, fontSize = 13.sp)
+        Text("Pago: ${order.paymentMethod.storePaymentLabel()} · ${order.financialStatus.storeFinancialLabel()}", color = PediloMuted, fontSize = 13.sp)
+        if (order.collectionRequired) {
+            Text("Cobro al recibir: ${order.amountToCollect.storeMoneyLabel()}", color = PediloOrange, fontSize = 13.sp)
+        }
     }
 }
 
@@ -348,6 +352,28 @@ private fun LiveOrderAction.storeImpact(): String =
 
 private fun LiveOrderAction.requiresStoreReason(): Boolean =
     this in setOf(LiveOrderAction.LocalReject, LiveOrderAction.CancelOrder, LiveOrderAction.OpenIncident)
+
+private fun String.storePaymentLabel(): String =
+    when (trim()) {
+        "cash" -> "Efectivo"
+        "transfer" -> "Transferencia declarada"
+        "already_paid" -> "Pago declarado"
+        else -> "Pago en revisión"
+    }
+
+private fun String.storeFinancialLabel(): String =
+    when (trim()) {
+        "collect_on_delivery" -> "Cobro en entrega"
+        "transfer_declared_pending" -> "Transferencia pendiente"
+        "paid_declared" -> "Pago declarado"
+        "pending_review" -> "Revisión financiera"
+        else -> ifBlank { "Estado financiero no informado" }
+    }
+
+private fun String.storeMoneyLabel(): String {
+    val cents = toLongOrNull() ?: return ifBlank { "No informado" }
+    return "\$${cents / 100}"
+}
 
 private fun CoreError.storeErrorMessage(): String =
     when (this) {
