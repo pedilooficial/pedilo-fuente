@@ -160,3 +160,95 @@ data class AdminOrderActionResult(
     val eventSummary: String,
     val humanMessage: String,
 )
+
+data class AdminOperationalHealthReport(
+    val healthStatus: String = "unknown",
+    val severity: String = "unknown",
+    val generatedAt: String = "",
+    val metrics: AdminOperationalHealthMetrics = AdminOperationalHealthMetrics(),
+    val modules: List<AdminModuleHealth> = emptyList(),
+    val alerts: List<AdminHealthAlert> = emptyList(),
+    val criticalEvents: List<AdminCriticalEvent> = emptyList(),
+    val auditSummary: AdminAuditSummary = AdminAuditSummary(),
+    val securitySignals: List<AdminHealthAlert> = emptyList(),
+)
+
+data class AdminOperationalHealthMetrics(
+    val liveOrders: Int = 0,
+    val pendingReviewOrders: Int = 0,
+    val openIncidentOrders: Int = 0,
+    val cancelledOrders: Int = 0,
+    val closedOrders: Int = 0,
+    val failedCommunicationOrders: Int = 0,
+    val preparedCommunicationOrders: Int = 0,
+    val disabledCommunicationOrders: Int = 0,
+    val financialReviewOrders: Int = 0,
+    val pendingAiSuggestionOrders: Int = 0,
+    val publicClaimsReceived: Int = 0,
+    val linkedPublicClaims: Int = 0,
+    val unlinkedPublicClaims: Int = 0,
+    val requiresAttention: Int = 0,
+    val collectOnDeliveryOrders: Int = 0,
+    val transferDeclaredPending: Int = 0,
+    val paidDeclaredUnconfirmed: Int = 0,
+    val collectionPendingOrders: Int = 0,
+    val openIncidents: Int = 0,
+    val resolvedIncidents: Int = 0,
+    val unresolvedIncidents: Int = 0,
+    val aiSuggested: Int = 0,
+    val aiAccepted: Int = 0,
+    val aiRejected: Int = 0,
+    val aiNotApplicable: Int = 0,
+    val highRiskAi: Int = 0,
+    val whatsappDisabled: Boolean = true,
+    val pushDisabled: Boolean = true,
+    val externalAiDisabled: Boolean = true,
+    val engineVersion: String = "",
+    val providerStatus: String = "disabled",
+)
+
+data class AdminModuleHealth(
+    val key: String,
+    val label: String,
+    val moduleStatus: String,
+    val healthStatus: String,
+    val severity: String,
+    val warningCode: String,
+    val warningMessage: String,
+)
+
+data class AdminHealthAlert(
+    val healthStatus: String,
+    val severity: String,
+    val scope: String,
+    val source: String,
+    val metricKey: String,
+    val metricValue: String,
+    val warningCode: String,
+    val warningMessage: String,
+    val requiresAdminReview: Boolean,
+    val relatedOrderId: String = "",
+)
+
+data class AdminCriticalEvent(
+    val relatedOrderId: String,
+    val source: String,
+    val type: String,
+    val summary: String,
+    val actorRole: String,
+    val previousStatus: String,
+    val nextStatus: String,
+    val severity: String,
+)
+
+data class AdminAuditSummary(
+    val ordersWithEvents: Int = 0,
+    val orderEventRecords: Int = 0,
+    val incidentRecords: Int = 0,
+    val claimRecords: Int = 0,
+    val communicationRecords: Int = 0,
+    val aiDecisionRecords: Int = 0,
+    val publicClaimRecords: Int = 0,
+    val exposesPublicAudit: Boolean = false,
+    val correctiveActionsExecuted: Boolean = false,
+)

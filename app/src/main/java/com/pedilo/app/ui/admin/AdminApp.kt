@@ -86,6 +86,7 @@ import com.pedilo.app.core.model.AdminOperationOrderClassification
 import com.pedilo.app.core.model.AdminOperationOrderSignals
 import com.pedilo.app.core.model.AdminOrderDetail
 import com.pedilo.app.core.model.AdminOrderSummary
+import com.pedilo.app.core.model.AdminOperationalHealthReport
 import com.pedilo.app.core.model.AdminProblemOrdersBucket
 import com.pedilo.app.core.model.LiveOrderAction
 import com.pedilo.app.core.result.CoreError
@@ -772,6 +773,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
     var showSignOut by remember { mutableStateOf(false) }
     var readOnlyOrders by remember { mutableStateOf<List<AdminOrderSummary>>(emptyList()) }
     var readOnlyOrderDetails by remember { mutableStateOf<Map<String, AdminOrderDetail>>(emptyMap()) }
+    var operationalHealth by remember { mutableStateOf<AdminOperationalHealthReport?>(null) }
     var operationMessage by remember { mutableStateOf("") }
     var operationError by remember { mutableStateOf("") }
     var pendingLiveAction by remember { mutableStateOf<AdminPendingLiveAction?>(null) }
@@ -818,6 +820,10 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
     }
 
     LaunchedEffect(Unit) {
+        when (val result = adminOrders.getHealth()) {
+            is CoreResult.Success -> operationalHealth = result.value
+            is CoreResult.Failure -> operationalHealth = null
+        }
         adminOrders.observe().collect { result ->
             when (result) {
                 is CoreResult.Success -> readOnlyOrders = result.value
@@ -899,6 +905,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
         when (val current = route) {
             AdminRoute.Operation -> AdminOperationDeskScreen(
                 orders = readOnlyOrders,
+                health = operationalHealth,
                 onOpenView = { viewTitle ->
                     operationUniverses.firstOrNull { it.key == AdminOperationUniverseKey.Orders }?.let { universe ->
                         universe.views.firstOrNull { it.title == viewTitle }?.let { view ->
@@ -1705,6 +1712,7 @@ private fun AdminOperationListScreen(
 @Composable
 private fun AdminOperationDeskScreen(
     orders: List<AdminOrderSummary>,
+    health: AdminOperationalHealthReport?,
     onOpenView: (String) -> Unit,
     onOpenList: (AdminOperationUniverseKey, String, String) -> Unit,
     onSignOut: () -> Unit,
@@ -1733,6 +1741,9 @@ private fun AdminOperationDeskScreen(
                 onSignOut = onSignOut,
                 showSignOut = true,
             )
+        }
+        item {
+            AdminOperationalHealthPanel(health = health, orders = orders)
         }
         item {
             AdminOperationMotherCard(
@@ -1783,6 +1794,71 @@ private fun AdminOperationDeskScreen(
                 },
             )
         }
+    }
+}
+
+@Composable
+private fun AdminOperationalHealthPanel(
+    health: AdminOperationalHealthReport?,
+    orders: List<AdminOrderSummary>,
+) {
+    val metrics = health?.metrics
+    val fallbackLive = orders.count { it.archiveStatus == "live" && it.status !in listOf("delivered", "closed", "archived", "cancelled", "canceled") }
+    val healthLabel = health?.healthStatus?.adminHealthLabel() ?: "Sin resumen"
+    val moduleText = health?.modules
+        ?.take(4)
+        ?.joinToString(" · ") { "${it.label}: ${it.moduleStatus.adminHealthLabel()}" }
+        .orEmpty()
+        .ifBlank { "Módulos externos no activos" }
+    val alertText = health?.alerts?.firstOrNull()?.warningMessage ?: "Sin alertas críticas calculadas"
+    val audit = health?.auditSummary
+
+    AdminInfoPanel(
+        title = "Salud interna",
+        text = "Estado $healthLabel · Lectura Admin calculada",
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            AdminHealthMetric("Vivos", (metrics?.liveOrders ?: fallbackLive).toString(), Modifier.weight(1f))
+            AdminHealthMetric("Atención", (metrics?.requiresAttention ?: orders.count { it.needsAttention }).toString(), Modifier.weight(1f))
+            AdminHealthMetric("Comunicación", (metrics?.failedCommunicationOrders ?: orders.count { it.communicationStatus == "failed" }).toString(), Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            AdminHealthMetric("Finanzas", (metrics?.financialReviewOrders ?: 0).toString(), Modifier.weight(1f))
+            AdminHealthMetric("Incidencias", (metrics?.openIncidentOrders ?: orders.count { it.activeIncident }).toString(), Modifier.weight(1f))
+            AdminHealthMetric("IA pendiente", (metrics?.pendingAiSuggestionOrders ?: orders.count { it.aiRequiresHumanReview }).toString(), Modifier.weight(1f))
+        }
+        AdminInfoPanel(
+            title = "Módulos",
+            text = moduleText,
+        )
+        AdminInfoPanel(
+            title = "Consistencia",
+            text = "${health?.alerts?.size ?: 0} alertas · $alertText",
+        )
+        AdminInfoPanel(
+            title = "Auditoría transversal",
+            text = "Eventos ${audit?.orderEventRecords ?: 0} · Incidencias ${audit?.incidentRecords ?: 0} · Comunicaciones ${audit?.communicationRecords ?: 0} · Reclamos públicos ${metrics?.publicClaimsReceived ?: 0}",
+        )
+        AdminInfoPanel(
+            title = "Últimos eventos críticos",
+            text = health?.criticalEvents?.firstOrNull()?.let { "${it.type}: ${it.summary}" } ?: "Sin eventos críticos recientes en el resumen",
+        )
+    }
+}
+
+@Composable
+private fun AdminHealthMetric(title: String, value: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(PediloPanel)
+            .border(1.dp, PediloLine, RoundedCornerShape(8.dp))
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(title, color = PediloMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(value, color = PediloText, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 
@@ -2025,6 +2101,18 @@ private fun operationCompactTitle(title: String): String =
 
 private fun operationHomeViewTitle(title: String): String =
     title
+
+private fun String.adminHealthLabel(): String = when (this) {
+    "ok" -> "OK"
+    "warning" -> "Advertencia"
+    "critical" -> "Crítico"
+    "disabled" -> "Deshabilitado"
+    "prepared" -> "Preparado"
+    "not_implemented" -> "No implementado"
+    "not_ready" -> "No listo"
+    "pending_o" -> "Pendiente O"
+    else -> ifBlank { "Desconocido" }
+}
 
 private fun operationUniverseSummary(universe: AdminOperationUniverse, orders: List<AdminOrderSummary>): String {
     if (universe.key != AdminOperationUniverseKey.Orders) return "Sin datos"

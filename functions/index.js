@@ -177,6 +177,24 @@ const ASSISTED_DECISION_RESOLUTION_STATUSES = [
   AI_DECISION_STATUSES.REJECTED,
   AI_DECISION_STATUSES.NOT_APPLICABLE,
 ];
+const HEALTH_STATUSES = {
+  OK: "ok",
+  WARNING: "warning",
+  CRITICAL: "critical",
+  DISABLED: "disabled",
+  PREPARED: "prepared",
+  UNKNOWN: "unknown",
+};
+const MODULE_HEALTH = [
+  {key: "whatsapp", label: "WhatsApp", moduleStatus: HEALTH_STATUSES.DISABLED, source: "communication_provider", warningCode: "WHATSAPP_PROVIDER_DISABLED"},
+  {key: "push_fcm", label: "Push/FCM", moduleStatus: HEALTH_STATUSES.DISABLED, source: "communication_provider", warningCode: "PUSH_PROVIDER_DISABLED"},
+  {key: "external_ai", label: "IA externa", moduleStatus: HEALTH_STATUSES.DISABLED, source: "assisted_decisions", warningCode: "EXTERNAL_AI_DISABLED"},
+  {key: "advanced_cashbox", label: "Caja avanzada", moduleStatus: "not_implemented", source: "finance", warningCode: "ADVANCED_CASHBOX_NOT_IMPLEMENTED"},
+  {key: "bank_gateway", label: "Banco / pasarela", moduleStatus: "not_implemented", source: "finance", warningCode: "BANK_GATEWAY_NOT_IMPLEMENTED"},
+  {key: "google_play", label: "Google Play", moduleStatus: "not_ready", source: "release", warningCode: "GOOGLE_PLAY_NOT_READY"},
+  {key: "production", label: "Producción", moduleStatus: "not_ready", source: "release", warningCode: "PRODUCTION_NOT_READY"},
+  {key: "load_hardening", label: "Hardening de carga", moduleStatus: "pending_o", source: "architecture", warningCode: "LOAD_HARDENING_PENDING"},
+];
 
 exports.createLocalOrder = onCall({region: REGION}, async (request) => {
   const payload = request.data || {};
@@ -657,6 +675,41 @@ exports.resolveAssistedDecision = onCall({region: REGION}, async (request) => {
       status: clean.status,
       humanMessage: "Sugerencia asistida auditada. No se ejecutó ninguna acción crítica.",
     };
+  });
+});
+
+exports.getOperationalHealth = onCall({region: REGION}, async (request) => {
+  await requireAdminActor(request);
+
+  const [ordersSnap, claimsSnap] = await Promise.all([
+    db.collection(ORDERS).limit(250).get(),
+    db.collection(PUBLIC_CLAIMS).limit(250).get(),
+  ]);
+  const orders = ordersSnap.docs.map((doc) => ({id: doc.id, ...doc.data()}));
+  const publicClaims = claimsSnap.docs.map((doc) => ({id: doc.id, ...doc.data()}));
+  const orderRelatedPairs = await Promise.all(orders.map(async (order) => {
+    const orderRef = db.collection(ORDERS).doc(order.id);
+    const [events, incidents, claims, communications, aiDecisions] = await Promise.all([
+      orderRef.collection("events").orderBy("createdAt", "desc").limit(5).get(),
+      orderRef.collection("incidents").limit(25).get(),
+      orderRef.collection("claims").limit(25).get(),
+      orderRef.collection("communications").limit(25).get(),
+      orderRef.collection("ai_decisions").limit(25).get(),
+    ]);
+    return [order.id, {
+      events: events.docs.map((doc) => ({id: doc.id, ...doc.data()})),
+      incidents: incidents.docs.map((doc) => ({id: doc.id, ...doc.data()})),
+      claims: claims.docs.map((doc) => ({id: doc.id, ...doc.data()})),
+      communications: communications.docs.map((doc) => ({id: doc.id, ...doc.data()})),
+      aiDecisions: aiDecisions.docs.map((doc) => ({id: doc.id, ...doc.data()})),
+    }];
+  }));
+
+  return buildOperationalHealthReport({
+    orders,
+    publicClaims,
+    orderRelated: Object.fromEntries(orderRelatedPairs),
+    generatedAt: new Date().toISOString(),
   });
 });
 
@@ -2192,6 +2245,207 @@ async function createOrderWithInitialEvent(orderRef, orderData, now) {
     writeOrderCommunications(tx, orderRef, communicationRecords);
     writeAssistedDecision(tx, orderRef, assistedDecision);
   });
+}
+
+function buildOperationalHealthReport({orders = [], publicClaims = [], orderRelated = {}, generatedAt = ""}) {
+  const metrics = operationalHealthMetrics(orders, publicClaims, orderRelated);
+  const alerts = orders.flatMap((order) => orderConsistencyWarnings(order, orderRelated[order.id] || {}));
+  const criticalEvents = recentCriticalEvents(orders, orderRelated);
+  const healthStatus = alerts.some((item) => item.severity === HEALTH_STATUSES.CRITICAL)
+    ? HEALTH_STATUSES.CRITICAL
+    : alerts.length > 0 || metrics.requiresAttention > 0
+      ? HEALTH_STATUSES.WARNING
+      : HEALTH_STATUSES.OK;
+
+  return {
+    healthStatus,
+    severity: healthStatus,
+    scope: "internal_admin",
+    source: "calculated_read_model",
+    generatedAt,
+    metrics,
+    modules: MODULE_HEALTH.map((module) => ({
+      ...module,
+      healthStatus: module.moduleStatus,
+      severity: module.moduleStatus === HEALTH_STATUSES.DISABLED ? HEALTH_STATUSES.DISABLED : HEALTH_STATUSES.WARNING,
+      requiresAdminReview: false,
+      warningMessage: moduleHealthMessage(module),
+    })),
+    alerts,
+    criticalEvents,
+    auditSummary: {
+      ordersWithEvents: orders.filter((order) => (orderRelated[order.id]?.events || []).length > 0).length,
+      orderEventRecords: sumRelated(orderRelated, "events"),
+      incidentRecords: sumRelated(orderRelated, "incidents"),
+      claimRecords: sumRelated(orderRelated, "claims"),
+      communicationRecords: sumRelated(orderRelated, "communications"),
+      aiDecisionRecords: sumRelated(orderRelated, "aiDecisions"),
+      publicClaimRecords: publicClaims.length,
+      exposesPublicAudit: false,
+      correctiveActionsExecuted: false,
+    },
+    securitySignals: [
+      securitySignal("orders_client_write_denied", "orders", "Escritura directa cliente sobre /orders denegada por rules."),
+      securitySignal("critical_subcollections_backend_only", "orders", "events/incidents/claims/communications/ai_decisions tienen escritura directa denegada."),
+      securitySignal("admin_only_internal_health", "health", "El tablero global de salud se entrega solo por callable Admin activo."),
+      securitySignal("public_audit_not_exposed", "public", "Tracking público no expone auditoría ni diagnósticos internos."),
+    ],
+  };
+}
+
+function operationalHealthMetrics(orders, publicClaims, orderRelated) {
+  const liveOrders = orders.filter((order) => !isTerminalStatus(order.status) && cleanText(order.archiveStatus || ARCHIVE_STATUS_LIVE) === ARCHIVE_STATUS_LIVE);
+  const actionsByRole = {};
+  for (const order of orders) {
+    const role = cleanText(order.currentResponsibleRole || order.responsibleRole) || "unknown";
+    const actions = Array.isArray(order.nextAllowedActions) ? order.nextAllowedActions.length : 0;
+    actionsByRole[role] = (actionsByRole[role] || 0) + actions;
+  }
+
+  return {
+    liveOrders: liveOrders.length,
+    pendingReviewOrders: orders.filter((order) => cleanText(order.operationalStatus).includes("review") || order.needsAttention === true).length,
+    openIncidentOrders: orders.filter((order) => order.activeIncident === true || cleanText(order.incidentStatus) === "open").length,
+    cancelledOrders: orders.filter((order) => ["cancelled", "canceled"].includes(cleanText(order.status).toLowerCase())).length,
+    closedOrders: orders.filter((order) => isTerminalStatus(order.status)).length,
+    failedCommunicationOrders: orders.filter((order) => cleanText(order.communicationStatus) === "failed").length,
+    preparedCommunicationOrders: orders.filter((order) => cleanText(order.communicationStatus) === COMMUNICATION_STATUS_PREPARED).length,
+    disabledCommunicationOrders: orders.filter((order) => cleanText(order.communicationStatus) === COMMUNICATION_STATUS_DISABLED).length,
+    financialReviewOrders: orders.filter((order) => order.financialReviewRequired === true || cleanText(order.financialStatus) === FINANCIAL_STATUS_PENDING).length,
+    pendingAiSuggestionOrders: orders.filter((order) => order.aiRequiresHumanReview === true).length,
+    publicClaimsReceived: publicClaims.length,
+    linkedPublicClaims: publicClaims.filter((claim) => cleanText(claim.orderId)).length,
+    unlinkedPublicClaims: publicClaims.filter((claim) => !cleanText(claim.orderId)).length,
+    actionsPendingByRole: actionsByRole,
+    requiresAttention: orders.filter((order) => order.needsAttention === true).length,
+    collectOnDeliveryOrders: orders.filter((order) => cleanText(order.financialStatus) === FINANCIAL_STATUS_COLLECT_ON_DELIVERY || cleanText(order.paymentMethod) === PAYMENT_METHOD_CASH).length,
+    transferDeclaredPending: orders.filter((order) => cleanText(order.financialStatus) === FINANCIAL_STATUS_TRANSFER_DECLARED).length,
+    paidDeclaredUnconfirmed: orders.filter((order) => cleanText(order.financialStatus) === FINANCIAL_STATUS_PAID_DECLARED).length,
+    collectionPendingOrders: orders.filter((order) => order.collectionRequired === true && Number(order.amountToCollect) > 0).length,
+    openIncidents: sumRelatedWhere(orderRelated, "incidents", (incident) => cleanText(incident.status) === "open"),
+    resolvedIncidents: sumRelatedWhere(orderRelated, "incidents", (incident) => cleanText(incident.status) === "resolved"),
+    unresolvedIncidents: sumRelatedWhere(orderRelated, "incidents", (incident) => cleanText(incident.status) !== "resolved"),
+    aiSuggested: sumRelatedWhere(orderRelated, "aiDecisions", (decision) => cleanText(decision.status) === AI_DECISION_STATUSES.SUGGESTED),
+    aiAccepted: sumRelatedWhere(orderRelated, "aiDecisions", (decision) => cleanText(decision.status) === AI_DECISION_STATUSES.ACCEPTED),
+    aiRejected: sumRelatedWhere(orderRelated, "aiDecisions", (decision) => cleanText(decision.status) === AI_DECISION_STATUSES.REJECTED),
+    aiNotApplicable: sumRelatedWhere(orderRelated, "aiDecisions", (decision) => cleanText(decision.status) === AI_DECISION_STATUSES.NOT_APPLICABLE),
+    highRiskAi: orders.filter((order) => ["high", "critical"].includes(cleanText(order.aiRiskLevel))).length,
+    whatsappDisabled: true,
+    pushDisabled: true,
+    externalAiDisabled: true,
+    engineVersion: ASSISTED_ENGINE_VERSION,
+    providerStatus: AI_PROVIDER_STATUS_DISABLED,
+  };
+}
+
+function orderConsistencyWarnings(order, related) {
+  const warnings = [];
+  const push = (severity, metricKey, warningCode, warningMessage) => {
+    warnings.push({
+      healthStatus: severity === HEALTH_STATUSES.CRITICAL ? HEALTH_STATUSES.CRITICAL : HEALTH_STATUSES.WARNING,
+      severity,
+      scope: "order",
+      source: "live_order_consistency",
+      metricKey,
+      metricValue: cleanText(order[metricKey]) || String(order[metricKey] ?? ""),
+      warningCode,
+      warningMessage,
+      requiresAdminReview: true,
+      relatedOrderId: order.id || "",
+      lastEventAt: order.lastOperationEvent?.createdAt || "",
+    });
+  };
+
+  if (isTerminalStatus(order.status) && cleanText(order.archiveStatus) === ARCHIVE_STATUS_LIVE) {
+    push(HEALTH_STATUSES.CRITICAL, "archiveStatus", "TERMINAL_ORDER_STILL_LIVE", "Pedido terminal con archiveStatus live.");
+  }
+  if (!isTerminalStatus(order.status) && (!Array.isArray(order.nextAllowedActions) || order.nextAllowedActions.length === 0)) {
+    push(HEALTH_STATUSES.WARNING, "nextAllowedActions", "ACTIVE_ORDER_WITHOUT_ACTIONS", "Pedido activo sin próximas acciones permitidas.");
+  }
+  if (order.activeIncident === true && cleanText(order.incidentStatus) === INCIDENT_STATUS_NONE) {
+    push(HEALTH_STATUSES.CRITICAL, "incidentStatus", "ACTIVE_INCIDENT_WITH_NONE_STATUS", "activeIncident true con incidentStatus none.");
+  }
+  if (cleanText(order.incidentStatus) === "open" && order.activeIncident !== true) {
+    push(HEALTH_STATUSES.CRITICAL, "activeIncident", "OPEN_INCIDENT_FLAG_FALSE", "incidentStatus open con activeIncident false.");
+  }
+  if (order.financialReviewRequired === true && !cleanText(order.financialReviewReason || order.financialNotes)) {
+    push(HEALTH_STATUSES.WARNING, "financialReviewRequired", "FINANCIAL_REVIEW_WITHOUT_REASON", "Revisión financiera requerida sin nota o motivo.");
+  }
+  if (cleanText(order.communicationStatus) === "failed" && !(related.communications || []).some((item) => cleanText(item.status) === "failed")) {
+    push(HEALTH_STATUSES.WARNING, "communicationStatus", "FAILED_COMMUNICATION_WITHOUT_RECORD", "communicationStatus failed sin comunicación fallida registrada.");
+  }
+  if (order.aiRequiresHumanReview === true && (related.aiDecisions || []).length === 0) {
+    push(HEALTH_STATUSES.WARNING, "aiRequiresHumanReview", "AI_REVIEW_WITHOUT_DECISION", "Revisión humana IA requerida sin ai_decision vinculada.");
+  }
+  if (!isTerminalStatus(order.status) && !cleanText(order.currentResponsibleRole || order.responsibleRole)) {
+    push(HEALTH_STATUSES.WARNING, "currentResponsibleRole", "ACTIVE_ORDER_WITHOUT_RESPONSIBLE_ROLE", "Pedido activo sin currentResponsibleRole.");
+  }
+  if (cleanText(order.currentResponsibleRole || order.responsibleRole) === "driver" && !cleanText(order.driverId) && cleanText(order.assignedActorId)) {
+    push(HEALTH_STATUSES.WARNING, "driverId", "DRIVER_ASSIGNED_WITHOUT_DRIVER_ID", "Pedido asignado a Driver sin driverId.");
+  }
+  if (cleanText(order.source) === LOCAL_SOURCE && !cleanText(order.storeId)) {
+    push(HEALTH_STATUSES.CRITICAL, "storeId", "LOCAL_ORDER_WITHOUT_STORE_ID", "Pedido Store sin storeId.");
+  }
+  if (order.collectionRequired === true && Number(order.amountToCollect) <= 0) {
+    push(HEALTH_STATUSES.CRITICAL, "amountToCollect", "COLLECTION_REQUIRED_INVALID_AMOUNT", "collectionRequired true con amountToCollect inválido.");
+  }
+  if (Object.hasOwn(order, "amountToCollect") && Number(order.amountToCollect) < 0) {
+    push(HEALTH_STATUSES.CRITICAL, "amountToCollect", "NEGATIVE_AMOUNT_TO_COLLECT", "amountToCollect incoherente.");
+  }
+  if (Object.hasOwn(order, "total") && (!Number.isFinite(Number(order.total)) || Number(order.total) < 0)) {
+    push(HEALTH_STATUSES.WARNING, "total", "INVALID_TOTAL", "Total inválido o ausente cuando corresponde.");
+  }
+
+  return warnings;
+}
+
+function recentCriticalEvents(orders, orderRelated) {
+  const criticalTypes = new Set(["cancel_order", "cancel_by_admin", "open_incident", "mark_incident", "communication_failed", "assisted_decision_resolved"]);
+  return orders
+    .flatMap((order) => (orderRelated[order.id]?.events || []).map((event) => ({
+      relatedOrderId: order.id,
+      source: "orders/events",
+      type: cleanText(event.type),
+      summary: cleanText(event.summary || event.reason),
+      actorRole: cleanText(event.actorRole),
+      previousStatus: cleanText(event.previousStatus),
+      nextStatus: cleanText(event.nextStatus),
+      createdAt: event.createdAt || "",
+      severity: criticalTypes.has(cleanText(event.type)) ? HEALTH_STATUSES.WARNING : HEALTH_STATUSES.OK,
+    })))
+    .filter((event) => event.severity !== HEALTH_STATUSES.OK)
+    .slice(0, 10);
+}
+
+function securitySignal(metricKey, scope, warningMessage) {
+  return {
+    healthStatus: HEALTH_STATUSES.OK,
+    severity: HEALTH_STATUSES.OK,
+    scope,
+    source: "firestore_rules",
+    metricKey,
+    metricValue: "enforced",
+    warningCode: "",
+    warningMessage,
+    requiresAdminReview: false,
+  };
+}
+
+function moduleHealthMessage(module) {
+  if (module.moduleStatus === HEALTH_STATUSES.DISABLED) {
+    return `${module.label} deshabilitado: no hay proveedor real activo.`;
+  }
+  return `${module.label} no debe tratarse como listo para producción.`;
+}
+
+function sumRelated(orderRelated, key) {
+  return Object.values(orderRelated).reduce((sum, related) => sum + ((related && related[key]) || []).length, 0);
+}
+
+function sumRelatedWhere(orderRelated, key, predicate) {
+  return Object.values(orderRelated).reduce((sum, related) => {
+    return sum + ((related && related[key]) || []).filter(predicate).length;
+  }, 0);
 }
 
 function publicIdempotencyKey(source, payload) {

@@ -13,9 +13,15 @@ import com.pedilo.app.core.model.AdminOrderActionRequest
 import com.pedilo.app.core.model.AdminOrderActionResult
 import com.pedilo.app.core.model.AdminLiveOrderActionRequest
 import com.pedilo.app.core.model.AdminLiveOrderActionResult
+import com.pedilo.app.core.model.AdminAuditSummary
+import com.pedilo.app.core.model.AdminCriticalEvent
+import com.pedilo.app.core.model.AdminHealthAlert
+import com.pedilo.app.core.model.AdminModuleHealth
 import com.pedilo.app.core.model.AdminOrderEvent
 import com.pedilo.app.core.model.AdminOrderDetail
 import com.pedilo.app.core.model.AdminOrderSummary
+import com.pedilo.app.core.model.AdminOperationalHealthMetrics
+import com.pedilo.app.core.model.AdminOperationalHealthReport
 import com.pedilo.app.core.model.LiveOrderAction
 import com.pedilo.app.core.port.AdminOrdersPort
 import com.pedilo.app.core.result.CoreError
@@ -190,6 +196,16 @@ class FirebaseAdminOrdersAdapter(
             onFailure = { CoreResult.Failure(CoreError.NotAvailable) },
         )
 
+    override suspend fun getOperationalHealth(): CoreResult<AdminOperationalHealthReport> =
+        runCatching {
+            val result = functions.getHttpsCallable(GET_OPERATIONAL_HEALTH).call(emptyMap<String, Any>()).await()
+            @Suppress("UNCHECKED_CAST")
+            (result.getData() as? Map<String, Any?>).orEmpty().toOperationalHealthReport()
+        }.fold(
+            onSuccess = { CoreResult.Success(it) },
+            onFailure = { CoreResult.Failure(CoreError.NotAvailable) },
+        )
+
     private fun com.google.firebase.firestore.DocumentSnapshot.toSummary(): AdminOrderSummary =
         AdminOrderSummary(
             id = id,
@@ -267,16 +283,126 @@ class FirebaseAdminOrdersAdapter(
 
     private fun Any?.asText(): String = this as? String ?: ""
 
+    private fun Any?.asIntValue(): Int = (this as? Number)?.toInt() ?: 0
+
+    private fun Any?.asBoolValue(default: Boolean = false): Boolean = this as? Boolean ?: default
+
+    @Suppress("UNCHECKED_CAST")
+    private fun Any?.asMap(): Map<String, Any?> = this as? Map<String, Any?> ?: emptyMap()
+
+    @Suppress("UNCHECKED_CAST")
+    private fun Any?.asMapList(): List<Map<String, Any?>> =
+        (this as? List<*>).orEmpty().mapNotNull { it as? Map<String, Any?> }
+
     private fun Any?.asActionList(): List<AdminOrderAction> =
         (this as? List<*>).orEmpty().mapNotNull { AdminOrderAction.fromWire(it.orEmptyText()) }
 
     private fun Any?.orEmptyText(): String = this?.toString().orEmpty()
+
+    private fun Map<String, Any?>.toOperationalHealthReport(): AdminOperationalHealthReport =
+        AdminOperationalHealthReport(
+            healthStatus = this["healthStatus"].asText(),
+            severity = this["severity"].asText(),
+            generatedAt = this["generatedAt"].asText(),
+            metrics = this["metrics"].asMap().toHealthMetrics(),
+            modules = this["modules"].asMapList().map { it.toModuleHealth() },
+            alerts = this["alerts"].asMapList().map { it.toHealthAlert() },
+            criticalEvents = this["criticalEvents"].asMapList().map { it.toCriticalEvent() },
+            auditSummary = this["auditSummary"].asMap().toAuditSummary(),
+            securitySignals = this["securitySignals"].asMapList().map { it.toHealthAlert() },
+        )
+
+    private fun Map<String, Any?>.toHealthMetrics(): AdminOperationalHealthMetrics =
+        AdminOperationalHealthMetrics(
+            liveOrders = this["liveOrders"].asIntValue(),
+            pendingReviewOrders = this["pendingReviewOrders"].asIntValue(),
+            openIncidentOrders = this["openIncidentOrders"].asIntValue(),
+            cancelledOrders = this["cancelledOrders"].asIntValue(),
+            closedOrders = this["closedOrders"].asIntValue(),
+            failedCommunicationOrders = this["failedCommunicationOrders"].asIntValue(),
+            preparedCommunicationOrders = this["preparedCommunicationOrders"].asIntValue(),
+            disabledCommunicationOrders = this["disabledCommunicationOrders"].asIntValue(),
+            financialReviewOrders = this["financialReviewOrders"].asIntValue(),
+            pendingAiSuggestionOrders = this["pendingAiSuggestionOrders"].asIntValue(),
+            publicClaimsReceived = this["publicClaimsReceived"].asIntValue(),
+            linkedPublicClaims = this["linkedPublicClaims"].asIntValue(),
+            unlinkedPublicClaims = this["unlinkedPublicClaims"].asIntValue(),
+            requiresAttention = this["requiresAttention"].asIntValue(),
+            collectOnDeliveryOrders = this["collectOnDeliveryOrders"].asIntValue(),
+            transferDeclaredPending = this["transferDeclaredPending"].asIntValue(),
+            paidDeclaredUnconfirmed = this["paidDeclaredUnconfirmed"].asIntValue(),
+            collectionPendingOrders = this["collectionPendingOrders"].asIntValue(),
+            openIncidents = this["openIncidents"].asIntValue(),
+            resolvedIncidents = this["resolvedIncidents"].asIntValue(),
+            unresolvedIncidents = this["unresolvedIncidents"].asIntValue(),
+            aiSuggested = this["aiSuggested"].asIntValue(),
+            aiAccepted = this["aiAccepted"].asIntValue(),
+            aiRejected = this["aiRejected"].asIntValue(),
+            aiNotApplicable = this["aiNotApplicable"].asIntValue(),
+            highRiskAi = this["highRiskAi"].asIntValue(),
+            whatsappDisabled = this["whatsappDisabled"].asBoolValue(true),
+            pushDisabled = this["pushDisabled"].asBoolValue(true),
+            externalAiDisabled = this["externalAiDisabled"].asBoolValue(true),
+            engineVersion = this["engineVersion"].asText(),
+            providerStatus = this["providerStatus"].asText(),
+        )
+
+    private fun Map<String, Any?>.toModuleHealth(): AdminModuleHealth =
+        AdminModuleHealth(
+            key = this["key"].asText(),
+            label = this["label"].asText(),
+            moduleStatus = this["moduleStatus"].asText(),
+            healthStatus = this["healthStatus"].asText(),
+            severity = this["severity"].asText(),
+            warningCode = this["warningCode"].asText(),
+            warningMessage = this["warningMessage"].asText(),
+        )
+
+    private fun Map<String, Any?>.toHealthAlert(): AdminHealthAlert =
+        AdminHealthAlert(
+            healthStatus = this["healthStatus"].asText(),
+            severity = this["severity"].asText(),
+            scope = this["scope"].asText(),
+            source = this["source"].asText(),
+            metricKey = this["metricKey"].asText(),
+            metricValue = this["metricValue"].orEmptyText(),
+            warningCode = this["warningCode"].asText(),
+            warningMessage = this["warningMessage"].asText(),
+            requiresAdminReview = this["requiresAdminReview"].asBoolValue(),
+            relatedOrderId = this["relatedOrderId"].asText(),
+        )
+
+    private fun Map<String, Any?>.toCriticalEvent(): AdminCriticalEvent =
+        AdminCriticalEvent(
+            relatedOrderId = this["relatedOrderId"].asText(),
+            source = this["source"].asText(),
+            type = this["type"].asText(),
+            summary = this["summary"].asText(),
+            actorRole = this["actorRole"].asText(),
+            previousStatus = this["previousStatus"].asText(),
+            nextStatus = this["nextStatus"].asText(),
+            severity = this["severity"].asText(),
+        )
+
+    private fun Map<String, Any?>.toAuditSummary(): AdminAuditSummary =
+        AdminAuditSummary(
+            ordersWithEvents = this["ordersWithEvents"].asIntValue(),
+            orderEventRecords = this["orderEventRecords"].asIntValue(),
+            incidentRecords = this["incidentRecords"].asIntValue(),
+            claimRecords = this["claimRecords"].asIntValue(),
+            communicationRecords = this["communicationRecords"].asIntValue(),
+            aiDecisionRecords = this["aiDecisionRecords"].asIntValue(),
+            publicClaimRecords = this["publicClaimRecords"].asIntValue(),
+            exposesPublicAudit = this["exposesPublicAudit"].asBoolValue(),
+            correctiveActionsExecuted = this["correctiveActionsExecuted"].asBoolValue(),
+        )
 
     private companion object {
         const val REGION = "southamerica-east1"
         const val ORDERS = "orders"
         const val ADMIN_ORDER_ACTION = "adminOrderAction"
         const val OPERATE_LIVE_ORDER = "operateLiveOrder"
+        const val GET_OPERATIONAL_HEALTH = "getOperationalHealth"
         const val TRACKING = "trackingNumber"
         const val PUBLIC_NUMBER = "publicOrderNumber"
         const val STATUS = "status"

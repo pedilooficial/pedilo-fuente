@@ -13,4 +13,5 @@ class GetAdminOperationOrdersUseCase(
     suspend fun execute(request: AdminOrderActionRequest) = port.executeAdminOrderAction(request)
     suspend fun executeLive(request: AdminLiveOrderActionRequest) = port.executeLiveOrderAction(request)
     suspend fun getEvents(orderId: String) = port.getOrderEventsReadOnly(orderId)
+    suspend fun getHealth() = port.getOperationalHealth()
 }

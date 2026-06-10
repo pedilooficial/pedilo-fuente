@@ -4,6 +4,7 @@ import com.pedilo.app.core.model.AdminOrderDetail
 import com.pedilo.app.core.model.AdminLiveOrderActionRequest
 import com.pedilo.app.core.model.AdminLiveOrderActionResult
 import com.pedilo.app.core.model.AdminOrderEvent
+import com.pedilo.app.core.model.AdminOperationalHealthReport
 import com.pedilo.app.core.model.AdminOrderActionRequest
 import com.pedilo.app.core.model.AdminOrderActionResult
 import com.pedilo.app.core.model.AdminOrderSummary
@@ -17,4 +18,5 @@ interface AdminOrdersPort {
     suspend fun executeAdminOrderAction(request: AdminOrderActionRequest): CoreResult<AdminOrderActionResult>
     suspend fun executeLiveOrderAction(request: AdminLiveOrderActionRequest): CoreResult<AdminLiveOrderActionResult>
     suspend fun getOrderEventsReadOnly(orderId: String): CoreResult<List<AdminOrderEvent>>
+    suspend fun getOperationalHealth(): CoreResult<AdminOperationalHealthReport>
 }
