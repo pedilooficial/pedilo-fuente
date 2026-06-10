@@ -2887,7 +2887,7 @@ private fun adminCommunicationStatusLabel(value: String): String =
         "received" -> "Recibida"
         "pending" -> "Pendiente"
         "prepared" -> "Preparada, sin envío externo real"
-        "sent" -> "Enviada por canal real"
+        "sent" -> "Registrada como enviada; verificar canal"
         "failed" -> "Fallida"
         "closed" -> "Cerrada"
         "disabled" -> "Canal externo deshabilitado"
