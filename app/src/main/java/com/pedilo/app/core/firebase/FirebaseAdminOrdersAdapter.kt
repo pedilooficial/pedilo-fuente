@@ -8,6 +8,9 @@ import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.google.firebase.functions.ktx.functions
 import com.google.firebase.ktx.Firebase
+import com.pedilo.app.core.model.AdminConfigState
+import com.pedilo.app.core.model.AdminConfigUpdateRequest
+import com.pedilo.app.core.model.AdminMutationResult
 import com.pedilo.app.core.model.AdminOrderAction
 import com.pedilo.app.core.model.AdminOrderActionRequest
 import com.pedilo.app.core.model.AdminOrderActionResult
@@ -22,6 +25,8 @@ import com.pedilo.app.core.model.AdminOrderDetail
 import com.pedilo.app.core.model.AdminOrderSummary
 import com.pedilo.app.core.model.AdminOperationalHealthMetrics
 import com.pedilo.app.core.model.AdminOperationalHealthReport
+import com.pedilo.app.core.model.AdminRoleUpdateRequest
+import com.pedilo.app.core.model.AdminTeamUser
 import com.pedilo.app.core.model.LiveOrderAction
 import com.pedilo.app.core.port.AdminOrdersPort
 import com.pedilo.app.core.result.CoreError
@@ -206,6 +211,55 @@ class FirebaseAdminOrdersAdapter(
             onFailure = { CoreResult.Failure(CoreError.NotAvailable) },
         )
 
+
+
+    override fun observeTeamUsers(): Flow<CoreResult<List<AdminTeamUser>>> =
+        callbackFlow {
+            val registration = db.collection(USERS).addSnapshotListener { snapshot, error ->
+                if (error != null || snapshot == null) {
+                    trySend(CoreResult.Failure(CoreError.NotAvailable))
+                    return@addSnapshotListener
+                }
+                trySend(CoreResult.Success(snapshot.documents.map { it.toTeamUser() }.sortedWith(compareBy({ !it.active }, { it.role }, { it.displayName.ifBlank { it.email } }))))
+            }
+            awaitClose { registration.remove() }
+        }
+
+    override fun observeAdminConfig(): Flow<CoreResult<AdminConfigState>> =
+        callbackFlow {
+            val registration = db.collection(ADMIN_CONFIG).document(ADMIN_CONFIG_REAL_USE)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null || snapshot == null) {
+                        trySend(CoreResult.Failure(CoreError.NotAvailable))
+                        return@addSnapshotListener
+                    }
+                    trySend(CoreResult.Success(snapshot.toAdminConfig()))
+                }
+            awaitClose { registration.remove() }
+        }
+
+    override suspend fun updateTeamUser(request: AdminRoleUpdateRequest): CoreResult<AdminMutationResult> =
+        runCatching {
+            val result = functions.getHttpsCallable(ADMIN_UPDATE_TEAM_USER).call(request.toCallablePayload()).await()
+            @Suppress("UNCHECKED_CAST")
+            val data = result.getData() as? Map<String, Any?> ?: emptyMap()
+            AdminMutationResult(data["message"].asText().ifBlank { "Acceso actualizado y persistido." })
+        }.fold(
+            onSuccess = { CoreResult.Success(it) },
+            onFailure = { CoreResult.Failure(CoreError.Operational((it as? FirebaseFunctionsException)?.message ?: "No pudimos actualizar el acceso.")) },
+        )
+
+    override suspend fun updateAdminConfig(request: AdminConfigUpdateRequest): CoreResult<AdminMutationResult> =
+        runCatching {
+            val result = functions.getHttpsCallable(ADMIN_UPDATE_CONFIG).call(request.toCallablePayload()).await()
+            @Suppress("UNCHECKED_CAST")
+            val data = result.getData() as? Map<String, Any?> ?: emptyMap()
+            AdminMutationResult(data["message"].asText().ifBlank { "Configuración actualizada y persistida." })
+        }.fold(
+            onSuccess = { CoreResult.Success(it) },
+            onFailure = { CoreResult.Failure(CoreError.Operational((it as? FirebaseFunctionsException)?.message ?: "No pudimos actualizar la configuración.")) },
+        )
+
     private fun com.google.firebase.firestore.DocumentSnapshot.toSummary(): AdminOrderSummary =
         AdminOrderSummary(
             id = id,
@@ -245,6 +299,32 @@ class FirebaseAdminOrdersAdapter(
             idempotencyKey = getString(IDEMPOTENCY_KEY).orEmpty(),
         )
 
+
+
+    private fun com.google.firebase.firestore.DocumentSnapshot.toTeamUser(): AdminTeamUser =
+        AdminTeamUser(
+            uid = id,
+            email = getString(EMAIL).orEmpty(),
+            displayName = getString(DISPLAY_NAME).orEmpty(),
+            role = getString(ROLE).orEmpty(),
+            active = getBoolean(ACTIVE) ?: false,
+            storeId = getString(STORE_ID).orEmpty(),
+            driverId = getString(DRIVER_ID).orEmpty(),
+            updatedAtMillis = (get(UPDATED_AT) as? Timestamp)?.toDate()?.time,
+        )
+
+    private fun com.google.firebase.firestore.DocumentSnapshot.toAdminConfig(): AdminConfigState =
+        AdminConfigState(
+            id = id,
+            maintenanceMode = getBoolean(MAINTENANCE_MODE) ?: false,
+            rainMode = getBoolean(RAIN_MODE) ?: false,
+            saturationMode = getBoolean(SATURATION_MODE) ?: false,
+            emergencyMode = getBoolean(EMERGENCY_MODE) ?: false,
+            publicOrderingEnabled = getBoolean(PUBLIC_ORDERING_ENABLED) ?: true,
+            lastUpdatedBy = getString(LAST_UPDATED_BY).orEmpty(),
+            updatedAtMillis = (get(UPDATED_AT) as? Timestamp)?.toDate()?.time,
+        )
+
     private fun com.google.firebase.firestore.DocumentSnapshot.operationalStatus(): String =
         getString(OPERATIONAL_STATUS).orEmpty().ifBlank { getString(STATUS).orEmpty() }
 
@@ -279,6 +359,19 @@ class FirebaseAdminOrdersAdapter(
             "action" to action.wireName,
             "expectedVersion" to expectedVersion,
             "reason" to reason,
+        )
+
+    private fun AdminRoleUpdateRequest.toCallablePayload(): Map<String, Any?> =
+        mapOf(
+            "uid" to uid,
+            "role" to role,
+            "active" to active,
+        )
+
+    private fun AdminConfigUpdateRequest.toCallablePayload(): Map<String, Any?> =
+        mapOf(
+            "field" to field,
+            "enabled" to enabled,
         )
 
     private fun Any?.asText(): String = this as? String ?: ""
@@ -400,9 +493,28 @@ class FirebaseAdminOrdersAdapter(
     private companion object {
         const val REGION = "southamerica-east1"
         const val ORDERS = "orders"
+
+        const val USERS = "users"
+        const val ADMIN_CONFIG = "admin_config"
+        const val ADMIN_CONFIG_REAL_USE = "real_use"
+        const val EMAIL = "email"
+        const val DISPLAY_NAME = "displayName"
+        const val ROLE = "role"
+        const val ACTIVE = "active"
+        const val STORE_ID = "storeId"
+        const val DRIVER_ID = "driverId"
+        const val MAINTENANCE_MODE = "maintenanceMode"
+        const val RAIN_MODE = "rainMode"
+        const val SATURATION_MODE = "saturationMode"
+        const val EMERGENCY_MODE = "emergencyMode"
+        const val PUBLIC_ORDERING_ENABLED = "publicOrderingEnabled"
+        const val LAST_UPDATED_BY = "lastUpdatedBy"
+        val ADMIN_CONFIG_FIELDS = setOf(MAINTENANCE_MODE, RAIN_MODE, SATURATION_MODE, EMERGENCY_MODE, PUBLIC_ORDERING_ENABLED)
         const val ADMIN_ORDER_ACTION = "adminOrderAction"
         const val OPERATE_LIVE_ORDER = "operateLiveOrder"
         const val GET_OPERATIONAL_HEALTH = "getOperationalHealth"
+        const val ADMIN_UPDATE_TEAM_USER = "adminUpdateTeamUser"
+        const val ADMIN_UPDATE_CONFIG = "adminUpdateConfig"
         const val TRACKING = "trackingNumber"
         const val PUBLIC_NUMBER = "publicOrderNumber"
         const val STATUS = "status"

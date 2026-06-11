@@ -52,26 +52,29 @@ test("admin order detail shows backend allowed actions and safe empty action sta
   );
 
   assert.match(detail, /allowedActions = detail\?\.nextAllowedActions \?: summary\?\.nextAllowedActions\.orEmpty\(\)/);
-  assert.match(detail, /Solo se muestran acciones permitidas por backend para la versión \$expectedVersion/);
+  assert.match(detail, /Estas acciones están habilitadas para la versión \$expectedVersion del pedido/);
   assert.match(detail, /Sin acciones disponibles/);
-  assert.match(detail, /El backend no habilita acciones para este pedido o versión/);
-  assert.match(detail, /Si el pedido está cerrado, no hay acciones normales/);
+  assert.match(detail, /No hay acciones disponibles ahora/);
   assert.doesNotMatch(detail, /local_accept|driver_take|driver_mark_delivered|force_status/);
 });
 
-test("admin configuration and role access are explicit visual non persistent tools", () => {
+test("admin configuration and role access are real persisted admin surfaces", () => {
   const ui = read(adminUi);
+  const adapter = read(adminAdapter);
 
-  assert.match(ui, /Preparación visual sin guardar cambios reales/);
-  assert.match(ui, /sin guardar datos reales/);
-  assert.match(ui, /Borrador visual preparado, sin guardar datos reales/);
-  assert.match(ui, /Preparación visual sin crear usuarios reales/);
-  assert.match(ui, /Preparar alta Admin/);
-  assert.match(ui, /Preparar alta Local/);
-  assert.match(ui, /Preparar alta Repartidor/);
-  assert.match(ui, /No se crean cuentas reales en este bloque/);
-  assert.match(ui, /No se aplicaron cambios reales/);
-  assert.doesNotMatch(ui, /FirebaseAuth|createUser|sendInvitation|collection\("users"\)|\.set\(|\.update\(|\.delete\(/);
+  assert.match(ui, /AdminRealConfigurationScreen/);
+  assert.match(ui, /AdminRealRoleAccessScreen/);
+  assert.match(ui, /Controles reales de la operación/);
+  assert.match(ui, /Gestiona cuentas existentes del equipo/);
+  assert.match(ui, /Las cuentas nuevas están bloqueadas/);
+  assert.match(adapter, /observeAdminConfig/);
+  assert.match(adapter, /observeTeamUsers/);
+  assert.match(adapter, /updateAdminConfig/);
+  assert.match(adapter, /updateTeamUser/);
+  assert.match(adapter, /db\.collection\(USERS\)/);
+  assert.match(adapter, /db\.collection\(ADMIN_CONFIG\)/);
+  assert.doesNotMatch(ui, /sin guardar datos reales|No se aplicaron cambios reales|Confirmar de forma visual|guardar borrador visual|confirmar visualmente|maqueta|prototipo/);
+  assert.doesNotMatch(adapter, /collection\(ORDERS\)\.document\(.+\.update|collection\(ORDERS\)\.document\(.+\.set/);
 });
 
 test("admin errors are human controlled and public store driver compatibility remains protected", () => {

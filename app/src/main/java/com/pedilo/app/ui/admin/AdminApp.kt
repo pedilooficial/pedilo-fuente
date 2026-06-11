@@ -80,6 +80,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pedilo.app.core.model.AdminActiveOrdersBucket
+import com.pedilo.app.core.model.AdminConfigState
+import com.pedilo.app.core.model.AdminConfigUpdateRequest
 import com.pedilo.app.core.model.AdminLiveOrderActionRequest
 import com.pedilo.app.core.model.AdminOrderPrimaryPlacement
 import com.pedilo.app.core.model.AdminOperationOrderClassification
@@ -88,6 +90,8 @@ import com.pedilo.app.core.model.AdminOrderDetail
 import com.pedilo.app.core.model.AdminOrderSummary
 import com.pedilo.app.core.model.AdminOperationalHealthReport
 import com.pedilo.app.core.model.AdminProblemOrdersBucket
+import com.pedilo.app.core.model.AdminRoleUpdateRequest
+import com.pedilo.app.core.model.AdminTeamUser
 import com.pedilo.app.core.model.LiveOrderAction
 import com.pedilo.app.core.result.CoreError
 import com.pedilo.app.core.result.CoreResult
@@ -116,7 +120,7 @@ import kotlinx.coroutines.launch
 enum class AdminRoot(val label: String) {
     Operation("Operación"),
     Configuration("Configuración"),
-    RoleAccess("Alta de roles"),
+    RoleAccess("Equipo"),
 }
 
 internal enum class OperationOrderVariant {
@@ -226,7 +230,7 @@ private enum class AdminOperationMetricTone {
     Danger,
 }
 
-private enum class AdminVisualIntent {
+private enum class AdminHumanIntent {
     Info,
     Success,
     Warning,
@@ -313,9 +317,9 @@ private fun configurationSection(
 
 private val configurationSections = listOf(
     configurationSection(
-        "Público", "Contenido visible para personas usuarias.", "Información humana, segura y preparada para publicar.",
+        "Público", "Contenido visible para personas usuarias.", "Información clara y segura para el público.",
         "Home público" to "Orden, avisos y convenciones", "Compra / Retiro" to "Flujo público central",
-        "Tienda" to "Presentación de oferta", "Seguimiento / Reclamos" to "Consulta y ayuda preparada",
+        "Tienda" to "Presentación de oferta", "Seguimiento / Reclamos" to "Consulta y ayuda al cliente",
     ),
     configurationSection(
         "Locales", "Entidades comerciales, catálogo y capacidad.", "Un local incompleto no se publica ni opera.",
@@ -334,7 +338,7 @@ private val configurationSections = listOf(
         "Marketplace", "Orden y exposición de la oferta pública.", "Muestra oferta publicable de locales reales.",
         "Categorías" to "Crear, editar y ordenar", "Subcategorías" to "Organización visible",
         "Destacados y nuevos" to "Criterios de exposición", "Ofertas visibles" to "Promociones publicables",
-        "Ranking público" to "Orden configurable", "Previsualización" to "Revisión antes de publicar",
+        "Ranking público" to "Orden configurable", "Revisión" to "Revisión antes de publicar",
     ),
     configurationSection(
         "Pedidos", "Reglas generales para pedidos futuros.", "Configura integridad sin abrir ni modificar pedidos vivos.",
@@ -355,33 +359,33 @@ private val configurationSections = listOf(
         "Comprobantes" to "Validaciones y pendientes", "Cancelación y devolución" to "Reglas e impacto",
     ),
     configurationSection(
-        "Mensajes", "Comunicación preparada por contexto.", "Comunica sin gobernar estados ni enviar por canales reales.",
+        "Mensajes", "Comunicación por contexto.", "Comunica sin gobernar estados ni enviar por canales reales.",
         "Plantillas" to "Crear, editar y buscar", "Mensajes por estado" to "Persona usuaria, local y repartidor",
         "Mensajes por problema" to "Demora, cancelación y pago", "Avisos públicos" to "Publicar y despublicar",
-        "Avisos internos" to "Comunicación Admin preparada", "Tono y canales" to "Previsualización y alcance",
+        "Avisos internos" to "Comunicación Admin", "Tono y canales" to "Revisión y alcance",
     ),
     configurationSection(
-        "Reglas", "Condiciones de integridad del sistema.", "Define condiciones; la autoridad real queda fuera de esta herramienta.",
+        "Reglas", "Condiciones de integridad del sistema.", "Muestra condiciones y límites operativos.",
         "Publicación de locales" to "Datos mínimos y bloqueos", "Publicación de productos" to "Completitud y revisión",
-        "Creación de pedidos" to "Validaciones y borradores", "Solicitud de repartidor" to "Límites y datos requeridos",
+        "Creación de pedidos" to "Validaciones y datos requeridos", "Solicitud de repartidor" to "Límites y datos requeridos",
         "Pagos y roles activos" to "Validaciones previas", "Confirmaciones sensibles" to "Impacto y auditoría",
     ),
     configurationSection(
-        "Notificaciones", "Señales visuales y sonoras por rol.", "Cada señal tiene origen, destinatario y prioridad.",
+        "Notificaciones", "Alertas por rol.", "Cada señal tiene origen, destinatario y prioridad.",
         "Eventos notificables" to "Origen y agrupación", "Canales por rol" to "Destinatarios permitidos",
-        "Badges y prioridad" to "Lectura visual", "Sonidos y silencios" to "Reglas anti-saturación",
-        "Alertas críticas" to "Alcance y restricciones", "Prueba visual" to "Previsualización sin push real",
+        "Badges y prioridad" to "Lectura clara", "Sonidos y silencios" to "Reglas anti-saturación",
+        "Alertas críticas" to "Alcance y restricciones", "Prueba de alerta" to "Revisión sin push real",
     ),
     configurationSection(
         "Métricas", "Criterios de lectura, ranking y visibilidad.", "Las métricas nacen de pedidos y eventos; no se inventan.",
         "Pedidos y productos" to "Indicadores y tendencias", "Locales" to "Rendimiento, demoras y rechazos",
         "Repartidores" to "Criterios operativos y financieros", "Marketplace" to "Exposición y ranking",
-        "Visibilidad por rol" to "Indicadores habilitados", "Detalle y tendencia" to "Consulta preparada",
+        "Visibilidad por rol" to "Indicadores habilitados", "Detalle y tendencia" to "Consulta",
     ),
     configurationSection(
         "Auditoría", "Consulta de trazabilidad administrativa.", "La auditoría se consulta; no se edita ni se borra.",
         "Registro de cambios" to "Buscar y filtrar", "Publicaciones" to "Historial de contenido",
-        "Cambios sensibles" to "Antes, después e impacto", "Precios y finanzas" to "Trazabilidad preparada",
+        "Cambios sensibles" to "Antes, después e impacto", "Precios y finanzas" to "Trazabilidad",
         "Emergencias" to "Alcance y resultado", "Detalle de registro" to "Quién, cuándo y resultado",
     ),
     configurationSection(
@@ -417,7 +421,7 @@ private val publicHomeEntries = listOf(
     AdminEntry("Ofertas", "Orden y visibilidad"),
     AdminEntry("Nuevos locales", "Locales publicables"),
     AdminEntry("Buscador / tags", "Sugerencias y criterios"),
-    AdminEntry("Vista previa del Home", "Revisión visual completa"),
+    AdminEntry("Revisar Home", "Revisión completa"),
 )
 
 private val publicPurchaseEntries = listOf(
@@ -426,7 +430,7 @@ private val publicPurchaseEntries = listOf(
     AdminEntry("Retiro / Envío", "Dirección, horario y pago visible"),
     AdminEntry("Confirmación", "Revisión antes de confirmar"),
     AdminEntry("Ticket recibido", "Mensaje y seguimiento visible"),
-    AdminEntry("Vista previa", "Revisión del flujo completo"),
+    AdminEntry("Revisar", "Revisión del flujo completo"),
 )
 
 private val publicStoreEntries = listOf(
@@ -436,15 +440,15 @@ private val publicStoreEntries = listOf(
     AdminEntry("Locales visibles", "Orden, destacados y estado visible"),
     AdminEntry("Buscador Tienda", "Sugerencias y mensaje sin resultados"),
     AdminEntry("Seguimiento desde Tienda", "Consulta visible desde Tienda"),
-    AdminEntry("Vista previa", "Revisión de portada y listados"),
-    AdminEntry("Orden / visibilidad", "Exposición pública preparada"),
+    AdminEntry("Revisar", "Revisión de portada y listados"),
+    AdminEntry("Orden / visibilidad", "Exposición pública"),
 )
 
 private val publicTrackingEntries = listOf(
     AdminEntry("Consulta de pedido", "Texto, número y mensajes"),
     AdminEntry("Motivos de reclamo", "Motivos visibles y avisos"),
-    AdminEntry("Vista previa", "Consulta preparada"),
-    AdminEntry("Auditoría visual", "Registro preparado"),
+    AdminEntry("Revisar", "Consulta"),
+    AdminEntry("Auditoría", "Registro"),
 )
 
 private fun publicWorldEntriesFor(world: String): List<AdminEntry> =
@@ -469,7 +473,7 @@ private fun publicHomePartEntries(part: String): List<AdminEntry> =
             AdminEntry("Título", "Valor actual: Pédilo"),
             AdminEntry("Subtítulo", "Todos tus pedidos en un solo lugar"),
             AdminEntry("Imagen / marca", "Imagen visible y alternativa"),
-            AdminEntry("Vista previa", "Revisar encabezado"),
+            AdminEntry("Revisar", "Revisar encabezado"),
         )
         "Accesos rápidos" -> listOf("Mascotas", "Farmacia", "Bebidas", "Mercado").map {
             AdminEntry(it, "Nombre, ícono, orden, estado y destino")
@@ -480,7 +484,7 @@ private fun publicHomePartEntries(part: String): List<AdminEntry> =
             AdminEntry("Imagen", "Imagen visible y alternativa"),
             AdminEntry("Botón ver más", "Texto y destino del botón"),
             AdminEntry("Activo / inactivo", "Visibilidad del banner"),
-            AdminEntry("Vista previa", "Revisar banner completo"),
+            AdminEntry("Revisar", "Revisar banner completo"),
         )
         "Ver más / Convenciones" -> listOf(
             AdminEntry("Día activo", "Título, texto, imagen y estado"),
@@ -493,23 +497,23 @@ private fun publicHomePartEntries(part: String): List<AdminEntry> =
             AdminEntry("Cards visibles", "Oferta publicable"),
             AdminEntry("Orden", "Posición en Home"),
             AdminEntry("Activo / inactivo", "Visibilidad de la sección"),
-            AdminEntry("Destino", "Ruta pública preparada"),
-            AdminEntry("Vista previa", "Revisar ofertas"),
+            AdminEntry("Destino", "Ruta pública"),
+            AdminEntry("Revisar", "Revisar ofertas"),
         )
         "Nuevos locales" -> listOf(
             AdminEntry("Título de sección", "Texto visible"),
             AdminEntry("Cards visibles", "Locales publicables"),
             AdminEntry("Orden", "Posición en Home"),
             AdminEntry("Activo / inactivo", "Visibilidad de la sección"),
-            AdminEntry("Destino", "Ruta pública preparada"),
-            AdminEntry("Vista previa", "Revisar nuevos locales"),
+            AdminEntry("Destino", "Ruta pública"),
+            AdminEntry("Revisar", "Revisar nuevos locales"),
         )
         "Buscador / tags" -> listOf(
             AdminEntry("Tags visibles", "Nombre y criterio"),
             AdminEntry("Orden", "Posición de sugerencias"),
             AdminEntry("Activo / inactivo", "Visibilidad de tags"),
             AdminEntry("Destino / criterio", "Categoría existente"),
-            AdminEntry("Vista previa", "Revisar buscador y tags"),
+            AdminEntry("Revisar", "Revisar buscador y tags"),
         )
         else -> listOf(
             AdminEntry("Vista completa", "Encabezado, accesos y banner"),
@@ -534,7 +538,7 @@ private fun publicPurchasePartEntries(part: String): List<AdminEntry> =
             AdminEntry("Campo cantidad / detalle", "Texto del campo"),
             AdminEntry("Agregar otro producto", "Texto del botón"),
             AdminEntry("Continuar", "Texto del botón"),
-            AdminEntry("Imagen / ícono", "Selector visual preparado"),
+            AdminEntry("Imagen / ícono", "Selector de imagen"),
             AdminEntry("Avisos", "Mensajes visibles"),
         )
         "Retiro / Envío" -> listOf(
@@ -545,7 +549,7 @@ private fun publicPurchasePartEntries(part: String): List<AdminEntry> =
             AdminEntry("Nombre del paquete", "Texto del campo"),
             AdminEntry("Pago en retiro", "Texto visible"),
             AdminEntry("Monto a pagar", "Texto visible"),
-            AdminEntry("Imagen / ícono", "Selector visual preparado"),
+            AdminEntry("Imagen / ícono", "Selector de imagen"),
         )
         "Confirmación" -> listOf(
             AdminEntry("Título", "Texto visible"),
@@ -560,7 +564,7 @@ private fun publicPurchasePartEntries(part: String): List<AdminEntry> =
             AdminEntry("Número de seguimiento", "Texto visible"),
             AdminEntry("Seguir comprando", "Texto del botón"),
             AdminEntry("Ver seguimiento", "Texto del botón"),
-            AdminEntry("Imagen / ícono", "Selector visual preparado"),
+            AdminEntry("Imagen / ícono", "Selector de imagen"),
         )
         else -> listOf(
             AdminEntry("Pantalla inicial", "Compra y Retiro / Envío"),
@@ -577,24 +581,24 @@ private fun publicStorePartEntries(part: String): List<AdminEntry> =
             AdminEntry("Título", "Texto visible"),
             AdminEntry("Subtítulo", "Texto de apoyo"),
             AdminEntry("Texto de buscador", "Campo visible"),
-            AdminEntry("Imagen / ícono", "Selector visual preparado"),
+            AdminEntry("Imagen / ícono", "Selector de imagen"),
             AdminEntry("Bloque seguimiento", "Consulta visible"),
-            AdminEntry("Orden visual", "Posición preparada"),
+            AdminEntry("Orden", "Posición"),
         )
         "Categorías" -> listOf(
             AdminEntry("Nombre visible", "Texto de card"),
-            AdminEntry("Ícono / imagen", "Selector visual preparado"),
+            AdminEntry("Ícono / imagen", "Selector de imagen"),
             AdminEntry("Orden", "Posición pública"),
             AdminEntry("Activo / inactivo", "Estado visible"),
-            AdminEntry("Destino", "Ruta pública preparada"),
+            AdminEntry("Destino", "Ruta pública"),
         )
         "Subcategorías" -> listOf(
             AdminEntry("Nombre visible", "Texto de card"),
-            AdminEntry("Ícono / imagen", "Selector visual preparado"),
+            AdminEntry("Ícono / imagen", "Selector de imagen"),
             AdminEntry("Categoría padre", "Relación requerida"),
             AdminEntry("Orden", "Posición pública"),
             AdminEntry("Activo / inactivo", "Estado visible"),
-            AdminEntry("Destino", "Ruta pública preparada"),
+            AdminEntry("Destino", "Ruta pública"),
         )
         "Locales visibles" -> listOf(
             AdminEntry("Orden de exposición", "Posición pública"),
@@ -637,14 +641,14 @@ private fun publicTrackingPartEntries(part: String): List<AdminEntry> =
         )
         "Motivos de reclamo" -> listOf(
             AdminEntry("Texto de reclamo", "Título visible"),
-            AdminEntry("Motivos visibles", "Lista preparada"),
+            AdminEntry("Motivos visibles", "Lista"),
             AdminEntry("Avisos", "Mensajes activos"),
-            AdminEntry("Imagen / ícono", "Selector visual preparado"),
+            AdminEntry("Imagen / ícono", "Selector de imagen"),
         )
         else -> listOf(
-            AdminEntry("Consulta preparada", "Texto, número y mensajes"),
+            AdminEntry("Consulta", "Texto, número y mensajes"),
             AdminEntry("Ayuda visible", "Motivos y avisos"),
-            AdminEntry("Registro preparado", "Auditoría visual"),
+            AdminEntry("Registro", "Auditoría"),
         )
     }
 
@@ -660,7 +664,7 @@ private val roleAccessSections = listOf(
             AdminEntry("Roles asignados", "Distribución de Admin, Local y Repartidor"),
             AdminEntry("Estado de acceso", "Lectura de habilitación"),
             AdminEntry("Vínculos operativos", "Relación con entidad operativa"),
-            AdminEntry("Auditoría", "Historial visual consultivo"),
+            AdminEntry("Auditoría", "Historial de cambios"),
         ),
     ),
     AdminRoleAccessSection(
@@ -669,12 +673,12 @@ private val roleAccessSections = listOf(
         contextTitle = "Acceso administrativo",
         contextText = "Revisión de cuentas Admin sin modificar permisos reales.",
         entries = listOf(
-            AdminEntry("Cuentas Admin", "Listado conceptual de acceso"),
-            AdminEntry("Preparar alta Admin", "Alta visual sensible sin crear usuario real"),
+            AdminEntry("Cuentas Admin", "Listado de acceso"),
+            AdminEntry("Alta Admin bloqueada", "Alta bloqueada hasta definir invitación segura"),
             AdminEntry("Estado de acceso", "Control de vigencia administrativa"),
             AdminEntry("Nivel de sensibilidad", "Impacto del acceso"),
             AdminEntry("Permisos visibles", "Alcance de acciones permitido"),
-            AdminEntry("Auditoría", "Historial visual consultivo"),
+            AdminEntry("Auditoría", "Historial de cambios"),
         ),
     ),
     AdminRoleAccessSection(
@@ -684,11 +688,11 @@ private val roleAccessSections = listOf(
         contextText = "Organiza relación de cuenta y local sin editar la entidad comercial.",
         entries = listOf(
             AdminEntry("Cuentas Local", "Estado de cuentas store"),
-            AdminEntry("Preparar alta Local", "Alta visual de acceso sin crear usuario real"),
+            AdminEntry("Alta Local bloqueada", "Alta bloqueada hasta definir invitación segura"),
             AdminEntry("Local vinculado", "Relación con local asignado"),
             AdminEntry("Vinculación pendiente", "Cuenta sin relación completa"),
             AdminEntry("Estado de acceso", "Lectura de habilitación de ingreso"),
-            AdminEntry("Auditoría", "Historial visual consultivo"),
+            AdminEntry("Auditoría", "Historial de cambios"),
         ),
     ),
     AdminRoleAccessSection(
@@ -698,11 +702,11 @@ private val roleAccessSections = listOf(
         contextText = "Organiza relación de cuenta y repartidor sin operar entregas.",
         entries = listOf(
             AdminEntry("Cuentas Repartidor", "Estado de cuentas driver"),
-            AdminEntry("Preparar alta Repartidor", "Alta visual de acceso sin crear usuario real"),
+            AdminEntry("Alta Repartidor bloqueada", "Alta bloqueada hasta definir invitación segura"),
             AdminEntry("Repartidor vinculado", "Relación con entidad de reparto"),
             AdminEntry("Vinculación pendiente", "Cuenta con vínculo incompleto"),
             AdminEntry("Estado de acceso", "Lectura de habilitación de ingreso"),
-            AdminEntry("Auditoría", "Historial visual consultivo"),
+            AdminEntry("Auditoría", "Historial de cambios"),
         ),
     ),
     AdminRoleAccessSection(
@@ -716,7 +720,7 @@ private val roleAccessSections = listOf(
             AdminEntry("Datos faltantes", "Información pendiente para completar"),
             AdminEntry("Estado pendiente", "Situación actual de la alta"),
             AdminEntry("Revisión antes de activar", "Chequeo previo a habilitación"),
-            AdminEntry("Resultado", "Cierre visual preparado"),
+            AdminEntry("Resultado", "Cierre"),
         ),
     ),
     AdminRoleAccessSection(
@@ -730,7 +734,7 @@ private val roleAccessSections = listOf(
             AdminEntry("Motivo visible", "Causa administrativa declarada"),
             AdminEntry("Revisión pendiente", "Control previo a cambio de estado"),
             AdminEntry("Posible reactivación", "Ruta de revisión posterior"),
-            AdminEntry("Auditoría", "Historial visual consultivo"),
+            AdminEntry("Auditoría", "Historial de cambios"),
         ),
     ),
     AdminRoleAccessSection(
@@ -744,7 +748,7 @@ private val roleAccessSections = listOf(
             AdminEntry("Relación incompleta", "Pendiente de asociación final"),
             AdminEntry("Entidad pendiente", "Entidad destino por definir"),
             AdminEntry("Revisión de vínculo", "Control de consistencia de asociación"),
-            AdminEntry("Resultado", "Cierre visual preparado"),
+            AdminEntry("Resultado", "Cierre"),
         ),
     ),
     AdminRoleAccessSection(
@@ -774,6 +778,12 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
     var readOnlyOrders by remember { mutableStateOf<List<AdminOrderSummary>>(emptyList()) }
     var readOnlyOrderDetails by remember { mutableStateOf<Map<String, AdminOrderDetail>>(emptyMap()) }
     var operationalHealth by remember { mutableStateOf<AdminOperationalHealthReport?>(null) }
+    var teamUsers by remember { mutableStateOf<List<AdminTeamUser>>(emptyList()) }
+    var adminConfig by remember { mutableStateOf(AdminConfigState()) }
+    var accessMessage by remember { mutableStateOf("") }
+    var accessError by remember { mutableStateOf("") }
+    var configMessage by remember { mutableStateOf("") }
+    var configError by remember { mutableStateOf("") }
     var operationMessage by remember { mutableStateOf("") }
     var operationError by remember { mutableStateOf("") }
     var pendingLiveAction by remember { mutableStateOf<AdminPendingLiveAction?>(null) }
@@ -819,10 +829,49 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
         }
     }
 
+
+    fun updateTeamUser(request: AdminRoleUpdateRequest) {
+        scope.launch {
+            accessMessage = ""
+            accessError = ""
+            when (val result = adminOrders.updateTeamUser(request)) {
+                is CoreResult.Success -> accessMessage = result.value.message
+                is CoreResult.Failure -> accessError = result.error.adminHumanError()
+            }
+        }
+    }
+
+    fun updateAdminConfig(request: AdminConfigUpdateRequest) {
+        scope.launch {
+            configMessage = ""
+            configError = ""
+            when (val result = adminOrders.updateAdminConfig(request)) {
+                is CoreResult.Success -> configMessage = result.value.message
+                is CoreResult.Failure -> configError = result.error.adminHumanError()
+            }
+        }
+    }
+
     LaunchedEffect(Unit) {
         when (val result = adminOrders.getHealth()) {
             is CoreResult.Success -> operationalHealth = result.value
             is CoreResult.Failure -> operationalHealth = null
+        }
+        launch {
+            adminOrders.observeTeamUsers().collect { result ->
+                when (result) {
+                    is CoreResult.Success -> teamUsers = result.value
+                    is CoreResult.Failure -> accessError = "No pudimos leer usuarios y roles."
+                }
+            }
+        }
+        launch {
+            adminOrders.observeAdminConfig().collect { result ->
+                when (result) {
+                    is CoreResult.Success -> adminConfig = result.value
+                    is CoreResult.Failure -> configError = "No pudimos leer configuración Admin."
+                }
+            }
         }
         adminOrders.observe().collect { result ->
             when (result) {
@@ -924,24 +973,20 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 },
                 onSignOut = { showSignOut = true },
             )
-            AdminRoute.Configuration -> AdminConfigurationHomeScreen(
-                entries = configurationEntries,
-                onEntry = { entry ->
-                    route = AdminRoute.ConfigurationSection(configurationSections.first { it.title == entry.title })
-                },
-            )
-            AdminRoute.RoleAccess -> AdminRootScreen(
-                title = "Alta de roles",
-                eyebrow = "Usuarios y accesos",
-                summary = "Preparación visual sin crear usuarios reales.",
-                entries = roleAccessRootEntries,
-                onEntry = { entry ->
-                    roleAccessSections.firstOrNull { it.title == entry.title }?.let {
-                        route = AdminRoute.RoleAccessSection(it)
-                    }
-                },
+            AdminRoute.Configuration -> AdminRealConfigurationScreen(
+                config = adminConfig,
+                message = configMessage,
+                error = configError,
+                onToggle = { field, enabled -> updateAdminConfig(AdminConfigUpdateRequest(field, enabled)) },
                 onSignOut = { showSignOut = true },
-                showSignOut = false,
+            )
+            AdminRoute.RoleAccess -> AdminRealRoleAccessScreen(
+                users = teamUsers,
+                message = accessMessage,
+                error = accessError,
+                onToggleActive = { user -> updateTeamUser(AdminRoleUpdateRequest(uid = user.uid, active = !user.active)) },
+                onRole = { user, role -> updateTeamUser(AdminRoleUpdateRequest(uid = user.uid, role = role)) },
+                onSignOut = { showSignOut = true },
             )
             is AdminRoute.OperationUniverse -> AdminOperationUniverseScreen(
                 universe = current.universe,
@@ -1036,9 +1081,9 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 title = current.title,
                 summary = current.section.entries.firstOrNull { it.title == current.title }?.note
                     ?: publicWorldEntries.firstOrNull { it.title == current.title }?.note
-                    ?: "Revisión visual preparada.",
+                    ?: "Revisión disponible.",
                 panelTitle = current.section.title,
-                panelText = "Revisá el detalle, prepará cambios y evaluá su impacto antes de confirmar.",
+                panelText = "Revisá detalle, alcance e impacto antes de decidir.",
                 onConfigurationConvergence = {
                     route = AdminRoute.ConfigurationConvergence(
                         section = current.section.title,
@@ -1064,9 +1109,9 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
             is AdminRoute.RoleAccessSubsection -> AdminSectionScreen(
                 root = AdminRoot.RoleAccess,
                 title = current.title,
-                summary = "Revisá cuenta, rol, estado y vínculo antes de preparar un cambio.",
+                summary = "Revisá cuenta, rol, estado y vínculo antes de decidir.",
                 panelTitle = current.section.title,
-                panelText = "Este espacio ordena cuentas y vínculos de forma visual sin modificar usuarios ni roles.",
+                panelText = "La gestión real está en Equipo. Esta sección queda sólo para consulta.",
                 onRoleAccessConvergence = { initial ->
                     route = AdminRoute.RoleAccessConvergence(
                         section = current.section.title,
@@ -1085,7 +1130,7 @@ fun AdminApp(onSignOutConfirmed: () -> Unit) {
                 root = current.root,
                 title = current.title,
                 summary = "Revisá el contenido visible antes de avanzar.",
-                panelTitle = "Lectura preparada",
+                panelTitle = "Consulta",
                 panelText = "Este espacio ordena el bloque sin leer información, guardar cambios ni operar pedidos.",
             )
         }
@@ -1215,7 +1260,7 @@ private fun AdminConfigurationHomeScreen(
             AdminHeader(
                 title = "Configuración",
                 eyebrow = "Datos y reglas",
-                summary = "Preparación visual sin guardar cambios reales.",
+                summary = "Lectura de configuración heredada sin acción directa.",
                 onSignOut = {},
                 showSignOut = false,
             )
@@ -1294,9 +1339,9 @@ private fun AdminPublicWorldPartScreen(
 private fun publicWorldSummary(world: String): String =
     when (world) {
         "Home público" -> "Elegí qué parte visible del Home querés gestionar."
-        "Compra / Retiro" -> "Prepará el flujo público central sin crear pedidos reales."
+        "Compra / Retiro" -> "Revisá el flujo público central sin crear pedidos."
         "Tienda" -> "Organizá exposición pública sin crear locales ni productos."
-        else -> "Mundo preparado para consulta y reclamos visibles."
+        else -> "Consulta y reclamos visibles."
     }
 
 private fun publicWorldPartSummary(world: String, part: String): String =
@@ -1304,7 +1349,7 @@ private fun publicWorldPartSummary(world: String, part: String): String =
         "Home público" -> publicHomePartSummary(part)
         "Compra / Retiro" -> publicPurchasePartSummary(part)
         "Tienda" -> publicStorePartSummary(part)
-        else -> "Prepará textos, avisos, vista previa y registro visual."
+        else -> "Revisá textos, avisos, alcance y registro."
     }
 
 private fun publicHomePartSummary(part: String): String =
@@ -1313,9 +1358,9 @@ private fun publicHomePartSummary(part: String): String =
         "Accesos rápidos" -> "Elegí un acceso para revisar nombre, ícono, orden y destino."
         "Banner destacado" -> "Gestioná el contenido y el botón visible del banner."
         "Ver más / Convenciones" -> "Mantené alineada la información resumida y ampliada."
-        "Ofertas" -> "Prepará oferta publicable sin crear productos ni editar precios."
+        "Ofertas" -> "Revisá oferta publicable sin crear productos ni editar precios."
         "Nuevos locales" -> "Mostrá únicamente locales completos y publicables."
-        "Buscador / tags" -> "Prepará sugerencias con destino o criterio válido."
+        "Buscador / tags" -> "Revisá sugerencias con destino o criterio válido."
         else -> "Revisá cómo quedaría el Home antes de confirmar."
     }
 
@@ -1326,18 +1371,18 @@ private fun publicPurchasePartSummary(part: String): String =
         "Retiro / Envío" -> "Textos, dirección, horario y pago visible."
         "Confirmación" -> "Labels y botones visibles antes del ticket."
         "Ticket recibido" -> "Mensaje final y seguimiento visible."
-        else -> "Vista previa del flujo completo."
+        else -> "Revisar del flujo completo."
     }
 
 private fun publicStorePartSummary(part: String): String =
     when (part) {
-        "Portada Tienda" -> "Título, buscador, seguimiento y orden visual."
+        "Portada Tienda" -> "Título, buscador, seguimiento y orden."
         "Categorías" -> "Navegación pública por categoría sin crear oferta."
         "Subcategorías" -> "Navegación pública con padre y destino válido."
         "Locales visibles" -> "Exposición de locales publicables."
         "Buscador Tienda" -> "Textos, sugerencias y mensajes sin resultados."
         "Seguimiento desde Tienda" -> "Consulta visible que converge al seguimiento común."
-        else -> "Vista previa y orden de exposición pública."
+        else -> "Revisar y orden de exposición pública."
     }
 
 private fun publicHomeIconFor(title: String): ImageVector =
@@ -1352,7 +1397,7 @@ private fun publicHomeIconFor(title: String): ImageVector =
         "Ver más / Convenciones", "Día activo", "Información del día" -> Icons.Outlined.CalendarToday
         "Nuevos locales" -> Icons.Outlined.Storefront
         "Buscador / tags", "Tags visibles", "Destino / criterio" -> Icons.Outlined.Search
-        "Vista previa del Home", "Vista previa", "Vista completa", "Contenido ampliado", "Búsqueda y tags" -> Icons.Outlined.CheckCircle
+        "Revisar Home", "Revisar", "Vista completa", "Contenido ampliado", "Búsqueda y tags" -> Icons.Outlined.CheckCircle
         "Imagen / marca", "Imagen" -> Icons.Outlined.Restaurant
         "Orden" -> Icons.Outlined.Tune
         "Activo / inactivo" -> Icons.Outlined.Bolt
@@ -1371,19 +1416,19 @@ private fun AdminPublicHomeEditorScreen(
     val title = when (step) {
         AdminPublicHomeEditorStep.Detail -> item
         AdminPublicHomeEditorStep.Edit -> "Editar $item"
-        AdminPublicHomeEditorStep.Preview -> "Vista previa"
+        AdminPublicHomeEditorStep.Preview -> "Revisar"
         AdminPublicHomeEditorStep.Impact -> "Impacto"
         AdminPublicHomeEditorStep.Confirmation -> "Confirmar cambio"
         AdminPublicHomeEditorStep.Result -> "Resultado"
-        AdminPublicHomeEditorStep.Audit -> "Auditoría visual"
+        AdminPublicHomeEditorStep.Audit -> "Auditoría"
     }
     val action = when (step) {
         AdminPublicHomeEditorStep.Detail -> "Editar contenido" to AdminPublicHomeEditorStep.Edit
         AdminPublicHomeEditorStep.Edit -> "Ver vista previa" to AdminPublicHomeEditorStep.Preview
         AdminPublicHomeEditorStep.Preview -> "Ver impacto" to AdminPublicHomeEditorStep.Impact
         AdminPublicHomeEditorStep.Impact -> "Continuar a confirmación" to AdminPublicHomeEditorStep.Confirmation
-        AdminPublicHomeEditorStep.Confirmation -> "Confirmar visualmente" to AdminPublicHomeEditorStep.Result
-        AdminPublicHomeEditorStep.Result -> "Consultar auditoría visual" to AdminPublicHomeEditorStep.Audit
+        AdminPublicHomeEditorStep.Confirmation -> "Confirmar revisión" to AdminPublicHomeEditorStep.Result
+        AdminPublicHomeEditorStep.Result -> "Consultar auditoría" to AdminPublicHomeEditorStep.Audit
         AdminPublicHomeEditorStep.Audit -> "Revisar registro" to AdminPublicHomeEditorStep.Audit
     }
     LazyColumn(
@@ -1409,25 +1454,25 @@ private fun AdminPublicHomeEditorScreen(
             item { AdminInfoPanel(title = "Nuevo valor", text = publicHomeEditableFields(world, part, item)) }
             item {
                 AdminActionCard(
-                    title = "Guardar borrador visual",
-                    note = "Prepara la revisión dentro de esta pantalla, sin guardar datos reales.",
+                    title = "Guardar revisión",
+                    note = "Abre revisión de contenido sin publicar cambios desde esta ruta heredada.",
                     onClick = {},
                 )
             }
         }
         if (step == AdminPublicHomeEditorStep.Preview) {
-            item { AdminInfoPanel(title = "Vista previa", text = publicHomePreview(world, part, item)) }
+            item { AdminInfoPanel(title = "Revisar", text = publicHomePreview(world, part, item)) }
         }
         if (step == AdminPublicHomeEditorStep.Impact || step == AdminPublicHomeEditorStep.Confirmation) {
-            item { AdminInfoPanel(title = "Impacto visible", text = publicHomeImpact(world, part, item)) }
+            item { AdminInfoPanel(title = "Impacto", text = publicHomeImpact(world, part, item)) }
         }
         if (step == AdminPublicHomeEditorStep.Result) {
-            item { AdminInfoPanel(title = "Cambio preparado", text = "La revisión visual quedó lista. El usuario público real permanece sin cambios.") }
+            item { AdminInfoPanel(title = "Revisión lista", text = "La revisión quedó lista. El público no cambia desde esta pantalla.") }
         }
         if (step == AdminPublicHomeEditorStep.Audit) {
             item {
                 AdminInfoPanel(
-                    title = "Registro preparado",
+                    title = "Registro",
                     text = "Qué cambió · Responsable · Momento · Valor anterior · Valor nuevo · Dónde impacta · Resultado.",
                 )
             }
@@ -1435,7 +1480,7 @@ private fun AdminPublicHomeEditorScreen(
         item {
             AdminActionCard(
                 title = action.first,
-                note = "Continuar dentro de la herramienta visual.",
+                note = "Continuar.",
                 onClick = { onNext(action.second) },
             )
         }
@@ -1445,19 +1490,19 @@ private fun AdminPublicHomeEditorScreen(
 private fun publicHomeEditorSummary(world: String, step: AdminPublicHomeEditorStep): String =
     when (step) {
         AdminPublicHomeEditorStep.Detail -> "Revisá el dato visible antes de editar."
-        AdminPublicHomeEditorStep.Edit -> "Prepará un nuevo valor sin modificar $world real."
+        AdminPublicHomeEditorStep.Edit -> "Revisá un nuevo valor sin modificar $world."
         AdminPublicHomeEditorStep.Preview -> "Compará cómo se vería el cambio."
-        AdminPublicHomeEditorStep.Impact -> "Revisá qué parte visible cambia y qué permanece igual."
-        AdminPublicHomeEditorStep.Confirmation -> "Confirmación visual previa al resultado."
-        AdminPublicHomeEditorStep.Result -> "Cierre visual sin publicación real."
-        AdminPublicHomeEditorStep.Audit -> "Consulta del registro visual preparado."
+        AdminPublicHomeEditorStep.Impact -> "Revisá qué cambia y qué queda igual."
+        AdminPublicHomeEditorStep.Confirmation -> "Confirmación antes del cierre."
+        AdminPublicHomeEditorStep.Result -> "Cierre de revisión sin publicación externa."
+        AdminPublicHomeEditorStep.Audit -> "Consulta del registro."
     }
 
 private fun publicHomeCurrentValue(world: String, part: String, item: String): String =
     when {
-        world == "Compra / Retiro" -> "$item visible en $part · Activo · Orden preparado"
-        world == "Tienda" -> "$item visible en $part · Activo · Destino preparado"
-        world == "Seguimiento / Reclamos" -> "$item preparado para consulta pública"
+        world == "Compra / Retiro" -> "$item visible en $part · Activo · Orden definido"
+        world == "Tienda" -> "$item visible en $part · Activo · Destino definido"
+        world == "Seguimiento / Reclamos" -> "$item listo para consulta pública"
         part == "Encabezado" && item == "Título" -> "Pédilo"
         part == "Encabezado" && item == "Subtítulo" -> "Todos tus pedidos en un solo lugar"
         part == "Accesos rápidos" -> "$item · Activo · Orden visible · Destino configurado"
@@ -1468,37 +1513,37 @@ private fun publicHomeCurrentValue(world: String, part: String, item: String): S
 
 private fun publicHomeEditableFields(world: String, part: String, item: String): String =
     when {
-        world == "Compra / Retiro" -> "Valor actual · Nuevo valor · Imagen / ícono · Estado activo / inactivo · Orden · Avisos · Vista previa"
-        world == "Tienda" -> "Valor actual · Nuevo valor · Selector visual · Estado activo / inactivo · Orden · Destino · Vista previa"
-        world == "Seguimiento / Reclamos" -> "Texto visible · Mensaje sin resultado · Motivos · Avisos · Imagen / ícono · Vista previa"
+        world == "Compra / Retiro" -> "Valor actual · Nuevo valor · Imagen / ícono · Estado activo / inactivo · Orden · Avisos · Revisar"
+        world == "Tienda" -> "Valor actual · Nuevo valor · Imagen · Estado activo / inactivo · Orden · Destino · Revisar"
+        world == "Seguimiento / Reclamos" -> "Texto visible · Mensaje sin resultado · Motivos · Avisos · Imagen / ícono · Revisar"
         part == "Accesos rápidos" -> "Nombre visible · Imagen / ícono · Orden · Activo / inactivo · Destino"
         part == "Banner destacado" -> "Texto principal · Texto secundario · Imagen · Botón visible · Texto del botón · Destino · Activo / inactivo"
         part == "Ver más / Convenciones" -> "Título · Texto · Imagen · Orden · Activo / inactivo"
         part == "Ofertas" || part == "Nuevos locales" -> "Título · Cards visibles · Orden · Activo / inactivo · Destino"
         part == "Buscador / tags" -> "Nombre · Orden · Activo / inactivo · Destino / criterio"
-        part == "Vista previa del Home" -> "Encabezado · Accesos rápidos · Banner · Convenciones · Ofertas · Nuevos locales · Tags"
+        part == "Revisar Home" -> "Encabezado · Accesos rápidos · Banner · Convenciones · Ofertas · Nuevos locales · Tags"
         else -> "Nuevo valor · Imagen / marca · Estado visible"
     }
 
 private fun publicHomePreview(world: String, part: String, item: String): String =
     when (world) {
-        "Compra / Retiro" -> "$item se revisa dentro de $part con Compra, Retiro / Envío, confirmación y ticket preparado."
-        "Tienda" -> "$item se revisa dentro de $part con portada, categorías, locales visibles, buscador y seguimiento preparado."
-        "Seguimiento / Reclamos" -> "$item queda preparado como card de consulta, sin desarrollo profundo todavía."
-        else -> "$item se muestra dentro de $part junto al resto del Home, con tamaño, orden y destino preparados."
+        "Compra / Retiro" -> "$item se revisa dentro de $part con compra, retiro / envío, confirmación y ticket."
+        "Tienda" -> "$item se revisa dentro de $part con portada, categorías, locales visibles, buscador y seguimiento."
+        "Seguimiento / Reclamos" -> "$item queda bloqueado como tarjeta de consulta hasta completar su flujo."
+        else -> "$item se muestra dentro de $part junto al resto del Home, con tamaño, orden y destino."
     }
 
 private fun publicHomeImpact(world: String, part: String, item: String): String =
     when {
-        world == "Compra / Retiro" -> "Cambia la presentación del flujo público. No crea pedidos reales ni cambia pagos."
-        world == "Tienda" && part == "Locales visibles" -> "Cambia exposición de locales publicables. No crea locales ni edita productos."
-        world == "Tienda" -> "Cambia navegación o presentación pública. No crea oferta ni edita precios."
-        world == "Seguimiento / Reclamos" -> "Prepara consulta y ayuda visible. No redefine seguimiento real."
-        part == "Ofertas" -> "Cambia la presentación de ofertas publicables. No crea productos ni modifica precios."
-        part == "Nuevos locales" -> "Cambia la presentación de locales publicables. No crea ni habilita locales."
+        world == "Compra / Retiro" -> "Cambia la presentación del flujo público. No genera pedidos ni cambia pagos."
+        world == "Tienda" && part == "Locales visibles" -> "Cambia exposición de locales publicables. No da de alta locales ni edita productos."
+        world == "Tienda" -> "Cambia navegación o presentación pública. No da de alta oferta ni edita precios."
+        world == "Seguimiento / Reclamos" -> "Revisa consulta y ayuda visible. No redefine seguimiento."
+        part == "Ofertas" -> "Cambia la presentación de ofertas publicables. No da de alta productos ni modifica precios."
+        part == "Nuevos locales" -> "Cambia la presentación de locales publicables. No da de alta ni habilita locales."
         part == "Banner destacado" -> "Cambia el banner visible. Solo el botón ver más conserva navegación."
-        part == "Accesos rápidos" -> "Cambia accesos visibles, orden y destino preparado."
-        part == "Buscador / tags" -> "Cambia sugerencias visibles y criterio preparado."
+        part == "Accesos rápidos" -> "Cambia accesos visibles, orden y destino."
+        part == "Buscador / tags" -> "Cambia sugerencias visibles y criterio."
         else -> "Cambia $item dentro de $part. No modifica datos reales ni pedidos vivos."
     }
 
@@ -1508,7 +1553,7 @@ private fun AdminConfigurationRootCard(
     icon: ImageVector,
     onClick: () -> Unit,
 ) {
-    val intent = adminVisualIntentFor(entry.title, entry.note)
+    val intent = adminHumanIntentFor(entry.title, entry.note)
     val toneColor = intent.adminIntentColor()
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -2226,7 +2271,7 @@ private fun AdminOperationOrderCard(
     card: AdminOperationalLiveCard,
     onClick: () -> Unit,
 ) {
-    val toneColor = adminVisualIntentFor(card.title, card.detail).adminIntentColor()
+    val toneColor = adminHumanIntentFor(card.title, card.detail).adminIntentColor()
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     Column(
@@ -2303,6 +2348,155 @@ private fun AdminConfigurationSectionScreen(
     }
 }
 
+
+@Composable
+private fun AdminRealConfigurationScreen(
+    config: AdminConfigState,
+    message: String,
+    error: String,
+    onToggle: (String, Boolean) -> Unit,
+    onSignOut: () -> Unit,
+) {
+    val configItems = listOf(
+        AdminRealConfigItem("maintenanceMode", "Mantenimiento", config.maintenanceMode, "Bloquea operación normal cuando el equipo necesita pausar la app."),
+        AdminRealConfigItem("rainMode", "Modo lluvia", config.rainMode, "Señal operativa para priorizar pedidos y revisar tarifas antes de aceptar volumen."),
+        AdminRealConfigItem("saturationMode", "Saturación", config.saturationMode, "Marca que Admin debe priorizar pedidos demorados, sin responsable o con incidencia."),
+        AdminRealConfigItem("emergencyMode", "Emergencia", config.emergencyMode, "Alerta sensible para operar sólo acciones auditadas y revisar comunicación."),
+        AdminRealConfigItem("publicOrderingEnabled", "Pedidos públicos habilitados", config.publicOrderingEnabled, "Control visible para saber si Admin permite ingreso de nuevos pedidos públicos."),
+    )
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = adminBottomBarReservedPadding),
+        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            AdminHeader(
+                title = "Configuración real",
+                eyebrow = "Admin",
+                summary = "Controles reales de la operación. Cada cambio se guarda y muestra resultado.",
+                onSignOut = onSignOut,
+                showSignOut = true,
+            )
+        }
+        item {
+            AdminInfoPanel(
+                title = "Alcance operativo",
+                text = "Estos controles ayudan a pausar, priorizar o limitar la operación. No activan servicios externos ni cobros.",
+            )
+        }
+        if (message.isNotBlank()) item { AdminInfoPanel(title = "Guardado", text = message) }
+        if (error.isNotBlank()) item { AdminInfoPanel(title = "Error", text = error) }
+        items(configItems) { item ->
+            AdminRealConfigCard(item = item, onToggle = { onToggle(item.field, !item.enabled) })
+        }
+    }
+}
+
+@Composable
+private fun AdminRealRoleAccessScreen(
+    users: List<AdminTeamUser>,
+    message: String,
+    error: String,
+    onToggleActive: (AdminTeamUser) -> Unit,
+    onRole: (AdminTeamUser, String) -> Unit,
+    onSignOut: () -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = adminBottomBarReservedPadding),
+        contentPadding = PaddingValues(top = 18.dp, bottom = adminContentBottomPadding),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            AdminHeader(
+                title = "Roles y accesos reales",
+                eyebrow = "Admin",
+                summary = "Gestiona cuentas existentes del equipo. La creación de cuentas nuevas está bloqueada hasta definir invitaciones seguras.",
+                onSignOut = onSignOut,
+                showSignOut = true,
+            )
+        }
+        item {
+            AdminInfoPanel(
+                title = "Bloqueo explícito",
+                text = "Las cuentas nuevas están bloqueadas por seguridad. Activar, desactivar y cambiar rol sí se guarda para usuarios existentes y no modifica pedidos anteriores.",
+            )
+        }
+        if (message.isNotBlank()) item { AdminInfoPanel(title = "Guardado", text = message) }
+        if (error.isNotBlank()) item { AdminInfoPanel(title = "Error", text = error) }
+        if (users.isEmpty()) {
+            item { AdminInfoPanel(title = "Sin usuarios", text = "No hay cuentas de equipo visibles. Cargá primero una cuenta autorizada para operar el equipo.") }
+        }
+        items(users, key = { it.uid }) { user ->
+            AdminTeamUserCard(user = user, onToggleActive = { onToggleActive(user) }, onRole = { role -> onRole(user, role) })
+        }
+    }
+}
+
+private data class AdminRealConfigItem(
+    val field: String,
+    val title: String,
+    val enabled: Boolean,
+    val note: String,
+)
+
+@Composable
+private fun AdminRealConfigCard(item: AdminRealConfigItem, onToggle: () -> Unit) {
+    AdminActionCard(
+        title = "${item.title}: ${if (item.enabled) "activo" else "inactivo"}",
+        note = item.note,
+        onClick = onToggle,
+    )
+}
+
+@Composable
+private fun AdminTeamUserCard(
+    user: AdminTeamUser,
+    onToggleActive: () -> Unit,
+    onRole: (String) -> Unit,
+) {
+    val label = user.displayName.ifBlank { user.email.ifBlank { user.uid } }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(PediloPanel, RoundedCornerShape(18.dp))
+            .border(1.dp, if (user.active) PediloGreen.copy(alpha = 0.45f) else PediloWarning.copy(alpha = 0.55f), RoundedCornerShape(18.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(label, color = PediloText, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
+        Text("Rol actual: ${user.role.adminRoleLabel()} · Estado: ${if (user.active) "activo" else "inactivo"}", color = PediloMuted, fontSize = 13.sp)
+        if (user.storeId.isNotBlank() || user.driverId.isNotBlank()) {
+            Text("Vínculo: ${listOf(user.storeId, user.driverId).filter { it.isNotBlank() }.joinToString()}", color = PediloMuted, fontSize = 12.sp)
+        }
+        AdminActionCard(
+            title = if (user.active) "Desactivar acceso" else "Activar acceso",
+            note = "Persistir cambio de acceso para esta cuenta.",
+            onClick = onToggleActive,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            listOf("admin", "store", "driver").forEach { role ->
+                TextButton(onClick = { onRole(role) }) { Text(role.adminRoleLabel()) }
+            }
+        }
+    }
+}
+
+private fun String.adminRoleLabel(): String = when (trim().lowercase()) {
+    "admin" -> "Admin"
+    "store" -> "Local"
+    "driver" -> "Repartidor"
+    else -> adminDisplayValue("Sin rol")
+}
+
 @Composable
 private fun AdminRoleAccessSectionScreen(
     section: AdminRoleAccessSection,
@@ -2372,7 +2566,7 @@ private fun AdminSectionScreen(
         if (root == AdminRoot.Configuration) {
             item {
                 AdminEntryCard(
-                    entry = AdminEntry("Abrir revisión", "Ver detalle y preparar el cambio"),
+                    entry = AdminEntry("Abrir revisión", "Ver detalle y alcance"),
                     onClick = onConfigurationConvergence,
                 )
             }
@@ -2424,7 +2618,7 @@ private fun AdminRoleAccessConvergenceScreen(
     }
     val summary = when (step) {
         AdminRoleAccessConvergenceStep.Account -> "Detalle de cuenta y acciones de acceso."
-        AdminRoleAccessConvergenceStep.CreateAccount -> "Preparación de alta sin crear usuario real."
+        AdminRoleAccessConvergenceStep.CreateAccount -> "Alta bloqueada hasta definir invitación segura."
         AdminRoleAccessConvergenceStep.AccessEditor -> "Revisión de datos permitidos de acceso."
         AdminRoleAccessConvergenceStep.ChangeRole -> "Revisión de cambio entre Admin, Local y Repartidor."
         AdminRoleAccessConvergenceStep.ToggleAccess -> "Revisión de habilitación o detención de ingreso."
@@ -2432,7 +2626,7 @@ private fun AdminRoleAccessConvergenceScreen(
         AdminRoleAccessConvergenceStep.Impact -> "Evaluación de alcance antes de confirmar."
         AdminRoleAccessConvergenceStep.SensitiveConfirmation -> "Validación final previa al resultado."
         AdminRoleAccessConvergenceStep.Result -> "Cierre de revisión sin aplicación real."
-        AdminRoleAccessConvergenceStep.Audit -> "Consulta visual de cuenta, rol, vínculo y resultado."
+        AdminRoleAccessConvergenceStep.Audit -> "Consulta de cuenta, rol, vínculo y resultado."
     }
     val context = when (step) {
         AdminRoleAccessConvergenceStep.Account -> "Cuenta: persona@equipo.com · Nombre visible: Referencia de cuenta · Rol: Local · Estado: En revisión · Puede ingresar: Pendiente."
@@ -2443,7 +2637,7 @@ private fun AdminRoleAccessConvergenceScreen(
         AdminRoleAccessConvergenceStep.LinkEntity -> "Cuenta y vínculo operativo pendiente.\nLa entidad se gestiona en su bloque dueño."
         AdminRoleAccessConvergenceStep.Impact -> "Qué cambia en acceso y vínculo, y qué no cambia.\nNo afecta pedidos existentes, tracking, catálogo ni operación viva."
         AdminRoleAccessConvergenceStep.SensitiveConfirmation -> "Acción sensible en revisión final para cuenta del equipo.\nNo aplica cambios reales en esta etapa."
-        AdminRoleAccessConvergenceStep.Result -> "La revisión quedó preparada.\nNo se aplicaron cambios reales."
+        AdminRoleAccessConvergenceStep.Result -> "Esta sección sólo informa. Para cambiar accesos, volvé a Equipo."
         AdminRoleAccessConvergenceStep.Audit -> "Qué cambió, quién lo revisó, cuándo, valor anterior, valor nuevo, rol afectado, cuenta afectada, entidad vinculada, motivo y resultado."
     }
     val next = when (step) {
@@ -2466,7 +2660,7 @@ private fun AdminRoleAccessConvergenceScreen(
         AdminRoleAccessConvergenceStep.ToggleAccess -> "Evaluar impacto"
         AdminRoleAccessConvergenceStep.LinkEntity -> "Evaluar impacto"
         AdminRoleAccessConvergenceStep.Impact -> "Ir a confirmación"
-        AdminRoleAccessConvergenceStep.SensitiveConfirmation -> "Confirmar de forma visual"
+        AdminRoleAccessConvergenceStep.SensitiveConfirmation -> "Entendido"
         AdminRoleAccessConvergenceStep.Result -> "Consultar auditoría de accesos"
         AdminRoleAccessConvergenceStep.Audit -> "Revisar registro"
     }
@@ -2491,7 +2685,7 @@ private fun AdminRoleAccessConvergenceScreen(
         item {
             AdminActionCard(
                 title = actionLabel,
-                note = "Continuar sin aplicar cambios reales.",
+                note = "Continuar.",
                 onClick = { onNext(next) },
             )
         }
@@ -2507,17 +2701,17 @@ private fun AdminConfigurationConvergenceScreen(
 ) {
     val title = when (step) {
         AdminConfigurationConvergenceStep.Entity -> "Detalle de configuración"
-        AdminConfigurationConvergenceStep.Editor -> "Preparar cambio"
-        AdminConfigurationConvergenceStep.Preview -> "Previsualización"
+        AdminConfigurationConvergenceStep.Editor -> "Revisar cambio"
+        AdminConfigurationConvergenceStep.Preview -> "Revisión"
         AdminConfigurationConvergenceStep.Impact -> "Impacto"
         AdminConfigurationConvergenceStep.SensitiveConfirmation -> "Confirmación sensible"
         AdminConfigurationConvergenceStep.Result -> "Resultado"
-        AdminConfigurationConvergenceStep.Audit -> "Auditoría visual"
+        AdminConfigurationConvergenceStep.Audit -> "Auditoría"
     }
     val summary = when (step) {
         AdminConfigurationConvergenceStep.Entity -> "Lectura base de lo que se quiere ajustar."
-        AdminConfigurationConvergenceStep.Editor -> "Preparación del cambio sin aplicarlo."
-        AdminConfigurationConvergenceStep.Preview -> "Revisión conceptual antes de continuar."
+        AdminConfigurationConvergenceStep.Editor -> "Revisión del cambio antes de usar Configuración."
+        AdminConfigurationConvergenceStep.Preview -> "Revisión antes de continuar."
         AdminConfigurationConvergenceStep.Impact -> "Evaluación de alcance y efectos esperados."
         AdminConfigurationConvergenceStep.SensitiveConfirmation -> "Validación previa para cambios sensibles."
         AdminConfigurationConvergenceStep.Result -> "Cierre de la secuencia de revisión."
@@ -2526,19 +2720,19 @@ private fun AdminConfigurationConvergenceScreen(
     val context = when (step) {
         AdminConfigurationConvergenceStep.Entity -> "Sección: $section · Subsección: $subsection.\nControla alcance, estado actual y restricciones sin ejecutar acciones."
         AdminConfigurationConvergenceStep.Editor -> "Valor actual y nuevo valor se muestran para revisar.\nNo se guardan cambios reales ni se publica contenido."
-        AdminConfigurationConvergenceStep.Preview -> "Comparación conceptual del cambio.\nTodavía no está aplicado en la app real."
+        AdminConfigurationConvergenceStep.Preview -> "Comparación del cambio. Para guardar, usá Configuración."
         AdminConfigurationConvergenceStep.Impact -> "Qué cambia, qué afecta y qué no cambia.\nSolo lectura de impacto, sin aplicación."
-        AdminConfigurationConvergenceStep.SensitiveConfirmation -> "Confirmación humana del alcance y advertencias.\nEl botón de confirmar es solo visual en este bloque."
-        AdminConfigurationConvergenceStep.Result -> "La revisión quedó preparada.\nEl cambio permanece sin confirmar."
-        AdminConfigurationConvergenceStep.Audit -> "Registro preparado para buscar, filtrar y consultar.\nNo se edita ni se borra."
+        AdminConfigurationConvergenceStep.SensitiveConfirmation -> "Confirmación del alcance y advertencias. Para guardar, usá Configuración."
+        AdminConfigurationConvergenceStep.Result -> "Revisión cerrada. Para guardar, usá Configuración."
+        AdminConfigurationConvergenceStep.Audit -> "Registro para buscar, filtrar y consultar.\nNo se edita ni se borra."
     }
     val action = when (step) {
         AdminConfigurationConvergenceStep.Entity -> "Ir al editor" to AdminConfigurationConvergenceStep.Editor
-        AdminConfigurationConvergenceStep.Editor -> "Ir a preview" to AdminConfigurationConvergenceStep.Preview
+        AdminConfigurationConvergenceStep.Editor -> "Revisar antes de seguir" to AdminConfigurationConvergenceStep.Preview
         AdminConfigurationConvergenceStep.Preview -> "Revisar impacto" to AdminConfigurationConvergenceStep.Impact
         AdminConfigurationConvergenceStep.Impact -> "Continuar a confirmación" to AdminConfigurationConvergenceStep.SensitiveConfirmation
-        AdminConfigurationConvergenceStep.SensitiveConfirmation -> "Confirmar de forma visual" to AdminConfigurationConvergenceStep.Result
-        AdminConfigurationConvergenceStep.Result -> "Consultar auditoría visual" to AdminConfigurationConvergenceStep.Audit
+        AdminConfigurationConvergenceStep.SensitiveConfirmation -> "Entendido" to AdminConfigurationConvergenceStep.Result
+        AdminConfigurationConvergenceStep.Result -> "Consultar auditoría" to AdminConfigurationConvergenceStep.Audit
         AdminConfigurationConvergenceStep.Audit -> "Revisar otro registro" to AdminConfigurationConvergenceStep.Audit
     }
 
@@ -2565,7 +2759,7 @@ private fun AdminConfigurationConvergenceScreen(
             item {
                 AdminInfoPanel(
                     title = "Campos del editor",
-                    text = "Valor actual · Nuevo valor · Campo requerido · Campo bloqueado · Borrador visual preparado, sin guardar datos reales.",
+                    text = "Valor actual · Nuevo valor · Campo requerido · Campo bloqueado · edición bloqueada en esta sección.",
                 )
             }
         }
@@ -2580,7 +2774,7 @@ private fun AdminConfigurationConvergenceScreen(
         item {
             AdminActionCard(
                 title = action.first,
-                note = "Continuar sin aplicar cambios reales.",
+                note = "Continuar.",
                 onClick = { onNext(action.second) },
             )
         }
@@ -2694,7 +2888,7 @@ private fun AdminOrderDetailScreen(
             AdminOrderNavigationCard(entry = entry, onClick = { onSection(entry.section) })
         }
         if (allowedActions.isNotEmpty() && orderId != null) {
-            item { AdminInfoPanel(title = "Acciones disponibles", text = "Solo se muestran acciones permitidas por backend para la versión $expectedVersion.") }
+            item { AdminInfoPanel(title = "Acciones disponibles", text = "Estas acciones están habilitadas para la versión $expectedVersion del pedido.") }
             items(allowedActions) { action ->
                 AdminActionCard(
                     title = action.adminActionLabel(),
@@ -2706,7 +2900,7 @@ private fun AdminOrderDetailScreen(
             item {
                 AdminInfoPanel(
                     title = "Sin acciones disponibles",
-                    text = "El backend no habilita acciones para este pedido o versión. Si el pedido está cerrado, no hay acciones normales.",
+                    text = "No hay acciones disponibles ahora. Actualizá el pedido o revisá el historial para entender el motivo.",
                 )
             }
         }
@@ -2886,7 +3080,7 @@ private fun adminCommunicationStatusLabel(value: String): String =
     when (value.trim()) {
         "received" -> "Recibida"
         "pending" -> "Pendiente"
-        "prepared" -> "Preparada, sin envío externo real"
+        "prepared" -> "Lista para revisar; sin envío externo"
         "sent" -> "Registrada como enviada; verificar canal"
         "failed" -> "Fallida"
         "closed" -> "Cerrada"
@@ -2926,7 +3120,7 @@ private fun LiveOrderAction.adminActionLabel(): String =
     when (this) {
         LiveOrderAction.LocalAccept -> "Aceptar pedido"
         LiveOrderAction.LocalReject -> "Rechazar pedido"
-        LiveOrderAction.LocalMarkPreparing -> "Marcar en preparación"
+        LiveOrderAction.LocalMarkPreparing -> "Marcar como preparando"
         LiveOrderAction.LocalMarkReady -> "Marcar listo"
         LiveOrderAction.DriverTake -> "Tomar pedido"
         LiveOrderAction.DriverMarkPickedUp -> "Marcar retirado"
@@ -2964,7 +3158,7 @@ private fun LiveOrderAction.requiresAdminReason(): Boolean =
 private fun CoreError.adminHumanError(): String =
     when (this) {
         is CoreError.Operational -> humanMessage
-        CoreError.NotAvailable -> "No pudimos conectar con el backend operativo."
+        CoreError.NotAvailable -> "No pudimos conectar con el servicio operativo."
         CoreError.IncompleteData -> "Faltan datos para ejecutar la acción."
         is CoreError.Validation -> "Revisá los datos antes de confirmar."
         CoreError.Unknown -> "No pudimos ejecutar la acción."
@@ -3059,7 +3253,7 @@ private fun AdminOrderFactPanel(title: String, facts: List<Pair<String, String>>
 
 @Composable
 private fun AdminActionCard(title: String, note: String, onClick: () -> Unit) {
-    val intent = adminVisualIntentFor(title, note)
+    val intent = adminHumanIntentFor(title, note)
     val toneColor = intent.adminIntentColor()
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -3085,50 +3279,50 @@ private fun AdminActionCard(title: String, note: String, onClick: () -> Unit) {
     }
 }
 
-private fun adminVisualIntentFor(title: String, note: String): AdminVisualIntent {
+private fun adminHumanIntentFor(title: String, note: String): AdminHumanIntent {
     val text = "$title $note"
     return when {
-        text.contains("Auditor", ignoreCase = true) || text.contains("registro", ignoreCase = true) -> AdminVisualIntent.Audit
-        text.contains("Confirm", ignoreCase = true) || text.contains("sensible", ignoreCase = true) -> AdminVisualIntent.Confirm
-        text.contains("Impacto", ignoreCase = true) || text.contains("Emergencia", ignoreCase = true) -> AdminVisualIntent.Impact
-        text.contains("Vista previa", ignoreCase = true) || text.contains("preview", ignoreCase = true) -> AdminVisualIntent.Preview
-        text.contains("Editar", ignoreCase = true) || text.contains("borrador", ignoreCase = true) || text.contains("prepar", ignoreCase = true) -> AdminVisualIntent.Edit
-        text.contains("Problema", ignoreCase = true) || text.contains("bloque", ignoreCase = true) || text.contains("detenido", ignoreCase = true) -> AdminVisualIntent.Problem
-        text.contains("revisión", ignoreCase = true) || text.contains("pendiente", ignoreCase = true) || text.contains("incompleto", ignoreCase = true) -> AdminVisualIntent.Warning
-        text.contains("cuenta", ignoreCase = true) || text.contains("rol", ignoreCase = true) || text.contains("víncul", ignoreCase = true) || text.contains("acceso", ignoreCase = true) -> AdminVisualIntent.Access
-        text.contains("activo", ignoreCase = true) || text.contains("publicable", ignoreCase = true) || text.contains("listo", ignoreCase = true) -> AdminVisualIntent.Success
-        else -> AdminVisualIntent.Info
+        text.contains("Auditor", ignoreCase = true) || text.contains("registro", ignoreCase = true) -> AdminHumanIntent.Audit
+        text.contains("Confirm", ignoreCase = true) || text.contains("sensible", ignoreCase = true) -> AdminHumanIntent.Confirm
+        text.contains("Impacto", ignoreCase = true) || text.contains("Emergencia", ignoreCase = true) -> AdminHumanIntent.Impact
+        text.contains("Revisar", ignoreCase = true) -> AdminHumanIntent.Preview
+        text.contains("Editar", ignoreCase = true) || text.contains("Ajustar", ignoreCase = true) -> AdminHumanIntent.Edit
+        text.contains("Problema", ignoreCase = true) || text.contains("bloque", ignoreCase = true) || text.contains("detenido", ignoreCase = true) -> AdminHumanIntent.Problem
+        text.contains("revisión", ignoreCase = true) || text.contains("pendiente", ignoreCase = true) || text.contains("incompleto", ignoreCase = true) -> AdminHumanIntent.Warning
+        text.contains("cuenta", ignoreCase = true) || text.contains("rol", ignoreCase = true) || text.contains("víncul", ignoreCase = true) || text.contains("acceso", ignoreCase = true) -> AdminHumanIntent.Access
+        text.contains("activo", ignoreCase = true) || text.contains("publicable", ignoreCase = true) || text.contains("listo", ignoreCase = true) -> AdminHumanIntent.Success
+        else -> AdminHumanIntent.Info
     }
 }
 
-private fun AdminVisualIntent.adminIntentColor(): Color =
+private fun AdminHumanIntent.adminIntentColor(): Color =
     when (this) {
-        AdminVisualIntent.Info -> PediloMuted
-        AdminVisualIntent.Success -> PediloGreen
-        AdminVisualIntent.Warning -> PediloWarning
-        AdminVisualIntent.Problem -> PediloPink
-        AdminVisualIntent.Emergency -> PediloWarning
-        AdminVisualIntent.Audit -> PediloPink
-        AdminVisualIntent.Edit -> PediloOrange
-        AdminVisualIntent.Preview -> PediloCyan
-        AdminVisualIntent.Impact -> PediloWarning
-        AdminVisualIntent.Confirm -> PediloOrange
-        AdminVisualIntent.Access -> PediloPink
+        AdminHumanIntent.Info -> PediloMuted
+        AdminHumanIntent.Success -> PediloGreen
+        AdminHumanIntent.Warning -> PediloWarning
+        AdminHumanIntent.Problem -> PediloPink
+        AdminHumanIntent.Emergency -> PediloWarning
+        AdminHumanIntent.Audit -> PediloPink
+        AdminHumanIntent.Edit -> PediloOrange
+        AdminHumanIntent.Preview -> PediloCyan
+        AdminHumanIntent.Impact -> PediloWarning
+        AdminHumanIntent.Confirm -> PediloOrange
+        AdminHumanIntent.Access -> PediloPink
     }
 
-private fun AdminVisualIntent.adminIntentLabel(): String =
+private fun AdminHumanIntent.adminIntentLabel(): String =
     when (this) {
-        AdminVisualIntent.Info -> "Lectura"
-        AdminVisualIntent.Success -> "Listo"
-        AdminVisualIntent.Warning -> "Revisar"
-        AdminVisualIntent.Problem -> "Bloqueo"
-        AdminVisualIntent.Emergency -> "Emergencia"
-        AdminVisualIntent.Audit -> "Auditoría"
-        AdminVisualIntent.Edit -> "Editable"
-        AdminVisualIntent.Preview -> "Vista previa"
-        AdminVisualIntent.Impact -> "Impacto"
-        AdminVisualIntent.Confirm -> "Confirmación"
-        AdminVisualIntent.Access -> "Acceso"
+        AdminHumanIntent.Info -> "Lectura"
+        AdminHumanIntent.Success -> "Listo"
+        AdminHumanIntent.Warning -> "Revisar"
+        AdminHumanIntent.Problem -> "Bloqueo"
+        AdminHumanIntent.Emergency -> "Emergencia"
+        AdminHumanIntent.Audit -> "Auditoría"
+        AdminHumanIntent.Edit -> "Editable"
+        AdminHumanIntent.Preview -> "Revisar"
+        AdminHumanIntent.Impact -> "Impacto"
+        AdminHumanIntent.Confirm -> "Confirmación"
+        AdminHumanIntent.Access -> "Acceso"
     }
 
 private fun AdminRoute.root(): AdminRoot = when (this) {
