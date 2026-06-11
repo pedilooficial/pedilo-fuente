@@ -44,7 +44,7 @@ internal val operationUniverses = listOf(
                     AdminOperationList("Preparando", "El local está preparando.", "Sin pedidos", AdminOperationListKind.ActivePreparing),
                     AdminOperationList("Buscando repartidor", "Listos para asignar o retirar.", "Sin pedidos", AdminOperationListKind.ActiveWaitingDriver),
                     AdminOperationList("En camino", "Ya están camino al destino.", "Sin pedidos", AdminOperationListKind.ActiveInDelivery),
-                    AdminOperationList("Revisar estado", "Activos sin una etapa explícita.", "Sin pedidos", AdminOperationListKind.ActiveReviewState),
+                    AdminOperationList("Revisar estado", "Activos con estado operativo incompleto.", "Sin pedidos", AdminOperationListKind.ActiveReviewState),
                 ),
             ),
             AdminOperationView(

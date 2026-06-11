@@ -76,7 +76,7 @@ private data class AdminIntentTone(
 )
 
 private val AdminOperationTone = AdminUniverseTone("Mesa viva", PediloOrange, PediloWarning, Icons.Outlined.Dashboard)
-private val AdminConfigurationTone = AdminUniverseTone("Preparación", PediloCyan, PediloOrange, Icons.Outlined.Settings)
+private val AdminConfigurationTone = AdminUniverseTone("Ajustes", PediloCyan, PediloOrange, Icons.Outlined.Settings)
 private val AdminRoleAccessTone = AdminUniverseTone("Accesos", PediloPink, PediloCyan, Icons.Outlined.AdminPanelSettings)
 
 @Composable
@@ -242,7 +242,7 @@ fun AdminBottomBar(
     ) {
         AdminBottomItem(AdminOperationTone.icon, "Operación", AdminOperationTone.primary, selected = current == AdminRoot.Operation, onClick = onOperation, modifier = Modifier.weight(1f))
         AdminBottomItem(AdminConfigurationTone.icon, "Configuración", AdminConfigurationTone.primary, selected = current == AdminRoot.Configuration, onClick = onConfiguration, modifier = Modifier.weight(1f))
-        AdminBottomItem(AdminRoleAccessTone.icon, "Alta de roles", AdminRoleAccessTone.primary, selected = current == AdminRoot.RoleAccess, onClick = onRoleAccess, modifier = Modifier.weight(1f))
+        AdminBottomItem(AdminRoleAccessTone.icon, "Equipo", AdminRoleAccessTone.primary, selected = current == AdminRoot.RoleAccess, onClick = onRoleAccess, modifier = Modifier.weight(1f))
     }
 }
 
@@ -319,11 +319,11 @@ private fun adminIntentToneFor(title: String, note: String): AdminIntentTone {
             AdminIntentTone("Auditoría", PediloPink, Icons.Outlined.History)
         text.contains("impacto", ignoreCase = true) || text.contains("emergencia", ignoreCase = true) || text.contains("sensible", ignoreCase = true) ->
             AdminIntentTone("Impacto", PediloWarning, Icons.Outlined.ReportProblem)
-        text.contains("bloque", ignoreCase = true) || text.contains("detenido", ignoreCase = true) || text.contains("inactivo", ignoreCase = true) ->
+        text.contains("paus", ignoreCase = true) || text.contains("detenido", ignoreCase = true) || text.contains("inactivo", ignoreCase = true) ->
             AdminIntentTone("Bloqueo", PediloPink, Icons.Outlined.Block)
-        text.contains("vista previa", ignoreCase = true) || text.contains("previsual", ignoreCase = true) ->
-            AdminIntentTone("Vista previa", PediloCyan, Icons.Outlined.Preview)
-        text.contains("edit", ignoreCase = true) || text.contains("borrador", ignoreCase = true) || text.contains("prepar", ignoreCase = true) ->
+        text.contains("revis", ignoreCase = true) ->
+            AdminIntentTone("Revisión", PediloCyan, Icons.Outlined.Preview)
+        text.contains("edit", ignoreCase = true) || text.contains("ajust", ignoreCase = true) ->
             AdminIntentTone("Editable", PediloOrange, Icons.Outlined.EditNote)
         text.contains("víncul", ignoreCase = true) || text.contains("vincul", ignoreCase = true) ->
             AdminIntentTone("Vínculo", PediloCyan, Icons.Outlined.Link)

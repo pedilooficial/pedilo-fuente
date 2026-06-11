@@ -28,7 +28,7 @@ function readVisibleAdminStrings() {
     .join("\n");
 }
 
-test("admin role opens visual admin shell instead of empty placeholder", () => {
+test("admin role opens human admin workspace", () => {
   const appSource = fs.readFileSync(app, "utf8");
   const adminSource = fs.readFileSync(admin, "utf8");
 
@@ -44,7 +44,7 @@ test("admin has separated root navigation and no public bottom labels", () => {
 
   assert.match(source, /Operation\("Operación"\)/);
   assert.match(source, /Configuration\("Configuración"\)/);
-  assert.match(source, /RoleAccess\("Alta de roles"\)/);
+  assert.match(source, /RoleAccess\("Equipo"\)/);
   assert.match(source, /AdminBottomBar/);
   assert.doesNotMatch(bottomBar, /"Inicio"|"\\+"|"Tienda"|"Casa"|"Salir de Pedilo"/);
   assert.match(bottomBar, /AdminOperationTone/);
@@ -54,7 +54,7 @@ test("admin has separated root navigation and no public bottom labels", () => {
   assert.match(bottomBar, /selected \|\| pressed/);
 });
 
-test("admin operation root exposes visual operation cards only", () => {
+test("admin operation root exposes human operation cards", () => {
   const source = readAdminSourceTree();
 
   [
@@ -130,7 +130,7 @@ test("admin operation internal screens expose planned operation subworlds", () =
   ].forEach((label) => assert.match(source, new RegExp(label)));
 });
 
-test("admin remaining operation roots use safe visual copy", () => {
+test("admin remaining operation roots use safe human copy", () => {
   const source = readAdminSourceTree();
 
   [
@@ -177,7 +177,7 @@ test("admin operation visible strings avoid internal architecture copy", () => {
     "Lecturas dinámicas",
     "El pedido no vive en una carpeta fija",
     "Datos operativos reales",
-    "Lectura preparada para datos operativos reales",
+    "Consulta de datos operativos reales",
     "Abrir listados filtrados",
     "Sin tensión operativa",
     "Dato pendiente",
@@ -264,10 +264,10 @@ test("admin configuration and role access roots expose their planned entries", (
     ["Público", "Locales", "Reparto", "Marketplace", "Pedidos", "Precios", "Cobros", "Mensajes", "Reglas", "Notificaciones", "Métricas", "Auditoría", "Emergencias", "General"],
   );
   assert.match(adminSource, /private val configurationEntries = configurationSections\.map/);
-  assert.match(adminSource, /AdminRoute\.ConfigurationSection\(configurationSections\.first \{ it\.title == entry\.title \}\)/);
+  assert.match(adminSource, /AdminRoute\.Configuration -> AdminRealConfigurationScreen/);
 });
 
-test("admin configuration exposes internal visual sections without operational mixing", () => {
+test("admin configuration exposes internal human sections without operational mixing", () => {
   const source = fs.readFileSync(admin, "utf8");
 
   [
@@ -281,7 +281,7 @@ test("admin configuration exposes internal visual sections without operational m
     "Catálogo del local",
     "Productos y variantes",
     "Listado de repartidores",
-    "Habilitación y bloqueos",
+    "Habilitación y accesos",
     "Cierre financiero",
     "Categorías",
     "Subcategorías",
@@ -320,10 +320,10 @@ test("admin configuration exposes internal visual sections without operational m
     "Estado global",
     "Preferencias administrativas",
     "Pendientes globales",
-    "Derivación al bloque dueño",
+    "Derivación al área responsable",
   ].forEach((label) => assert.match(source, new RegExp(label)));
 
-  assert.match(source, /AdminConfigurationHomeScreen/);
+  assert.match(source, /AdminRealConfigurationScreen/);
   assert.match(source, /LazyVerticalGrid/);
   assert.match(source, /GridCells\.Fixed\(2\)/);
   assert.match(source, /\.aspectRatio\(1f\)/);
@@ -335,35 +335,34 @@ test("admin configuration exposes internal visual sections without operational m
   assert.match(source, /AdminRoute\.ConfigurationSection/);
   assert.match(source, /AdminRoute\.ConfigurationSubsection/);
   assert.match(source, /AdminRoute\.ConfigurationConvergence/);
+  assert.match(source, /is AdminRoute\.ConfigurationSection,[\s\S]*AdminRealConfigurationScreen/);
   assert.match(
     source,
-    /AdminRoute\.Configuration -> AdminConfigurationHomeScreen/,
+    /AdminRoute\.Configuration -> AdminRealConfigurationScreen/,
   );
 });
 
-test("admin configuration convergence flow is available and remains visual only", () => {
+test("admin configuration root is a real persisted control surface", () => {
   const source = fs.readFileSync(admin, "utf8");
-  const configurationFlow = source.slice(
-    source.indexOf("private fun AdminConfigurationConvergenceScreen"),
-    source.indexOf("private fun AdminOrderDetailScreen"),
+  const configurationScreen = source.slice(
+    source.indexOf("private fun AdminRealConfigurationScreen"),
+    source.indexOf("private fun AdminRealRoleAccessScreen"),
   );
+
   [
-    "Detalle de configuración",
-    "Preparar cambio",
-    "Previsualización",
-    "Impacto",
-    "Confirmación sensible",
-    "Resultado",
-    "Auditoría visual",
-    "El cambio permanece sin confirmar",
+    "Configuración",
+    "Controles de operación",
+    "maintenanceMode",
+    "rainMode",
+    "saturationMode",
+    "emergencyMode",
+    "publicOrderingEnabled",
   ].forEach((label) => assert.match(source, new RegExp(label)));
 
-  assert.match(source, /AdminConfigurationConvergenceScreen/);
-  assert.match(source, /AdminConfigurationConvergenceStep/);
-  assert.match(source, /onConfigurationConvergence/);
-  assert.match(source, /current\.section\.title == "Auditoría"[\s\S]*AdminConfigurationConvergenceStep\.Audit/);
-  assert.match(configurationFlow, /AdminConfigurationConvergenceStep\.Audit -> "Consulta de trazabilidad sin edición\."/);
-  assert.doesNotMatch(configurationFlow, /No se aplicaron cambios reales|Entidad configurable|Preview y revisión/);
+  assert.match(configurationScreen, /onToggle/);
+  assert.match(configurationScreen, /Guardado/);
+  assert.match(configurationScreen, /Error/);
+  assert.doesNotMatch(configurationScreen, /sin guardar datos reales|Confirmar de forma visual|El cambio permanece sin confirmar|guardar borrador visual|confirmar visualmente|herramienta visual/);
 });
 
 test("admin configuration keeps specialized roots within their final responsibilities", () => {
@@ -393,7 +392,7 @@ test("admin configuration keeps specialized roots within their final responsibil
   assert.doesNotMatch(general, /Catálogo del local|Precios comerciales|Formas de pago|Mensajes por estado|Eventos notificables|Registro de cambios|Modo seguro/);
 });
 
-test("admin public configuration closes public worlds with layered visual editor", () => {
+test("admin public configuration keeps inactive content clearly informational", () => {
   const source = fs.readFileSync(admin, "utf8");
   const publicHome = source.slice(
     source.indexOf("private val publicWorldEntries"),
@@ -415,7 +414,7 @@ test("admin public configuration closes public worlds with layered visual editor
     "Ofertas",
     "Nuevos locales",
     "Buscador / tags",
-    "Vista previa del Home",
+    "Revisar Home",
     "Pantalla inicial",
     "Retiro / Envío",
     "Confirmación",
@@ -432,27 +431,28 @@ test("admin public configuration closes public worlds with layered visual editor
   assert.match(source, /data class ConfigurationPublicWorld/);
   assert.match(source, /data class ConfigurationPublicWorldPart/);
   assert.match(source, /data class ConfigurationPublicWorldEditor/);
-  assert.match(source, /is AdminRoute\.ConfigurationPublicWorld -> AdminPublicWorldScreen/);
-  assert.match(source, /is AdminRoute\.ConfigurationPublicWorldPart -> AdminPublicWorldPartScreen/);
-  assert.match(source, /is AdminRoute\.ConfigurationPublicWorldEditor -> AdminPublicHomeEditorScreen/);
+  assert.match(source, /is AdminRoute\.ConfigurationPublicWorld,[\s\S]*AdminRealConfigurationScreen/);
+  assert.doesNotMatch(source, /is AdminRoute\.ConfigurationPublicWorld -> AdminPublicWorldScreen/);
+  assert.doesNotMatch(source, /is AdminRoute\.ConfigurationPublicWorldPart -> AdminPublicWorldPartScreen/);
+  assert.doesNotMatch(source, /is AdminRoute\.ConfigurationPublicWorldEditor -> AdminPublicHomeEditorScreen/);
   assert.match(source, /AdminPublicHomeEditorStep\.Detail -> AdminRoute\.ConfigurationPublicWorldPart/);
   assert.match(source, /is AdminRoute\.ConfigurationPublicWorldPart -> AdminRoute\.ConfigurationPublicWorld/);
   assert.match(publicScreens, /AdminConfigurationGridScreen/);
-  assert.match(publicScreens, /Guardar borrador visual/);
+  assert.match(publicScreens, /Guardar revisión/);
   assert.match(publicScreens, /Valor actual/);
   assert.match(publicScreens, /Nuevo valor/);
-  assert.match(publicScreens, /Vista previa/);
-  assert.match(publicScreens, /Impacto visible/);
-  assert.match(publicScreens, /Confirmar visualmente/);
-  assert.match(publicScreens, /Auditoría visual/);
-  assert.match(publicScreens, /No crea pedidos reales ni cambia pagos/);
-  assert.match(publicScreens, /No crea locales ni edita productos/);
-  assert.match(publicScreens, /usuario público real permanece sin cambios/);
+  assert.match(publicScreens, /Revisar/);
+  assert.match(publicScreens, /Impacto/);
+  assert.match(publicScreens, /Confirmar revisión/);
+  assert.match(publicScreens, /Auditoría/);
+  assert.match(publicScreens, /No genera pedidos ni cambia pagos/);
+  assert.match(publicScreens, /No da de alta locales ni edita productos/);
+  assert.match(publicScreens, /El público no cambia desde esta pantalla/);
   assert.doesNotMatch(source, /Botón \+/);
   assert.doesNotMatch(publicScreens, /Firebase|Functions|Rules|backend|mock|demo|placeholder/i);
 });
 
-test("admin role access exposes internal visual sections without touching real users", () => {
+test("admin role access exposes team sections without unsafe account creation", () => {
   const source = fs.readFileSync(admin, "utf8");
   [
     "Usuarios del equipo",
@@ -469,16 +469,16 @@ test("admin role access exposes internal visual sections without touching real u
     "Estado de acceso",
     "Vínculos operativos",
     "Cuentas Admin",
-    "Preparar alta Admin",
+    "Crear Admin",
     "Nivel de sensibilidad",
     "Permisos visibles",
     "Cuentas Local",
-    "Preparar alta Local",
+    "Crear Local",
     "Local vinculado",
     "Vinculación pendiente",
     "Revisión de cuenta",
     "Cuentas Repartidor",
-    "Preparar alta Repartidor",
+    "Crear Repartidor",
     "Repartidor vinculado",
     "Cuentas por revisar",
     "Rol previsto",
@@ -486,7 +486,7 @@ test("admin role access exposes internal visual sections without touching real u
     "Estado pendiente",
     "Revisión antes de activar",
     "Cuentas inactivas",
-    "Acceso detenido",
+    "Acceso pausado",
     "Motivo visible",
     "Revisión pendiente",
     "Posible reactivación",
@@ -497,8 +497,8 @@ test("admin role access exposes internal visual sections without touching real u
     "Revisión de vínculo",
     "Cambios de rol",
     "Activaciones",
-    "Bloqueos",
-    "Desbloqueos",
+    "Pausas de acceso",
+    "Reactivaciones",
     "Vinculaciones",
   ].forEach((label) => assert.match(source, new RegExp(label)));
 
@@ -506,33 +506,33 @@ test("admin role access exposes internal visual sections without touching real u
   assert.match(source, /AdminRoute\.RoleAccessSection/);
   assert.match(source, /AdminRoute\.RoleAccessSubsection/);
   assert.match(source, /AdminRoute\.RoleAccessConvergence/);
-  assert.match(source, /AdminRoute\.RoleAccess -> AdminRootScreen[\s\S]*showSignOut = false/);
+  assert.match(source, /is AdminRoute\.RoleAccessSection,[\s\S]*AdminRealRoleAccessScreen/);
+  assert.match(source, /AdminRoute\.RoleAccess -> AdminRealRoleAccessScreen/);
 });
 
-test("admin role access convergence flow is available and restricted to visual mode", () => {
+test("admin role access root persists existing users and blocks undefined account creation", () => {
   const source = fs.readFileSync(admin, "utf8");
+  const roleScreen = source.slice(
+    source.indexOf("private fun AdminRealRoleAccessScreen"),
+    source.indexOf("private data class AdminRealConfigItem"),
+  );
+
   [
-    "Cuenta concreta",
-    "Alta de cuenta",
-    "Editor de acceso",
-    "Cambio de rol",
-    "Activar o desactivar",
-    "Vincular entidad",
-    "Impacto",
-    "Confirmación sensible",
-    "Resultado",
-    "Auditoría de accesos",
-    "No se aplicaron cambios reales",
-    "Admin · Local · Repartidor",
+    "Equipo",
+    "Gestiona cuentas existentes del equipo",
+    "Crear cuentas nuevas no está disponible",
+    "Activar acceso",
+    "Desactivar acceso",
+    "Admin",
+    "Local",
+    "Repartidor",
   ].forEach((label) => assert.match(source, new RegExp(label)));
 
-  assert.match(source, /AdminRoleAccessConvergenceScreen/);
-  assert.match(source, /AdminRoleAccessConvergenceStep/);
-  assert.match(source, /onRoleAccessConvergence/);
-  assert.match(source, /isAccessAudit = panelTitle == "Auditoría de accesos"/);
-  assert.match(source, /AdminRoleAccessConvergenceStep\.Audit -> AdminRoleAccessConvergenceStep\.Audit/);
-  assert.match(source, /Detalle de registro", "Consulta de accesos sin edición"/);
-  assert.doesNotMatch(source, /supervisor|soporte|cajero|operador|owner|manager/);
+  assert.match(roleScreen, /onToggleActive/);
+  assert.match(roleScreen, /onRole/);
+  assert.match(roleScreen, /Guardado/);
+  assert.match(roleScreen, /Error/);
+  assert.doesNotMatch(roleScreen, /No se aplicaron cambios reales|Confirmar de forma visual|guardar borrador visual|confirmar visualmente|herramienta visual|preparada|Alta de roles|ruta heredada/);
 });
 
 test("admin order detail exposes Pedido #____ read-only ficha with real-data fallbacks", () => {
@@ -551,7 +551,7 @@ test("admin order detail exposes Pedido #____ read-only ficha with real-data fal
     "Estado actual",
     "Situación",
     "Local / origen",
-    "Origen técnico",
+    "Origen del pedido",
     "Pedido de local",
     "Retirar en local",
     "Qué hay que hacer",
@@ -617,14 +617,14 @@ test("admin operation uses real icons chips and tactile feedback", () => {
   assert.match(source, /MutableInteractionSource/);
   assert.match(source, /collectIsPressedAsState/);
   assert.match(source, /AdminStatusChip/);
-  assert.match(source, /AdminVisualIntent/);
+  assert.match(source, /AdminHumanIntent/);
   assert.match(source, /adminIntentColor/);
   assert.match(source, /adminIntentLabel/);
   assert.match(components, /AdminIntentTone/);
   assert.match(components, /AdminIntentChip/);
   assert.match(components, /adminUniverseToneFor/);
   assert.match(components, /Mesa viva/);
-  assert.match(components, /Preparación/);
+  assert.match(components, /Ajustes/);
   assert.match(components, /Accesos/);
   assert.match(source, /Buscando repartidor/);
   assert.match(source, /En camino/);
@@ -634,18 +634,18 @@ test("admin operation uses real icons chips and tactile feedback", () => {
   assert.doesNotMatch(source, /Aún no hay información real|Sin acciones disponibles por ahora|Pedido read-only/);
 });
 
-test("admin visual polish separates universe tones and action intentions", () => {
+test("admin UI polish separates universe tones and action intentions", () => {
   const source = readAdminSourceTree();
   const components = fs.readFileSync("app/src/main/java/com/pedilo/app/ui/admin/components/AdminComponents.kt", "utf8");
 
   [
     "Mesa viva",
-    "Preparación",
+    "Ajustes",
     "Accesos",
     "Auditoría",
     "Impacto",
     "Editable",
-    "Vista previa",
+    "Revisar",
     "Confirmación",
     "Bloqueo",
     "Listo",
@@ -655,12 +655,12 @@ test("admin visual polish separates universe tones and action intentions", () =>
   assert.match(components, /Brush\.linearGradient/);
   assert.match(components, /AdminEntryCard[\s\S]*AdminIntentChip/);
   assert.match(components, /AdminInfoPanel[\s\S]*adminIntentToneFor/);
-  assert.match(source, /AdminConfigurationRootCard[\s\S]*adminVisualIntentFor/);
+  assert.match(source, /AdminConfigurationRootCard[\s\S]*adminHumanIntentFor/);
   assert.match(source, /AdminActionCard[\s\S]*collectIsPressedAsState/);
-  assert.doesNotMatch(source, /Subsección de acceso lista|Sección preparada/);
+  assert.doesNotMatch(source, /Subsección de acceso lista|Sección preparada|guardar borrador visual|confirmar visualmente|herramienta visual|maqueta|prototipo/);
 });
 
-test("admin order detail keeps shell rules and visual entry paths", () => {
+test("admin order detail keeps safe rules and entry paths", () => {
   const source = readAdminSourceTree();
   const forbiddenReturnLabels = [`Volv${"er"}`, `Atr${"ás"}`];
 
@@ -758,15 +758,18 @@ test("admin operation universe avoids explanatory mockup panels", () => {
   assert.doesNotMatch(source, /Elegí qué parte de los pedidos/);
 });
 
-test("admin visual shell keeps non-operational actions and avoids writes", () => {
+test("admin shell keeps non-order actions safe and avoids direct order writes", () => {
   const source = readAdminSourceTree();
   const oldCopy = [
     `Sin datos conect${"ados"}`,
     `Estructura visual fut${"ura"}`,
     `Acceso visual fut${"uro"}`,
+    `guardar borrador visual`,
+    `confirmar visualmente`,
+    `herramienta visual`,
   ];
 
-  assert.doesNotMatch(source, /set\(|add\(|update\(|delete\(|runTransaction|writeBatch|createLocalOrder|createPlusOrder|getPublicOrderTracking|payments|WhatsApp|whatsapp|driverId/);
+  assert.doesNotMatch(source, /runTransaction|writeBatch|createLocalOrder|createPlusOrder|getPublicOrderTracking|payments|WhatsApp|whatsapp/);
   assert.doesNotMatch(source, /reasignar|desactivar usuario|editar perfil|editar local|cargar catálogo/);
   oldCopy.forEach((text) => assert.doesNotMatch(source, new RegExp(text)));
   assert.match(source, /"¿Querés cerrar sesión\?"/);
