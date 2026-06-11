@@ -53,6 +53,21 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
       allow create, update, delete: if isAdmin();
+
+      match /access_events/{eventId} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
+    }
+
+    match /admin_config/{configId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+
+      match /events/{eventId} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
     }
 
     match /stores/{storeId} {

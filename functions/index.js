@@ -713,6 +713,7 @@ exports.getOperationalHealth = onCall({region: REGION}, async (request) => {
   });
 });
 
+
 exports.operateLiveOrder = onCall({region: REGION}, async (request) => {
   const actor = await requireOperationalActor(request);
   const clean = cleanLiveActionPayload(request.data || {}, actor.uid);
@@ -849,6 +850,89 @@ exports.operateLiveOrder = onCall({region: REGION}, async (request) => {
 
     return result;
   });
+});
+
+exports.adminUpdateTeamUser = onCall({region: REGION}, async (request) => {
+  const actor = await requireAdminActor(request);
+  const payload = request.data || {};
+  const uid = cleanText(payload.uid);
+  const role = cleanText(payload.role).toLowerCase();
+  const hasActive = typeof payload.active === "boolean";
+
+  if (!isSafeDocumentId(uid)) {
+    throw new HttpsError("invalid-argument", "Elegí una cuenta válida.");
+  }
+  if (role && !OPERATIONAL_ROLES.includes(role)) {
+    throw new HttpsError("invalid-argument", "Elegí un rol operativo válido.");
+  }
+  if (!role && !hasActive) {
+    throw new HttpsError("invalid-argument", "No hay cambios de acceso para guardar.");
+  }
+
+  const userRef = db.collection("users").doc(uid);
+  const auditRef = userRef.collection("access_events").doc();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const patch = {updatedAt: now, updatedBy: actor.uid};
+  if (role) patch.role = role;
+  if (hasActive) patch.active = payload.active;
+
+  await db.runTransaction(async (tx) => {
+    const current = await tx.get(userRef);
+    if (!current.exists) {
+      throw new HttpsError("not-found", "La cuenta no existe en /users.");
+    }
+    tx.update(userRef, patch);
+    tx.set(auditRef, {
+      type: "admin_team_access_update",
+      actorUid: actor.uid,
+      actorRole: actor.role,
+      targetUid: uid,
+      previousRole: cleanText(current.get("role")),
+      nextRole: role || cleanText(current.get("role")),
+      previousActive: current.get("active") === true,
+      nextActive: hasActive ? payload.active : current.get("active") === true,
+      summary: "Admin actualizó acceso de equipo.",
+      createdAt: now,
+    });
+  });
+
+  return {uid, message: "Acceso actualizado y auditado."};
+});
+
+exports.adminUpdateConfig = onCall({region: REGION}, async (request) => {
+  const actor = await requireAdminActor(request);
+  const field = cleanText(request.data && request.data.field);
+  const enabled = request.data && request.data.enabled;
+  const allowed = ["maintenanceMode", "rainMode", "saturationMode", "emergencyMode", "publicOrderingEnabled"];
+
+  if (!allowed.includes(field) || typeof enabled !== "boolean") {
+    throw new HttpsError("invalid-argument", "Elegí una configuración válida.");
+  }
+
+  const configRef = db.collection("admin_config").doc("real_use");
+  const auditRef = configRef.collection("events").doc();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  await db.runTransaction(async (tx) => {
+    const current = await tx.get(configRef);
+    tx.set(configRef, {
+      [field]: enabled,
+      updatedAt: now,
+      updatedBy: actor.uid,
+    }, {merge: true});
+    tx.set(auditRef, {
+      type: "admin_config_update",
+      actorUid: actor.uid,
+      actorRole: actor.role,
+      field,
+      previousValue: current.exists ? current.get(field) === true : null,
+      nextValue: enabled,
+      summary: "Admin actualizó configuración operativa.",
+      createdAt: now,
+    });
+  });
+
+  return {field, enabled, message: "Configuración actualizada y auditada."};
 });
 
 async function requireAdminActor(request) {

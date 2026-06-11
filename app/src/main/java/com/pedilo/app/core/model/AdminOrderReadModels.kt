@@ -252,3 +252,40 @@ data class AdminAuditSummary(
     val exposesPublicAudit: Boolean = false,
     val correctiveActionsExecuted: Boolean = false,
 )
+
+data class AdminTeamUser(
+    val uid: String,
+    val email: String,
+    val displayName: String,
+    val role: String,
+    val active: Boolean,
+    val storeId: String = "",
+    val driverId: String = "",
+    val updatedAtMillis: Long? = null,
+)
+
+data class AdminConfigState(
+    val id: String = "real_use",
+    val maintenanceMode: Boolean = false,
+    val rainMode: Boolean = false,
+    val saturationMode: Boolean = false,
+    val emergencyMode: Boolean = false,
+    val publicOrderingEnabled: Boolean = true,
+    val lastUpdatedBy: String = "",
+    val updatedAtMillis: Long? = null,
+)
+
+data class AdminConfigUpdateRequest(
+    val field: String,
+    val enabled: Boolean,
+)
+
+data class AdminRoleUpdateRequest(
+    val uid: String,
+    val role: String? = null,
+    val active: Boolean? = null,
+)
+
+data class AdminMutationResult(
+    val message: String,
+)
